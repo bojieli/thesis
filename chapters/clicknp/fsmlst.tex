@@ -1,0 +1,37 @@
+\begin{lstlisting}[escapechar=@]
+.handler {
+ ...
+ .state_machine
+ {
+  begin { // ethernet
+   ...
+   if(etype==0x8100)
+    .goto_state VLAN;
+   else 
+   if(etype==0x0800)
+    .goto_state IPv4;
+   else
+    .goto_state end;
+  }
+  VLAN {
+    ...
+    if(etype==0x0800)
+     .goto_state IPv4;
+    else
+     .goto_state end;
+  }
+  IPv4 {
+    ...
+    if(proto==0x2F)
+     .goto_state GRE;
+    else
+     .goto_state end;
+  }
+  GRE {
+   .goto_state end;
+  }
+ }  
+...
+}
+
+\end{lstlisting} 

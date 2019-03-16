@@ -1,0 +1,204 @@
+%!TEX root=main.tex
+\section{Introduction}
+
+% cloud computing
+Modern multi-tenant datacenters provide shared infrastructure for hosting many different types of services 
+from different customers (\ie, tenants) at a low cost.
+%
+To ensure security and performance isolation, each tenant is deployed in a \textit{virtualized network} environment. 
+% flexible network functions
+Flexible network functions (NFs) are required for datacenter operators to enforce isolation 
+while simultaneously guaranteeing Service Level Agreements (SLAs). 
+
+% host networking and software network functions
+Conventional hardware-based network appliances are not flexible, 
+and almost all existing cloud providers, \eg, Microsoft, Amazon and VMWare,
+have been deploying software-based NFs on servers to
+maximize the flexibility~\cite{albert-ons, vmware-multi-tenancy}.
+%
+%have implemented \textit{virtualized} network functions in hypervisor software on every server to maximize the flexibility, 
+%ranging from tunning, load balancing, traffic shaping, and security (\eg, firewall)~\cite{albert-ons, vmware-multi-tenancy}. 
+% note: we may need to add citation to AWS later
+% limitation of software network functions
+However, software NFs have two fundamental limitations -- both stem 
+from the nature of software packet processing.   
+% capacity
+First, processing packets in software has limited capacity. 
+% 
+Existing software NFs usually require multiple cores to achieve 10~Gbps rate~\cite{comb, martins2014clickos}. 
+But the latest network links have scaled up to 40\approx100~Gbps~\cite{mellanox-100g}. 
+Although one could add more cores in a server, doing so adds significant cost,  
+not only in terms of capital expense, but also more operational expense as they are burning significantly more energy. 
+%
+Second, processing packets in software incurs large, and highly variable latency. This latency may range 
+from tens of microsecond to milliseconds~\cite{martins2014clickos, ananta, duet}. 
+For many low latency applications (\eg, stock trading), this inflated latency is unacceptable. 
+
+% hardware accelerating
+To overcome the limitations of software packet processing while retaining flexibility,
+recent work has proposed accelerating NFs using  
+Graphics Processing Units (GPUs)~\cite{packetshader}, network processors (NPs)~\cite{cavium, netronome},
+or reconfigurable hardware (\ie, Field Programmable Gate Arrays, or FPGAs)~\cite{netfpga, smartnic, rubow2010chimpp}.
+% brief comparisons
+Compared to GPU, FPGA is more power-efficient~\cite{fpga-vs-gpu,fpga-vs-gpu2}. 
+Compared to specialized NPs, FPGA is more \textit{versatile} 
+as it can be virtually reconfigured with any hardware logic for any service.
+Finally, FPGAs are inexpensive and being deployed at scale in datacenters~\cite{smartnic, putnam2014reconfigurable}.
+
+% turning directly to FPGA and its main challenge
+In this work, we explore the opportunity to use FPGA to accelerate software NFs in datacenters.
+The main challenge to use FPGA as an accelerator is \textit{programmability}. 
+% HDL
+Conventionally, FPGAs are programmed with hardware description 
+languages (HDLs), such as Verilog and VHDL, which expose only low
+level building blocks like gates, registers, multiplexers and clocks. 
+While the programmer can manually tune the logic to achieve maximum performance,
+the programming complexity is huge, resulting in low productivity and debugging
+difficulties.
+%
+Indeed, the lack of programmability of FPGA has kept the large community 
+of software programmers away from this technology for years~\cite{bacon2013fpga}. 
+
+This paper presents \name, an FPGA-accelerated platform for 
+highly flexible and high-performance NF processing 
+on commodity servers. 
+%
+\name\ addresses the programming challenges of FPGA in three steps.
+% programming model
+First, \name\ provides a modular architecture, resembling the well-known 
+Click model~\cite{kohler2000click}, where a complex network function is 
+composed using simple, well-defined elements
+\footnote{This is also where our system name, \textit{Click Network Processor}, comes from.}.  
+% HLS
+Second, \name\ elements are written with a high-level C-like language
+ and are cross-platform. 
+\name\ elements can be compiled into binaries on CPU or 
+low-level hardware description language (HDL) for FPGAs, by
+leveraging commercial high-level synthesis (HLS) tools~\cite{vivado, aoc, sdaccel}. 
+%
+% PCIE I/O, compute partitioning, and debugging
+Finally, we develop a high-performance PCIE I/O channel that provides 
+high-throughput and low latency communications between elements running on CPU 
+and FPGA.
+This PCIE I/O channel not only enables joint CPU-FPGA processing -- allowing programmers to 
+partition their processing freely, but also is of great help for debugging, 
+as a programmer may easily run an element in question on the host 
+and use familiar software tools to diagnose. 
+
+%While similar approaches have been tried before, \name\
+%achieves more than two orders of magnitude performance improvements compared to previous work~\cite{Click2NetFPGA}.
+% optimization of FPGA programming and performance
+\name\ employs a set of optimization techniques to effectively utilize 
+the massive parallelisms in FPGA. 
+%while completely programming in high-level language. 
+% divide and conque
+First of all, \name\ organizes each element into a logic block in FPGA and 
+connects them with first-in-first-out (FIFO) buffers.
+Therefore, all these element blocks can run in full parallel.
+% minimize the dependency
+For each element, the processing function is carefully written to minimize the dependency among 
+operations, which allows the HLS tools to generate maximum parallel logics.
+Further, we develop \textit{delayed write} and \textit{memory scattering} techniques to address
+the read-write dependency and pseudo-memory dependency, which cannot be resolved by existing HLS tools.
+% memory
+Finally, we carefully balance the operations in different stages and match their processing speed, 
+so that the overall throughput of pipelines is maximized. 
+% results
+With all these optimizations, \name\ achieves high packet processing throughput 
+up to 200 million packets per second~\footnote{The actual throughput of a \name\ NF may be bound by the Ethernet port data rate.}, with ultra-low latency ($< 2\mu$s for any packet size in most applications).
+% summarize the comparison of results
+This is about a 10x and 2.5x throughput gain, compared to state-of-the-art software NFs on CPU and CPU with GPU acceleration~\cite{packetshader}, 
+while reducing the latency by 10x and 100x, respectively.
+
+% implementation
+We have implemented the \name\ tool-chain, which can integrate with various commercial HLS tools~\cite{vivado, aoc}. 
+%including Altera OpenCL SDK, Xilinx Vivado and SDAccel. 
+% elements
+We have implemented about 100 common elements, 20\% of which are re-factored straightforwardly from Click. 
+We use these elements to build five demonstration NFs: 
+(1) a high-speed traffic capture and generator, 
+(2) a firewall supporting both exact and wildcard matching, 
+(3) an IPSec gateway,
+(4) a Layer-4 load balancer that can handle 32 million concurrent flows, 
+and (5) a pFabric scheduler~\cite{pfabric} that performs strict priority flow scheduling with 4-giga priority classes.
+%
+We evaluate these network functions on a testbed with 
+Dell servers and Altera Stratix V FPGA boards~\cite{putnam2014reconfigurable}.
+Our results show that all of these NFs can be greatly accelerated by FPGA and saturate the line rate of 40Gbps at 
+any packet size with very low latency and neglectable CPU overhead.  
+
+In summary, the contributions of this paper are: 
+(1) the design and implementation of \name\ language and tool-chain; 
+(2) the design and implementation of high-performance packet processing modules that are running efficiently on FPGA; 
+(3) the design and evaluation of five FPGA-accelerated NFs. 
+To the best of our knowledge, \name\ is the first FPGA-accelerated packet processing platform for general network functions, 
+written completely in high-level language and achieving a 40~Gbps line rate.
+
+\egg{
+\smalltitle{Roadmap.} The roadmap of the paper is as follows: \S\ref{clicknp:sec:background} discuss the background.
+\S\ref{clicknp:sec:architecture} presents the \name\ architecture and design. 
+Our optimizations for FPGA is explained in \S\ref{clicknp:sec:optimization}.
+\S\ref{clicknp:sec:impl} presents the implementation details and \name\ NFs are discribed in \S\ref{clicknp:sec:application}.
+We evaluate \name\ in \S\ref{clicknp:sec:eval}.
+Related work is discussed in \S\ref{clicknp:sec:related} and 
+we conclude in \S\ref{clicknp:sec:conclusion} .
+}
+
+\egg{
+\separate{outline}
+
+The flow: 
+
+Cloud services demand more and more capability. Trend in networking technologies: 40G \arrow 100G~\cite{mellanox-100g}.
+
+Multi-tenancy cloud pushes the network edge/functions to end host~\cite{albert-ons, vmware-multi-tenancy}
+
+Implementing network functions in software (or network function virtualization). Downsides: 1) performance (throughput and latency); and 2) cost (count \# of CPU in use). 
+
+What are the network functions in mind?
+\begin{itemize}
+\item tunning
+\item traffic shaping (rate limiters, load balancer)
+\item security (firewall, crypto)
+\item management and monitoring
+\end{itemize}•
+
+
+Hardware acceleration is needed. 1) GPU ~\cite{packetshader}; 2) FPGA \cite{netfpga, lockwood2007netfpga} \cite{smartnic}
+We also need to mention FPGA is cost efficient~\cite{putnam2014reconfigurable}.
+
+However, the programmability of FPGA is low. High-level Synthesizer could help. ~\cite{bacon2013fpga, feist2012vivado, auerbach2010lime, czajkowski2012opencl, Click2NetFPGA}. 
+But these tools are either hard to use for software programmer, or do not have a right interface for network processing.
+
+Why not just use OpenCL?
+\begin{itemize}
+\item OpenCL is originally designed to allow host program to execute a function (called kernel) on the accelerating devices.
+\item With pipe object OpenCL can be used for streaming processing of packet flows, but very cumbersome, requiring manually allocating, distributing and deallocating pipe objects.
+\item Code-reuse.  Hard to reuse code.
+\end{itemize}•
+
+Programming abstraction: Click model. Familiar, well modeling the packet processing flow.
+Key features:
+\begin{itemize}
+\item elements can be executed in both CPU or FPGA. good for debugging.
+
+\end{itemize}•
+
+
+Key optimizations in FPGA:
+\begin{itemize}
+\item memory dependency avoidance. 1) buffer registers; 2) memory stripping; 3) dependency among processing pipelines (?) 
+\item Unroll and code expansion. We need maximal iteration loop. (indeterminate, dynamically determined). 
+\item Explicit pipelining (control the size of combination logic)
+\end{itemize}•
+
+
+Host library.
+
+CommandHUB (hierarchical cmdhub).
+
+PCIE I/O channels
+Batching / Polling / Interrupt / sharing PCIE 
+
+The rest of this paper is organized as follows. Section \ref{clicknp:sec:background} walks through network processor architectures and programming challenges of FPGA, then propose design goals of ClickNP. Section \ref{clicknp:sec:architecture} illustrates the FPGA hardware platform we work on, and provides an overview of the ClickNP toolchain. In addition to programming abstractions for writing elements in OpenCL (section \ref{clicknp:sec:language}), we have also built a library of generic elements (section \ref{clicknp:sec:elements}) including basic connectors, packet parsers, lookup tables, packet modifications and traffic schedulers, which can be linked as a data flow graph using Click-like syntax to perform comprehensive network functions. We evaluate our work via several high performance network applications (section \ref{clicknp:sec:impl_eval}) built with ClickNP framework. Finally we discuss future works (section \ref{clicknp:sec:future}) and conclude (section \ref{clicknp:sec:conclusion}).
+}

@@ -1,0 +1,48 @@
+\newcommand{\knote}[1]
+{{$\langle${Kun: \textbf{#1}}$\rangle$}}
+\newcommand{\kfnote}[1] {\footnote{\textcolor{red}{Kun: \it{#1}}}}
+\newcommand{\todo}[1] {\textcolor{red}{To do: \it{#1}}}
+\newcommand{\remove}[1] {{\textcolor{red}{\sout{#1}}}}
+\newcommand{\add}[1] {{\textcolor{red}{\underline{#1}}}}
+\newcommand{\egg}[1] {}
+\newcommand{\separate}[1] {\textbf{\center ======  #1  ====== }}
+\newcommand{\smalltitle}[1] {\vspace{6pt} \noindent \textbf{#1}}
+
+\def\ie{\textit{i.e.}\xspace}
+\def\etal{\textit{et al.}\xspace}
+\def\etc{\textit{etc.}\xspace}
+\def\eg{\textit{e.g.}\xspace}
+\def\st{\xspace\textbf{s.t.}\xspace}
+\def\whp{{\emph{w.h.p}}}
+\def\cname{FICA \xspace}
+\def\802{IEEE 802.11\xspace}
+\def\arrow{$\rightarrow$}
+\def\mrts{\textit{M-RTS}\xspace}
+\def\mrtss{\textit{M-RTSes}\xspace}
+\def\mcts{\textit{M-CTS}\xspace}
+\def\mctss{\textit{M-CTSes}\xspace}
+\def\approx{$\sim$}
+
+\def\receivers{\textbf Q}
+\def\capacity{{ \textbf{c}}}
+\def\upperBound{{\mathcal D}}
+\def\schedule{{\mathcal S}}
+\def\throughput{{\cal T}}
+\def\period{{\textbf Z}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{axiom}[theorem]{Axiom}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{definition}{Definition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\prob}[1]{{\textbf{Pr}\left(#1\right)}}
+\newcommand{\mcell}[2]{ \parbox[h]{#1}{ \vspace{0.5mm} #2 \vspace{0.5mm}}}
+
+%\renewcommand\scriptsize{\@setfontsize\scriptsize\@viipt{9\p@}}
+%\def\appsize{\@setsize\scriptsize{9\p@}\viipt\@viipt}
+
+\lstdefinestyle{numbers} {numbers=left, stepnumber=1,
+numberstyle=\tiny, xleftmargin=10pt, numbersep=5pt}
+\lstset{language=C++}

@@ -1,0 +1,27 @@
+%!TEX root=main.tex
+\section{Conclusion}
+\label{clicknp:sec:conclusion}
+
+% compile time?
+
+This paper presents \name, an FPGA-accelerated platform for highly flexible 
+and high-performance NFs in commodity servers.
+\name\ is completely programmable using high-level language and provides a 
+modular architecture familiar to software programmers in the networking field.
+\name\ supports joint CPU/FPGA packet processing and has high performance.
+Our evaluations show that \name\ improves the throughput of NFs by 10x compared to
+state-of-the-art software NFs, while alos reducing latency by 10x.
+%
+Our work makes a concrete case showing FPGA is capable for accelerating NFs in datacenters.
+Also, we demonstrate that high-level programming for FPGA is actually feasible and practical. 
+%
+One limitation of FPGA programming, however, is that the compilation time is rather long, \eg, 1\approx 2 hours, largely
+due to HDL synthesis tools.
+% cross platform
+\name\ alleviates this pain with its cross-platform ability, and hopes most bugs 
+could be detected by running elements on CPU.
+However, in the long term, HDL synthesis tools should be optimized to greatly 
+shorten their compilation time.
+
+
+

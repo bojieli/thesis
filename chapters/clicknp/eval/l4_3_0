@@ -1,0 +1,4 @@
+Name                New Flow/s lat(not overload)    lat(overload)
+ClickNP             9.61M      4.53(4.52-4.54)      46.515(31.94-64.89)
+ClickNP unoptimized 230K       8.29(7.92-8.92)      3246(3229-3263)
+Linux ipvsadm       78K        124.55(83.83-165.91) 526310(68302-721391)

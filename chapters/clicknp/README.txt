@@ -1,0 +1,4 @@
+Please install:
+
+* MiKTeX
+* TeXStudio
