@@ -1,0 +1,928 @@
+%A-
+
+% platform
+
+@inproceedings{li2016clicknp,
+	title={{ClickNP}: Highly flexible and High-performance Network Processing with Reconfigurable Hardware},
+	author={Li, Bojie and Tan, Kun and Luo, Layong Larry and Peng, Yanqing and Luo, Renqian and Xu, Ningyi and Xiong, Yongqiang and Cheng, Peng and Chen, Enhong},
+	booktitle={SIGCOMM '16},
+	pages={1--14},
+	year={2016},
+	organization={ACM}
+}
+
+@inproceedings{putnam2014reconfigurable,
+	title={A reconfigurable fabric for accelerating large-scale datacenter services},
+	author={Putnam, Andrew and Caulfield, Adrian M and Chung, Eric S and Chiou, Derek and Constantinides, Kypros and Demme, John and Esmaeilzadeh, Hadi and Fowers, Jeremy and Gopal, Gopi Prashanth and Gray, Jan and others},
+	booktitle={2014 ACM/IEEE 41st International Symposium on Computer Architecture (ISCA)},
+	pages={13--24},
+	year={2014},
+	organization={IEEE}
+}
+
+% key-value stores
+
+@article{decandia2007dynamo,
+	title={{Dynamo}: amazon's highly available key-value store},
+	author={DeCandia, Giuseppe and Hastorun, Deniz and Jampani, Madan and Kakulapati, Gunavardhan and Lakshman, Avinash and Pilchin, Alex and Sivasubramanian, Swaminathan and Vosshall, Peter and Vogels, Werner},
+	journal={ACM SIGOPS Operating Systems Review},
+	volume={41},
+	number={6},
+	pages={205--220},
+	year={2007},
+	publisher={ACM}
+}
+
+@article{fitzpatrick2004distributed,
+	title={Distributed caching with memcached},
+	author={Fitzpatrick, Brad},
+	journal={Linux journal},
+	volume={2004},
+	number={124},
+	pages={5},
+	year={2004},
+	publisher={Belltown Media}
+}
+
+@article{ousterhout2010case,
+	title={The case for {RAMClouds}: scalable high-performance storage entirely in DRAM},
+	author={Ousterhout, John and Agrawal, Parag and Erickson, David and Kozyrakis, Christos and Leverich, Jacob and Mazi{\`e}res, David and Mitra, Subhasish and Narayanan, Aravind and Parulkar, Guru and Rosenblum, Mendel and others},
+	journal={ACM SIGOPS Operating Systems Review},
+	volume={43},
+	number={4},
+	pages={92--105},
+	year={2010},
+	publisher={ACM}
+}
+
+@inproceedings{mao2012cache,
+	title={Cache craftiness for fast multicore key-value storage},
+	author={Mao, Yandong and Kohler, Eddie and Morris, Robert Tappan},
+	booktitle={Proceedings of the 7th ACM european conference on Computer Systems},
+	pages={183--196},
+	year={2012},
+	organization={ACM}
+}
+
+@inproceedings{fan2013memc3,
+	title={{MemC3}: Compact and concurrent memcache with dumber caching and smarter hashing},
+	author={Fan, Bin and Andersen, David G and Kaminsky, Michael},
+	booktitle={NSDI~'13},
+	pages={371--384},
+	year={2013}
+}
+
+@inproceedings{nishtala2013scaling,
+	title={Scaling memcache at facebook},
+	author={Nishtala, Rajesh and Fugal, Hans and Grimm, Steven and Kwiatkowski, Marc and Lee, Herman and Li, Harry C and McElroy, Ryan and Paleczny, Mike and Peek, Daniel and Saab, Paul and others},
+	booktitle={NSDI~'13},
+	year={2013}
+}
+
+@inproceedings{kapoor2012chronos,
+	title={{Chronos}: predictable low latency for data center applications},
+	author={Kapoor, Rishi and Porter, George and Tewari, Malveeka and Voelker, Geoffrey M and Vahdat, Amin},
+	booktitle={Proceedings of the Third ACM Symposium on Cloud Computing},
+	pages={9},
+	year={2012},
+	organization={ACM}
+}
+
+@inproceedings{lim2014mica,
+	title={{MICA}: a holistic approach to fast in-memory key-value storage},
+	author={Lim, Hyeontaek and Han, Dongsu and Andersen, David G and Kaminsky, Michael},
+	booktitle={NSDI~'14},
+	pages={429--444},
+	year={2014}
+}
+
+@inproceedings{kalia2014using,
+	title={Using {RDMA} efficiently for key-value services},
+	author={Kalia, Anuj and Kaminsky, Michael and Andersen, David G},
+	booktitle={ACM SIGCOMM Computer Communication Review},
+	volume={44},
+	number={4},
+	pages={295--306},
+	year={2014},
+	organization={ACM}
+}
+
+@article{ousterhout2015ramcloud,
+	title={The ramcloud storage system},
+	author={Ousterhout, John and Gopalan, Arjun and Gupta, Ashish and Kejriwal, Ankita and Lee, Collin and Montazeri, Behnam and Ongaro, Diego and Park, Seo Jin and Qin, Henry and Rosenblum, Mendel and others},
+	journal={ACM Transactions on Computer Systems (TOCS)},
+	volume={33},
+	number={3},
+	year={2015},
+	publisher={ACM}
+}
+
+@article{li2016full,
+	title={Full-Stack Architecting to Achieve a Billion Requests Per Second Throughput on a Single Key-Value Store Server Platform},
+	author={Li, Sheng and Lim, Hyeontaek and Lee, Victor W and Ahn, Jung Ho and Kalia, Anuj and Kaminsky, Michael and Andersen, David G and Lee, Sukhan and Dubey, Pradeep and others},
+	journal={ACM Transactions on Computer Systems (TOCS)},
+	volume={34},
+	number={2},
+	pages={5},
+	year={2016},
+	publisher={ACM}
+}
+
+@inproceedings{mitchell2013using,
+	title={Using One-Sided {RDMA} Reads to Build a Fast, CPU-Efficient Key-Value Store},
+	author={Mitchell, Christopher and Geng, Yifeng and Li, Jinyang},
+	booktitle={USENIX ATC~'13},
+	pages={103--114},
+	year={2013}
+}
+
+@inproceedings{dragojevic2014farm,
+	title={{FaRM}: fast remote memory},
+	author={Dragojevi{\'c}, Aleksandar and Narayanan, Dushyanth and Castro, Miguel and Hodson, Orion},
+	booktitle={NSDI~'14},
+	year={2014}
+}
+
+@inproceedings{szepesi2014designing,
+	title={Designing a low-latency cuckoo hash table for write-intensive workloads using RDMA},
+	author={Szepesi, Tyler and Wong, Bernard and Cassell, Ben and Brecht, Tim},
+	booktitle={First International Workshop on Rack-scale Computing},
+	year={2014}
+}
+
+@inproceedings{kalia2016design,
+	title={Design Guidelines for High Performance {RDMA} Systems},
+	author={Kalia, Anuj and Kaminsky, Michael and Andersen, David G},
+	booktitle={USENIX ATC~'16},
+	year={2016}
+}
+
+@inproceedings{berezecki2011many,
+	title={Many-core key-value store},
+	author={Berezecki, Mateusz and Frachtenberg, Eitan and Paleczny, Mike and Steele, Kenneth},
+	booktitle={Green Computing Conference and Workshops (IGCC), 2011 International},
+	pages={1--8},
+	year={2011},
+	organization={IEEE}
+}
+
+@article{zhang2015mega,
+	title={{Mega-KV}: a case for GPUs to maximize the throughput of in-memory key-value stores},
+	author={Zhang, Kai and Wang, Kaibo and Yuan, Yuan and Guo, Lei and Lee, Rubao and Zhang, Xiaodong},
+	journal={Proceedings of the VLDB Endowment},
+	volume={8},
+	number={11},
+	pages={1226--1237},
+	year={2015},
+	publisher={VLDB Endowment}
+}
+
+@inproceedings{istvan2013flexible,
+	title={A flexible hash table design for 10gbps key-value stores on fpgas},
+	author={Istv{\'a}n, Zsolt and Alonso, Gustavo and Blott, Michaela and Vissers, Kees},
+	booktitle={23rd International Conference on Field programmable Logic and Applications},
+	pages={1--8},
+	year={2013},
+	organization={IEEE}
+}
+
+@inproceedings{chalamalasetti2013fpga,
+	title={An {FPGA} memcached appliance},
+	author={Chalamalasetti, Sai Rahul and Lim, Kevin and Wright, Mitch and AuYoung, Alvin and Ranganathan, Parthasarathy and Margala, Martin},
+	booktitle={Proceedings of the ACM/SIGDA international symposium on Field programmable gate arrays (FPGA)},
+	pages={245--254},
+	year={2013},
+	organization={ACM}
+}
+
+@article{lavasani2014fpga,
+	title={An {FPGA-based} in-line accelerator for Memcached},
+	author={Lavasani, Maysam and Angepat, Hari and Chiou, Derek},
+	journal={IEEE Computer Architecture Letters},
+	volume={13},
+	number={2},
+	pages={57--60},
+	year={2014},
+	publisher={IEEE}
+}
+
+@inproceedings{istvan2016consensus,
+	title={Consensus in a box: Inexpensive coordination in hardware},
+	author={Istvan, Zsolt and Sidler, David and Alonso, Gustavo and Vukolic, Marko},
+	booktitle={NSDI~'16},
+	pages={425--438},
+	year={2016}
+}
+
+% benchmarks
+
+@inproceedings{cooper2010benchmarking,
+	title={Benchmarking cloud serving systems with {YCSB}},
+	author={Cooper, Brian F and Silberstein, Adam and Tam, Erwin and Ramakrishnan, Raghu and Sears, Russell},
+	booktitle={Proceedings of the 1st ACM symposium on Cloud computing},
+	pages={143--154},
+	year={2010},
+	organization={ACM}
+}
+
+@inproceedings{atikoglu2012workload,
+	title={Workload analysis of a large-scale key-value store},
+	author={Atikoglu, Berk and Xu, Yuehai and Frachtenberg, Eitan and Jiang, Song and Paleczny, Mike},
+	booktitle={ACM SIGMETRICS Performance Evaluation Review},
+	volume={40},
+	number={1},
+	pages={53--64},
+	year={2012},
+	organization={ACM}
+}
+
+% theory
+
+@article{bernstein1981concurrency,
+	title={Concurrency control in distributed database systems},
+	author={Bernstein, Philip A and Goodman, Nathan},
+	journal={ACM Computing Surveys (CSUR)},
+	volume={13},
+	number={2},
+	pages={185--221},
+	year={1981},
+	publisher={ACM}
+}
+
+@inproceedings{nguyen2014lock,
+	title={Lock-free cuckoo hashing},
+	author={Nguyen, Nhan and Tsigas, Philippas},
+	booktitle={Distributed Computing Systems (ICDCS), 2014 IEEE 34th International Conference on},
+	pages={627--636},
+	year={2014},
+	organization={IEEE}
+}
+
+@inproceedings{herlihy2008hopscotch,
+	title={Hopscotch hashing},
+	author={Herlihy, Maurice and Shavit, Nir and Tzafrir, Moran},
+	booktitle={International Symposium on Distributed Computing},
+	pages={350--364},
+	year={2008},
+	organization={Springer}
+}
+
+@book{gharachorloo1992hiding,
+	title={Hiding memory latency using dynamic scheduling in shared-memory multiprocessors},
+	author={Gharachorloo, Kourosh and Gupta, Anoop and Hennessy, John},
+	volume={20},
+	number={2},
+	year={1992},
+	publisher={ACM}
+}
+
+@article{intelmemaccess,
+	title={Intel Memory Latency Checker},
+	author={Intel},
+	journal={URL https://software.intel.com/en-us/articles/intelr-memory-latency-checker},
+	year={2016}
+}
+
+@article{mellanoxrdma,
+	title={Mellanox InfiniBand Adapters},
+	author={Mellanox},
+    journal={URL http://www.mellanox.com/page/infiniband\_cards\_overview},
+	year={2017}
+}
+
+% spec
+
+@book{infiniband2000infiniband,
+	title={InfiniBand Architecture Specification: Release 1.0},
+	year={2000},
+	publisher={InfiniBand Trade Association}
+}
+
+@book{pciegen3,
+	title={PCI Express Base Specification Revision 3.0},
+	year={2010},
+	publisher={PCI-SIG}
+}
+
+% other ref
+
+@inproceedings{esmaeilzadeh2011dark,
+	title={Dark silicon and the end of multicore scaling},
+	author={Esmaeilzadeh, Hadi and Blem, Emily and Amant, Renee St and Sankaralingam, Karthikeyan and Burger, Doug},
+	booktitle={Computer Architecture (ISCA), 2011 38th Annual International Symposium on},
+	pages={365--376},
+	year={2011},
+	organization={IEEE}
+}
+
+@inproceedings{han2010packetshader,
+	title={PacketShader: a {GPU}-accelerated software router},
+	author={Han, Sangjin and Jang, Keon and Park, KyoungSoo and Moon, Sue},
+	booktitle={ACM SIGCOMM Computer Communication Review},
+	volume={40},
+	number={4},
+	pages={195--206},
+	year={2010},
+	organization={ACM}
+}
+
+@inproceedings{Sivaraman2016PIFO,
+	author = {Sivaraman, Anirudh and Subramanian, Suvinay and Alizadeh, Mohammad and Chole, Sharad and Chuang, Shang-Tse and Agrawal, Anurag and Balakrishnan, Hari and Edsall, Tom and Katti, Sachin and McKeown, Nick},
+	title = {Programmable Packet Scheduling at Line Rate},
+	booktitle = {Proceedings of the ACM SIGCOMM 2016 Conference},
+	series = {SIGCOMM '16},
+	year = {2016},
+	isbn = {978-1-4503-4193-6},
+	location = {Florianopolis, Brazil},
+	pages = {44--57},
+	numpages = {14},
+	acmid = {2934899},
+	publisher = {ACM},
+	address = {New York, NY, USA},
+	keywords = {Programmable scheduling, switch hardware},
+}
+
+@inproceedings{laforest2010efficient,
+	title={Efficient multi-ported memories for FPGAs},
+	author={LaForest, Charles Eric and Steffan, J Gregory},
+	booktitle={Proceedings of the 18th annual ACM/SIGDA international symposium on Field programmable gate arrays},
+	pages={41--50},
+	year={2010},
+	organization={ACM}
+}
+
+@inproceedings{perry2014fastpass,
+	title={Fastpass: A centralized zero-queue datacenter network},
+	author={Perry, Jonathan and Ousterhout, Amy and Balakrishnan, Hari and Shah, Devavrat and Fugal, Hans},
+	booktitle={ACM SIGCOMM Computer Communication Review},
+	volume={44},
+	number={4},
+	pages={307--318},
+	year={2014},
+	organization={ACM}
+}
+
+@inproceedings{zhu2015packet,
+	title={Packet-level telemetry in large datacenter networks},
+	author={Zhu, Yibo and Kang, Nanxi and Cao, Jiaxin and Greenberg, Albert and Lu, Guohan and Mahajan, Ratul and Maltz, Dave and Yuan, Lihua and Zhang, Ming and Zhao, Ben Y and others},
+	booktitle={ACM SIGCOMM Computer Communication Review},
+	volume={45},
+	number={4},
+	pages={479--491},
+	year={2015},
+	organization={ACM}
+}
+
+
+@article{gunderson2015snappy,
+	title={Snappy: A fast compressor/decompressor},
+	author={Gunderson, SH},
+	journal={https://github.com/google/snappy},
+	year={2015}
+}
+
+@article{istvan2015hash,
+  title={A hash table for line-rate data processing},
+  author={Istv{\'a}n, Zsolt and Alonso, Gustavo and Blott, Michaela and Vissers, Kees},
+  journal={ACM Transactions on Reconfigurable Technology and Systems (TRETS)},
+  volume={8},
+  number={2},
+  pages={13},
+  year={2015},
+  publisher={ACM}
+}
+
+@inproceedings{blott2015scaling,
+  title={Scaling Out to a Single-Node 80Gbps Memcached Server with 40Terabytes of Memory.},
+  author={Blott, Michaela and Liu, Ling and Karras, Kimon and Vissers, Kees A},
+  booktitle={HotStorage~'15},
+  year={2015}
+}
+
+@inproceedings{abdelfattah2014gzip,
+	title={Gzip on a chip: High performance lossless data compression on fpgas using opencl},
+	author={Abdelfattah, Mohamed S and Hagiescu, Andrei and Singh, Deshanand},
+	booktitle={Proceedings of the International Workshop on OpenCL 2013 \& 2014},
+	pages={4},
+	year={2014},
+	organization={ACM}
+}
+
+@inproceedings{li2014scaling,
+  title={Scaling Distributed Machine Learning with the Parameter Server.},
+  author={Li, Mu and Andersen, David G and Park, Jun Woo},
+  year={2014}
+}
+
+@inproceedings{shao2013trinity,
+  title={Trinity: A distributed graph engine on a memory cloud},
+  author={Shao, Bin and Wang, Haixun and Li, Yatao},
+  booktitle={Proceedings of the 2013 ACM SIGMOD International Conference on Management of Data},
+  pages={505--516},
+  year={2013},
+  organization={ACM}
+}
+
+@article{chang2008bigtable,
+  title={Bigtable: A distributed storage system for structured data},
+  author={Chang, Fay and Dean, Jeffrey and Ghemawat, Sanjay and Hsieh, Wilson C and Wallach, Deborah A and Burrows, Mike and Chandra, Tushar and Fikes, Andrew and Gruber, Robert E},
+  journal={ACM Transactions on Computer Systems (TOCS)},
+  volume={26},
+  number={2},
+  pages={4},
+  year={2008},
+  publisher={ACM}
+}
+
+@inproceedings{chowdhury2014efficient,
+  title={Efficient coflow scheduling with varys},
+  author={Chowdhury, Mosharaf and Zhong, Yuan and Stoica, Ion},
+  booktitle={ACM SIGCOMM Computer Communication Review},
+  volume={44},
+  number={4},
+  pages={443--454},
+  year={2014},
+  organization={ACM}
+}
+
+@techreport{page1999pagerank,
+  title={The PageRank citation ranking: Bringing order to the web.},
+  author={Page, Lawrence and Brin, Sergey and Motwani, Rajeev and Winograd, Terry},
+  year={1999},
+  institution={Stanford InfoLab}
+}
+
+@inproceedings{rizzo2012netmap,
+  title={Netmap: a novel framework for fast packet I/O},
+  author={Rizzo, Luigi},
+  booktitle={21st USENIX Security Symposium (USENIX Security 12)},
+  pages={101--112},
+  year={2012}
+}
+
+@inproceedings{marinos2014network,
+  title={Network stack specialization for performance},
+  author={Marinos, Ilias and Watson, Robert NM and Handley, Mark},
+  booktitle={ACM SIGCOMM Computer Communication Review},
+  volume={44},
+  number={4},
+  pages={175--186},
+  year={2014},
+  organization={ACM}
+}
+
+@inproceedings{jeong2014mtcp,
+  title={{mTCP}: a Highly Scalable User-level {TCP} Stack for Multicore Systems.},
+  author={Jeong, EunYoung and Woo, Shinae and Jamshed, Muhammad Asim and Jeong, Haewon and Ihm, Sunghwan and Han, Dongsu and Park, KyoungSoo},
+  booktitle={NSDI~'14},
+  pages={489--502},
+  year={2014}
+}
+
+@article{peter2016arrakis,
+  title={Arrakis: The operating system is the control plane},
+  author={Peter, Simon and Li, Jialin and Zhang, Irene and Ports, Dan RK and Woos, Doug and Krishnamurthy, Arvind and Anderson, Thomas and Roscoe, Timothy},
+  journal={ACM Transactions on Computer Systems (TOCS)},
+  volume={33},
+  number={4},
+  pages={11},
+  year={2016},
+  publisher={ACM}
+}
+
+@inproceedings{li2014algorithmic,
+  title={Algorithmic improvements for fast concurrent cuckoo hashing},
+  author={Li, Xiaozhou and Andersen, David G and Kaminsky, Michael and Freedman, Michael J},
+  booktitle={Eurosys~'14},
+  pages={27},
+  year={2014},
+  organization={ACM}
+}
+
+@inproceedings{narula2014phase,
+  title={Phase Reconciliation for Contended In-Memory Transactions.},
+  author={Narula, Neha and Cutler, Cody and Kohler, Eddie and Morris, Robert},
+  booktitle={OSDI~'14},
+  volume={14},
+  pages={511--524},
+  year={2014}
+}
+
+@article{sutter2005free,
+  title={The free lunch is over: A fundamental turn toward concurrency in software},
+  author={Sutter, Herb},
+  journal={Dr. Dobb’s journal},
+  volume={30},
+  number={3},
+  pages={202--210},
+  year={2005}
+}
+
+@article{esmaeilzadeh2013power,
+  title={Power challenges may end the multicore era},
+  author={Esmaeilzadeh, Hadi and Blem, Emily and Amant, Ren{\'e}e St and Sankaralingam, Karthikeyan and Burger, Doug},
+  journal={Communications of the ACM},
+  volume={56},
+  number={2},
+  pages={93--102},
+  year={2013},
+  publisher={ACM}
+}
+
+@article{tpu,
+	title={In-Datacenter Performance Analysis of a Tensor Processing Unit},
+    author={Norman P. Jouppi, et al},
+    booktitle={Proceedings of the 44th International Symposium on Computer Architecture (ISCA)},
+  	year={2017}
+}
+
+@inproceedings{liu2016cambricon,
+  title={Cambricon: An instruction set architecture for neural networks},
+  author={Liu, Shaoli and Du, Zidong and Tao, Jinhua and Han, Dong and Luo, Tao and Xie, Yuan and Chen, Yunji and Chen, Tianshi},
+  booktitle={Proceedings of the 43rd International Symposium on Computer Architecture},
+  pages={393--405},
+  year={2016},
+  organization={IEEE Press}
+}
+
+@inproceedings{caulfield2016cloud,
+  title={A cloud-scale acceleration architecture},
+  author={Caulfield, Adrian M and Chung, Eric S and Putnam, Andrew and Angepat, Hari and Fowers, Jeremy and Haselman, Michael and Heil, Stephen and Humphrey, Matt and Kaur, Puneet and Kim, Joo-Young and others},
+  booktitle={Microarchitecture (MICRO), 2016 49th Annual IEEE/ACM International Symposium on},
+  pages={1--13},
+  year={2016},
+  organization={IEEE}
+}
+
+@inproceedings{bosshart2013forwarding,
+  title={Forwarding metamorphosis: Fast programmable match-action processing in hardware for {SDN}},
+  author={Bosshart, Pat and Gibb, Glen and Kim, Hun-Seok and Varghese, George and McKeown, Nick and Izzard, Martin and Mujica, Fernando and Horowitz, Mark},
+  booktitle={ACM SIGCOMM Computer Communication Review},
+  volume={43},
+  number={4},
+  pages={99--110},
+  year={2013},
+  organization={ACM}
+}
+
+@inproceedings{greenberg2015sdn,
+  title={{SDN} for the Cloud},
+  author={Greenberg, Albert},
+  booktitle={Keynote in the 2015 ACM Conference on Special Interest Group on Data Communication},
+  year={2015}
+}
+
+@inproceedings{xiao17tux2,
+  title={{TuX2}: Distributed Graph Computation for Machine Learning},
+  author={Xiao, Wencong and Xue, Jilong and Miao, Youshan and Li, Zhen and Chen, Cheng and Wu, Ming and Li, Wei and Zhou, Lidong},
+  booktitle={NSDI~'17},
+  year={2017}
+}
+
+@inproceedings{breslow2016horton,
+  title={Horton tables: fast hash tables for in-memory data-intensive computing},
+  author={Breslow, Alex D and Zhang, Dong Ping and Greathouse, Joseph L and Jayasena, Nuwan and Tullsen, Dean M},
+  booktitle={USENIX ATC~'16},
+  year={2016}
+}
+
+@inproceedings{bonwick1994slab,
+  title={The Slab Allocator: An Object-Caching Kernel Memory Allocator.},
+  author={Bonwick, Jeff and others},
+  booktitle={USENIX summer},
+  volume={16},
+  year={1994},
+  organization={Boston, MA, USA}
+}
+
+@misc{hoberock2010thrust,
+  title={Thrust: A parallel template library},
+  author={Hoberock, Jared and Bell, Nathan},
+  year={2010},
+  publisher={version}
+}
+
+@inproceedings{satish2010fast,
+  title={Fast sort on {CPU}s and {GPU}s: a case for bandwidth oblivious {SIMD} sort},
+  author={Satish, Nadathur and Kim, Changkyu and Chhugani, Jatin and Nguyen, Anthony D and Lee, Victor W and Kim, Daehyun and Dubey, Pradeep},
+  booktitle={Proceedings of the 2010 ACM SIGMOD International Conference on Management of data},
+  pages={351--362},
+  year={2010},
+  organization={ACM}
+}
+
+@inproceedings{eicken1992active,
+  title={Active messages: a mechanism for integrated communication and computation},
+  author={Eicken, TV and Culler, David E and Goldstein, Seth Copen and Schauser, Klaus Erik},
+  booktitle={Computer Architecture, 1992. Proceedings., The 19th Annual International Symposium on},
+  pages={256--266},
+  year={1992},
+  organization={IEEE}
+}
+
+@misc{aoc,
+	title={{Altera SDK for OpenCL.}},
+	note={http://www.altera.com/},
+    year={2017}
+}
+
+@inproceedings{sivaraman2016packet,
+  title={Packet transactions: High-level programming for line-rate switches},
+  author={Sivaraman, Anirudh and Cheung, Alvin and Budiu, Mihai and Kim, Changhoon and Alizadeh, Mohammad and Balakrishnan, Hari and Varghese, George and McKeown, Nick and Licking, Steve},
+  booktitle={Proceedings of the ACM SIGCOMM 2016 Conference},
+  pages={15--28},
+  year={2016},
+  organization={ACM}
+}
+
+@misc{council2010tpc,
+  title={tpc-c benchmark, revision 5.11},
+  author={Council, TPC},
+  year={2010},
+  publisher={Feb}
+}
+
+@inproceedings {vfp,
+ author = {Daniel Firestone},
+ title = {{VFP}: A Virtual Switch Platform for Host {SDN} in the Public Cloud},
+ booktitle = {NSDI~'17},
+ year = {2017},
+ isbn = {978-1-931971-37-9},
+ address = {Boston, MA},
+ pages = {315--328},
+}
+ 
+@misc{intel2014data,
+  title={Data plane development kit},
+  author={Intel, DPDK},
+  year={2014}
+}
+
+@article{pagh2004cuckoo,
+  title={Cuckoo hashing},
+  author={Pagh, Rasmus and Rodler, Flemming Friche},
+  journal={Journal of Algorithms},
+  volume={51},
+  number={2},
+  pages={122--144},
+  year={2004},
+  publisher={Elsevier}
+}
+
+@article{escriva2012hyperdex,
+  title={{HyperDex}: A distributed, searchable key-value store},
+  author={Escriva, Robert and Wong, Bernard and Sirer, Emin G{\"u}n},
+  journal={ACM SIGCOMM Computer Communication Review},
+  volume={42},
+  number={4},
+  pages={25--36},
+  year={2012},
+  publisher={ACM}
+}
+
+@article{debnath2010flashstore,
+  title={FlashStore: high throughput persistent key-value store},
+  author={Debnath, Biplob and Sengupta, Sudipta and Li, Jin},
+  journal={Proceedings of the VLDB Endowment},
+  volume={3},
+  number={1-2},
+  pages={1414--1425},
+  year={2010},
+  publisher={VLDB Endowment}
+}
+
+@inproceedings{marmol2014nvmkv,
+  title={{NVMKV}: A Scalable and Lightweight Flash Aware Key-Value Store.},
+  author={Marmol, Leonardo and Sundararaman, Swaminathan and Talagala, Nisha and Rangaswami, Raju and Devendrappa, Sushma and Ramsundar, Bharath and Ganesan, Sriram},
+  booktitle={HotStorage},
+  year={2014}
+}
+
+@inproceedings{kejriwal2016slik,
+  title={{SLIK}: Scalable low-latency indexes for a key-value store},
+  author={Kejriwal, Ankita and Gopalan, Arjun and Gupta, Ashish and Jia, Zhihao and Yang, Stephen and Ousterhout, John},
+  booktitle={USENIX ATC~'16},
+  year={2016}
+}
+
+@inproceedings{papagiannis2016tucana,
+  title={Tucana: Design and implementation of a fast and efficient scale-up key-value store},
+  author={Papagiannis, Anastasios and Saloustros, Giorgos and Gonz{\'a}lez-F{\'e}rez, Pilar and Bilas, Angelos},
+  booktitle={USENIX ATC~'16},
+  pages={537--550},
+  year={2016},
+}
+
+@inproceedings{li2016fast,
+  title={Be fast, cheap and in control with {SwitchKV}},
+  author={Li, Xiaozhou and Sethi, Raghav and Kaminsky, Michael and Andersen, David G and Freedman, Michael J},
+  booktitle={NSDI~'16},
+  year={2016}
+}
+
+@INPROCEEDINGS{liang16fpl, 
+author={Wei Liang and Wenbo Yin and Ping Kang and Lingli Wang}, 
+booktitle={2016 26th International Conference on Field Programmable Logic and Applications (FPL)}, 
+title={Memory efficient and high performance key-value store on {FPGA} using Cuckoo hashing}, 
+year={2016}, 
+pages={1-4}, 
+keywords={cryptography;field programmable gate arrays;parallel architectures;FPGA-based parallel architecture;KVS;MRPS;constant worst case access time;cuckoo hashing;data explosion;delete operation;high performance key-value store;insert operation;memory efficient key-value store;memory utilization;million requests per second;pipeline scheme;search operation;Arrays;Clocks;Field programmable gate arrays;Memory management;Pipelines;Random access memory;Throughput},
+month={Aug},}
+
+@inproceedings {blott13hotcloud,
+author = {Michaela Blott and Kimon Karras and Ling Liu and Kees Vissers and Jeremia B{\"a}r and Zsolt Istv{\'a}n},
+title = {Achieving 10Gbps Line-rate Key-value Stores with {FPGA}s},
+booktitle = {The 5th USENIX Workshop on Hot Topics in Cloud Computing},
+year = {2013},
+address = {San Jose, CA},
+publisher = {USENIX},
+}
+
+@inproceedings{schroeder2009dram,
+  title={{DRAM} errors in the wild: a large-scale field study},
+  author={Schroeder, Bianca and Pinheiro, Eduardo and Weber, Wolf-Dietrich},
+  booktitle={ACM SIGMETRICS Performance Evaluation Review},
+  volume={37},
+  number={1},
+  pages={193--204},
+  year={2009},
+  organization={ACM}
+}
+
+@article{brakmo1995tcp,
+  title={{TCP Vegas}: End to end congestion avoidance on a global Internet},
+  author={Brakmo, Lawrence S. and Peterson, Larry L.},
+  journal={IEEE Journal on selected Areas in communications},
+  volume={13},
+  number={8},
+  pages={1465--1480},
+  year={1995},
+  publisher={IEEE}
+}
+
+@inproceedings{MaZC17fpga,
+  author    = {Xiaoyu Ma and
+               Dan Zhang and
+               Derek Chiou},
+  title     = {FPGA-Accelerated Transactional Execution of Graph Workloads},
+  booktitle = {Proceedings of the 2017 {ACM/SIGDA} International Symposium on Field-Programmable
+               Gate Arrays, {FPGA} 2017, Monterey, CA, USA, February 22-24, 2017},
+  pages     = {227--236},
+  year      = {2017},
+  crossref  = {DBLP:conf/fpga/2017},
+  timestamp = {Fri, 03 Feb 2017 14:06:23 +0100},
+  biburl    = {http://dblp2.uni-trier.de/rec/bib/conf/fpga/MaZC17},
+  bibsource = {dblp computer science bibliography, http://dblp.org}
+}
+
+@proceedings{DBLP:conf/fpga/2017,
+  editor    = {Jonathan W. Greene and
+               Jason Helge Anderson},
+  title     = {Proceedings of the 2017 {ACM/SIGDA} International Symposium on Field-Programmable
+               Gate Arrays, {FPGA} 2017, Monterey, CA, USA, February 22-24, 2017},
+  publisher = {{ACM}},
+  year      = {2017},
+  isbn      = {978-1-4503-4354-1},
+  timestamp = {Fri, 03 Feb 2017 14:06:23 +0100},
+  biburl    = {http://dblp2.uni-trier.de/rec/bib/conf/fpga/2017},
+  bibsource = {dblp computer science bibliography, http://dblp.org}
+}
+
+@article{ouyang14hotchips,
+author = {Jian Ouyang, and Shiding Lin, and Wei Qi, and Yong Wang, and Bo Yu, and Song Jiang},
+title = {{SDA}: Software-defined accelerator for large-scale {DNN} systems},
+journal = {2014 IEEE Hot Chips 26 Symposium (HCS)},
+volume = {00},
+number = {},
+issn = {},
+year = {2014},
+pages = {1-23},
+publisher = {IEEE Computer Society},
+address = {Los Alamitos, CA, USA},
+}
+
+@inproceedings{huang16socc,
+ author = {Huang, Muhuan and Wu, Di and Yu, Cody Hao and Fang, Zhenman and Interlandi, Matteo and Condie, Tyson and Cong, Jason},
+ title = {Programming and Runtime Support to Blaze {FPGA} Accelerator Deployment at Datacenter Scale},
+ booktitle = {Proceedings of the Seventh ACM Symposium on Cloud Computing},
+ series = {SoCC '16},
+ year = {2016},
+ isbn = {978-1-4503-4525-5},
+ location = {Santa Clara, CA, USA},
+ pages = {456--469},
+ numpages = {14},
+ acmid = {2987569},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+ keywords = {FPGA-as-a-service, heterogeneous datacenter},
+} 
+
+@inproceedings{cong16dac,
+ author = {Cong, Jason and Huang, Muhuan and Wu, Di and Yu, Cody Hao},
+ title = {Invited - Heterogeneous Datacenters: Options and Opportunities},
+ booktitle = {Proceedings of the 53rd Annual Design Automation Conference},
+ series = {DAC '16},
+ year = {2016},
+ isbn = {978-1-4503-4236-0},
+ location = {Austin, Texas},
+ pages = {16:1--16:6},
+ articleno = {16},
+ acmid = {2905012},
+ publisher = {ACM},
+ address = {New York, NY, USA},
+} 
+
+@inproceedings{wei2015fast,
+  title={Fast in-memory transaction processing using {RDMA} and {HTM}},
+  author={Wei, Xingda and Shi, Jiaxin and Chen, Yanzhe and Chen, Rong and Chen, Haibo},
+  booktitle={SOSP~'15},
+  pages={87--104},
+  year={2015},
+  organization={ACM}
+}
+
+@inproceedings{chen2016fast,
+  title={Fast and general distributed transactions using {RDMA} and {HTM}},
+  author={Chen, Yanzhe and Wei, Xingda and Shi, Jiaxin and Chen, Rong and Chen, Haibo},
+  booktitle={Eurosys~'16},
+  year={2016},
+  organization={ACM}
+}
+
+@inproceedings{kalia2016fasst,
+  title={{FaSST}: fast, scalable and simple distributed transactions with two-sided {RDMA} datagram RPCs},
+  author={Kalia, Anuj and Kaminsky, Michael and Andersen, David G},
+  booktitle={OSDI~'16},
+  pages={185--201},
+  year={2016},
+}
+
+@article{bacon2013fpga,
+  title={FPGA programming for the masses},
+  author={Bacon, David F and Rabbah, Rodric and Shukla, Sunil},
+  journal={Communications of the ACM},
+  volume={56},
+  number={4},
+  pages={56--63},
+  year={2013},
+  publisher={ACM}
+}
+
+@inproceedings{wu2015g,
+  title={GraM: scaling graph computation to the trillions},
+  author={Wu, Ming and Yang, Fan and Xue, Jilong and Xiao, Wencong and Miao, Youshan and Wei, Lan and Lin, Haoxiang and Dai, Yafei and Zhou, Lidong},
+  booktitle={Proceedings of the Sixth ACM Symposium on Cloud Computing},
+  pages={408--421},
+  year={2015},
+  organization={ACM}
+}
+
+@inproceedings{kaufmann2015flexnic,
+  title={FlexNIC: Rethinking Network DMA.},
+  author={Kaufmann, Antoine and Peter, Simon and Anderson, Thomas E and Krishnamurthy, Arvind},
+  booktitle={HotOS~'15},
+  year={2015}
+}
+
+@inproceedings{kaufmann2016krishnamurthy,
+  title={High Performance Packet Processing with FlexNIC},
+  author={Kaufmann, Antoine and Peter, Simon and Sharma, Navven Kumar and Anderson, Thomas},
+  booktitle={Proceedings of the 21th International Conference on Architectural Support for Programming Languages and Operating Systems},
+  year={2016}
+}
+
+@inproceedings{netcache-sosp17,
+  author = {Xin Jin and Xiaozhou Li and Haoyu Zhang and Robert Soule and Jeongkeun Lee and Nate Foster and Changhoon Kim and Ion Stoica}, 
+  title = {{NetCache: Balancing Key-Value Stores with Fast In-Network Caching}},
+  booktitle = {SOSP~'17},
+  year = {2017},
+  location = {Shanghai, China},
+}
+
+@inproceedings{eris,
+  author={Jialin Li and Ellis Michael and Dan R. K. Ports},
+  title={Eris: Coordination-Free Consistent Transactions Using In-Network Concurrency Control},
+  booktitle = {SOSP~'17},
+  year = {2017},
+  location = {Shanghai, China},
+}
+
+@inproceedings{tokusashi2016multilevel,
+  title={A multilevel NOSQL cache design combining In-NIC and In-Kernel caches},
+  author={Tokusashi, Yuta and Matsutani, Hiroki},
+  booktitle={High-Performance Interconnects (HOTI '16)},
+  pages={60--67},
+  year={2016},
+  organization={IEEE}
+}
+
+@inproceedings{bosshart2013forwarding,
+  title={Forwarding metamorphosis: Fast programmable match-action processing in hardware for SDN},
+  author={Bosshart, Pat and Gibb, Glen and Kim, Hun-Seok and Varghese, George and McKeown, Nick and Izzard, Martin and Mujica, Fernando and Horowitz, Mark},
+  booktitle={ACM SIGCOMM Computer Communication Review},
+  volume={43},
+  number={4},
+  pages={99--110},
+  year={2013},
+  organization={ACM}
+}

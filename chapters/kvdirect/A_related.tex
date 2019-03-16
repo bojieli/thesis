@@ -1,0 +1,41 @@
+\section{Related Work}
+\label{kvdirect:sec:related}
+
+As an important infrastructure, the research and development of distributed key-value store systems have been driven by performance. A large body of distributed KVS are based on CPU. To reduce the computation cost, Masstree~\cite{mao2012cache}, MemC3~\cite{fan2013memc3} and libcuckoo~\cite{li2014algorithmic} optimize locking, caching, hashing and memory allocation algorithms, while \oursys{} comes with a new hash table and memory management mechanism specially designed for FPGA to minimize the PCIe traffic. MICA~\cite{lim2014mica} partitions the hash table to each core thus completely avoids synchronization. This approach, however, introduces core imbalance for skewed workloads.
+
+To get rid of the OS kernel overhead, ~\cite{rizzo2012netmap, intel2014data} directly poll network packets from NIC and \cite{jeong2014mtcp, marinos2014network} process them with the user space lightweight network stack.
+Key-value store systems~\cite{kapoor2012chronos, ousterhout2010case, ousterhout2015ramcloud, lim2014mica,li2016full} benefit from such optimizations for high performance.
+As a further step towards this direction, recent works \cite{infiniband2000infiniband, kalia2014using, kalia2016design, kalia2014using, kalia2016design} leverage the hardware-based network stack of RDMA NIC, using two-sided RDMA as an RPC mechanism between KVS client and server to further improve per-core throughput and reduce latency. Still, these systems are CPU bound (\S\ref{kvdirect:sec:state-of-the-art-kvs}).
+
+Another different approach is to leverage one-sided RDMA. Pilaf~\cite{mitchell2013using} and FaRM~\cite{dragojevic2014farm} adopt one-sided RDMA read for GET operation and FaRM achieves throughput that saturates the network. Nessie~\cite{szepesi2014designing}, DrTM~\cite{wei2015fast}, DrTM+R~\cite{chen2016fast} and FaSST~\cite{kalia2016fasst} leverage distributed transactions to implement both GET and PUT with one-sided RDMA. However, the performance of PUT operation suffer from unavoidable synchronization overhead for consistency guarantee, limited by RDMA primitives~\cite{kalia2016design}. Moreover, client-side CPU is involved in KV processing, limiting per-core throughput to \approx10~Mops on the client side.
+In contrast, \oursys{} extends the RDMA primitives to key-value operations while guarantees the consistency in server side, leaving the KVS client totally transparent while achieving high throughput and low latency even for PUT operation.
+
+As a flexible and customizable hardware, FPGA is now widely deployed in datacenter-scale~\cite{putnam2014reconfigurable, caulfield2016cloud} and greatly improved for programmability~\cite{bacon2013fpga,li2016clicknp}. Several early works have explored building KVS on FPGA. But some of them are not practical by limiting the data storage in on-chip (about several MB memory)~\cite{liang16fpl} or on-board DRAM (typically 8GB memory)~\cite{istvan2013flexible,chalamalasetti2013fpga,istvan2015hash}.
+~\cite{blott2015scaling} focuses on improving system capacity rather than throughput, and adopts SSD as the secondary storage out of on-board DRAM.
+~\cite{liang16fpl, chalamalasetti2013fpga} limit their usage in fixed size key-value pairs, which can only work for the special purpose rather than a general key-value store.
+\cite{blott13hotcloud, lavasani2014fpga} uses host DRAM to store the hash table, and \cite{tokusashi2016multilevel} uses NIC DRAM as a cache of host DRAM, but they did not optimize for network and PCIe DMA bandwidth, resulting in poor performance.
+\oursys{} fully utilizes both NIC DRAM and host DRAM, making our FPGA-based key-value store system general and capable of large-scale deployment. Furthermore, our careful hardware and software co-design, together with optimizations for PCIe and networking push the performance to the physical limitation, advancing state-of-art solutions.
+
+Secondary index is an important feature to retrieve data by keys other
+than the primary key in data storage system~\cite{escriva2012hyperdex, kejriwal2016slik}. SLIK~\cite{kejriwal2016slik} supports multiple secondary keys using a B+ tree algorithm in key-value store system. It would be interesting to explore how to support secondary index to help \oursys{} step towards a general data storage system. SwitchKV~\cite{li2016fast} leverages content-based routing to route requests to backend nodes based on cached keys, and NetCache~\cite{netcache-sosp17} takes a further step to cache KV in the switches. Such load balancing and caching will also benefit our system.
+Eris~\cite{eris} leverages network sequencers to achieve efficient distributed transactions, which may give a new life to the one-sided RDMA approach with client synchronization.
+
+
+%\textbf{TODO}
+
+%SSD or HDD for persistence~\cite{marmol2014nvmkv, debnath2010flashstore, papagiannis2016tucana}
+%network switch~\cite{li2016fast}
+
+
+%main limitations:
+
+%~\cite{liang16fpl} only uses on-chip BRAM.
+%~\cite{istvan2013flexible,chalamalasetti2013fpga,istvan2015hash} only use on-board DRAM, These work don't make use of host RAM, result in small system capacity.
+
+%~\cite{lavasani2014fpga, blott13hotcloud} leverages host RAM, however they didn't have optimization for PCIe DMA which becomes the bottleneck.
+
+%~\cite{liang16fpl, lavasani2014fpga} only support fixed-size Key-value pair, not pratical.
+
+
+%all works lack of optimization for network like batching and only achieves low encoding efficiency, resulting in low network bandwidth utilization.
+%all works lack of optimization for hashtable, which leads to higher average search in heavy load.
