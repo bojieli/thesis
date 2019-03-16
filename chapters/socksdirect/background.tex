@@ -1,0 +1,641 @@
+\section{Background}
+\label{socksdirect:sec:background}
+
+\subsection{Overheads in Linux Socket}
+\label{socksdirect:subsec:motivation}
+
+%\begin{figure}[t]
+%	\centering
+%	\includegraphics[width=0.3\textwidth]{images/fixme}
+%	\caption{Fraction of CPU time in the kernel (socket connection setup, socket data transmission and non-socket system calls) and user-mode applications.}
+%	\label{socksdirect:fig:socket-kernel-time}
+%\end{figure}
+
+%\begin{figure}[t]
+%	\centering
+%	\includegraphics[width=0.3\textwidth]{images/fixme}
+%	\caption{Performance of back-end systems using inter-server socket, intra-server socket, inter-server RDMA and intra-server shared memory.}
+%	\label{socksdirect:fig:backend-performance}
+%\end{figure}
+
+
+%\begin{figure}[t]
+%	\centering
+%	\includegraphics[width=0.3\textwidth]{images/fixme}
+%	\caption{Latency comparison of mutual exclusion mechanisms (CAS, mutex, futex) and cache migration.}
+%	\label{socksdirect:fig:mutual-exclusion}
+%\end{figure}
+
+%\begin{figure}[t]
+%	\centering
+%	\includegraphics[width=0.3\textwidth]{images/fixme}
+%	\caption{Throughput (bar) and latency (line) for 16B messages using inter-server TCP socket, inter-server RDMA, intra-server TCP socket, UNIX socket, pipe and shared memory queue.}
+%	\label{socksdirect:fig:socket-comparison}
+%\end{figure}
+
+\iffalse
+\begin{table*}[t!]
+	\centering
+	\begin{tabular}{ll|ll|ll|ll}
+		\hline
+		\multicolumn{2}{c|}{Initialization} &
+		\multicolumn{2}{c|}{Connection Mgmt} &
+		\multicolumn{2}{c|}{Data Transmission} &
+		\multicolumn{2}{c}{Process Mgmt} \\
+		\hline
+		API & Cat. &
+		API & Cat. &
+		API & Cat. &
+		API & Cat. \\
+		\hline
+		\hline
+		\textbf{socket} & Local &
+		\textbf{connect} & NoPart &
+		\textbf{send(to,(m)msg)} & P2P &
+		\textit{(v)fork} & NoPart \\
+		\hline
+		bind & NoPart &
+		\textbf{accept(4)} & P2P &
+		\textbf{recv(from,(m)msg)} & P2P &
+		\textit{pthread\_create} & NoPart \\
+		\hline
+		listen & NoPart &
+		\textbf{\textit{fcntl, ioctl}} & Local &
+		\textbf{\textit{write(v)}} & P2P &
+		\textit{clone} & NoPart \\
+		\hline
+		socketpair & Local &
+		\textbf{(get,set)sockopt} & Local &
+		\textbf{\textit{read(v)}} & P2P &
+		\textit{execve} & NoPart \\
+		\hline
+		getsockname  & Local &
+		\textbf{\textit{close}, shutdown} & P2P &
+		\textbf{\textit{memcpy}} & Local &
+		\textit{exit} & P2P \\
+		\hline
+		\textbf{\textit{malloc}} & Local &
+		getpeername & Local &
+		\textit{(p)select} & P2P &
+		\textit{sleep} & P2P \\
+		\hline
+		\textbf{\textit{realloc}} & Local &
+		\textit{dup(2)} & P2P &
+		\textit{(p)poll} & P2P &
+		\textit{daemon} & P2P \\
+		\hline
+		\textit{epoll\_create} & Local &
+		\textbf{\textit{epoll\_ctl}} & Local &
+		\textbf{\textit{epoll\_(p)wait}} & P2P &
+		\textit{sigaction} & Local \\
+		\hline
+	\end{tabular}
+	\caption{Linux APIs that are related to socket and intercepted by \libipc{}. Categories include local, peer-to-peer (P2P) and non-partitionable (NoPart). APIs in \textit{italic} indicate usages besides socket. APIs in \textbf{bold} are called relatively more frequently.}
+	
+	\label{socksdirect:tab:socket-api}
+\end{table*}
+\fi
+
+\iffalse
+\begin{figure}
+\begin{lstlisting}[style=CStyle]
+int lfd = socket(...); // listen file descriptor (fd)
+bind(lfd, listen_addr_and_port, ...);
+listen(lfd, BACKLOG);
+fcntl(lfd, F_SETFL, fcntl(lfd,F_GETFL,0) | O_NONBLOCK);
+int efd = epoll_create(MAXEVENTS); // event fd
+epoll_ctl(efd, EPOLL_CTL_ADD, lfd, ...);
+while (true) { // main event loop
+	int n = epoll_wait(efd, events, MAXEVENTS, 0);
+	for (int i=0; i<n; i++) { // iterate events
+		if (events[i].data.fd == lfd) { // new connection
+			int cfd = accept(sfd, ...); // connection fd
+			epoll_ctl(efd, EPOLL_CTL_ADD, cfd, ...);
+			fcntl(cfd,F_SETFL,fcntl(cfd,F_GETFL,0)|O_NONBLOCK);
+		}
+		else if (events[i].events & EPOLLIN){//ready to recv
+			do { // fetch all received data
+				cnt = recv(events[i].data.fd, recvbuf, buflen);
+				recvbuf = next_recv_buf();
+			} while (cnt > 0);
+			// do processing
+		}
+		else if (events[i].events & EPOLLOUT){//ready to send
+			do { // flush send buf
+				cnt = send(events[i].data.fd, sendbuf, sendlen);
+				sendbuf += cnt; sendlen -= cnt;
+			} while (cnt > 0 && sendlen > 0);
+		}
+	}
+}
+\end{lstlisting}
+
+\caption{Pseudo-code of a typical socket server application, showing most important socket operations. A socket connection is a FIFO byte-stream channel identified by an integer \emph{file descriptor} (FD). Linux enables a readiness-driven I/O multiplexing model, in which the OS tells application which FDs are ready to receive or send, then the application may prepare buffers and issue socket operations.}
+\label{socksdirect:fig:socket-pseudo-code}
+
+\end{figure}
+\fi
+
+
+Socket is the standard communication primitive among applications, containers and hosts.
+%For example, a web service typically contains an HTTP load balancer, Web application, key-value store and database, which communicate via TCP or UNIX socket.
+%Socket is also used to exchange data between parameter server and workers in Tensorflow and from mapper to reducer in Spark.
+%The socket API was designed in 1980s when network communication has millisecond scale latency, so the computation overhead in OS networking stack is negligible.
+%In contrast, modern data centers have networks with microsecond scale latency and throughput comparable to intra-host buses, making socket a well-known bottleneck for communication intensive applications.
+Modern data center networks have microsecond-level base latency and tens of Gbps throughput. However, traditional Linux socket is implemented in the OS kernel space with shared data structures, making socket a well-known bottleneck for communication intensive applications running on multiple hosts~\cite{barroso2017attack}. In addition to inter-host communications, cloud applications and containers at the same host often communicate with each other, making intra-host socket communication increasingly important in the cloud era. Under stress tests, applications such as Nginx~\cite{reese2008nginx}, Memcached~\cite{fitzpatrick2004distributed} and Redis~\cite{carlson2013redis} consume 50\% to 90\% CPU time in the kernel, mostly dealing with TCP socket operations~\cite{jeong2014mtcp}.
+
+\iffalse
+%To understand the cost of socket, we first need to know the functions of socket.
+TCP socket in a modern OS typically has three functions:
+\begin{ecompact}
+	\item Address, locate and connect to another application; % in the system via IP and port;
+	\item Provide a reliable and ordered communication channel, identified by an integer \emph{file descriptor} (FD);
+	\item Multiplex events from multiple channels， e.g., poll and epoll. Most Linux applications use a readiness-driven I/O multiplexing model. The OS tells application which FDs are ready to receive or send, then the application may prepare buffers and issue receive or send operations.
+\end{ecompact}
+\fi
+
+Conceptually, the Linux networking stack is composed of three layers. First, the VFS layer provides socket APIs (e.g. \emph{connect}, \emph{send}, \emph{epoll}) to applications. A socket connection is a bidirectional, reliable and ordered pipe, identified by an integer \emph{file descriptor} (FD).
+Second, the transport layer, traditionally TCP/IP, provides I/O multiplexing, congestion control, loss recovery, routing and QoS functions.
+Third, the NIC layer communicates with the NIC hardware (or the virtual loopback interface for intra-host socket) to send and receive packets.
+It is well known that the VFS layer contributes a large portion of cost~\cite{clark1989analysis,boyd2010analysis}.
+This can be verified by a simple experiment: the latency and throughput of Linux TCP socket between two processes in a host is only a little worse than pipe, FIFO and Unix domain socket (Table~\ref{socksdirect:tab:operation-performance}).
+Pipe, FIFO and UNIX domain socket bypass the transport and NIC layers, but their performance is still not satisfactory.
+
+In the following, we categorize socket overhead into four types: per operation, per packet, per byte and per connection.
+%Clark et. al~\cite{clark1989analysis} categorized socket overhead into per-packet and per-byte costs.
+%Because connection establishment incurs significant cost~\cite{jeong2014mtcp,lin2016scalable} and some operations do not touch payload (e.g. \texttt{dup2}, \texttt{fnctl} and \texttt{epoll}), we include two additional types of costs: per connection cost and per operation cost, as Table~\ref{socksdirect:tab:overhead} shows.
+
+\begin{table}[t]
+	\centering
+		\begin{tabularx}{1\textwidth}{l|X|X}
+			\hline
+			Type & Overhead & Our Solution \\
+			\hline
+			\hline
+			Per op & Kernel crossing (syscall) & User space library (\S\ref{socksdirect:sec:architecture}) \\
+			\hline
+			Per op & Socket FD locks for concurrent threads \& processes & Lock-free socket sharing (\S\ref{socksdirect:subsec:fork}) \\
+			\hline
+			\hline
+			Per packet & Transport protocol (TCP/IP) & Use RDMA / SHM (\S\ref{socksdirect:subsec:lockless-queue}) \\
+			\hline
+			Per packet & Buffer management & New ring buffer (\S\ref{socksdirect:subsec:lockless-queue}) \\
+			\hline
+			Per packet & I/O multiplexing & Use RDMA / SHM (\S\ref{socksdirect:subsec:lockless-queue}) \\
+			\hline
+			Per packet & Interrupt handling & Event notification (\S\ref{socksdirect:subsec:process-mux}) \\
+			\hline
+			Per packet & Process wakeup & Event notification (\S\ref{socksdirect:subsec:process-mux}) \\
+			\hline
+			\hline
+			Per byte & Payload copy & Page remapping (\S\ref{socksdirect:subsec:zerocopy}) \\
+			\hline
+			\hline
+			Per conn. & Kernel FD allocation & FD remapping table (\S\ref{socksdirect:subsec:connection-management}) \\
+			\hline
+			Per conn. & Locks in TCB management & Distribute to \libipc{} (\S\ref{socksdirect:subsec:connection-management}) \\
+			\hline
+			Per conn. & New connection dispatch & Monitor daemon (\S\ref{socksdirect:subsec:connection-management}) \\
+			\hline
+		\end{tabularx}
+	\caption{Overheads in Linux socket.}
+	\label{socksdirect:tab:overhead}
+	
+\end{table}
+
+\subsubsection{Per Operation Overheads}
+\label{socksdirect:subsec:per-operation-overhead}
+\quad
+
+\parab{Kernel crossing.}
+Traditionally, socket APIs are implemented in kernel, thus require kernel crossing (system call) for each socket operation. To make it worse, the Kernel Page-Table Isolation (KPTI) patches~\cite{kpti} to protect against Meltdown~\cite{Lipp2018meltdown} attacks make kernel crossings 4x expensive, as Table~\ref{socksdirect:tab:operation-performance} shows.
+We aim to bypass kernel without compromising security.
+
+\parab{Socket FD locks.}
+%Many applications are multi-threaded for two reasons.
+%First, unlike FreeBSD, the asynchronous interface for reading and writing disk files in Linux cannot leverage OS cache and buffer, so the applications keep using a synchronous interface with multiple threads~\cite{nginx-multi-thread}.
+%Second, many web application frameworks prefer a synchronous programming model to process each user request because it is easier to write and debug~\cite{barroso2017attack}.
+Multiple threads in a process share socket connections. In addition, after a process forks, both parent and child processes share existing sockets. Sockets can also be passed to another process through Unix domain socket. To protect concurrent operations, Linux kernel acquires a per-socket lock for each socket operation~\cite{boyd2010analysis,han2012megapipe,lin2016scalable}. Table~\ref{socksdirect:tab:operation-performance} shows that a shared memory queue protected by atomic operations has 4x latency and 22\% throughput of a lockless queue, even if there is no contention.
+We aim to minimize synchronization overhead by optimizing for the common cases and remove synchronizations in frequently used socket operations.
+
+
+%\parab{Intra-host communication.}
+%Most existing approaches for intra-host socket either use kernel network stack or NIC loopback.
+%The kernel network stack has evolved to become quite complicated over the years~\cite{yasukata2016stackmap}, which is an overkill for intra-host communication. % may not need many TCP features, e.g., congestion control and loss recovery.
+
+%Arrakis uses the NIC to forward packets from one application to another.
+%As shown in Table~\ref{socksdirect:tab:operation-performance}, the hairpin latency from CPU to NIC is still 25x higher than inter-core cache migration delay ($\sim$30 ns). The throughput is also limited by Memory-Mapped I/O (MMIO) doorbell latency and PCIe bandwidth~\cite{neugebauer2018understanding,li2017kv}.
+
+%We aim to leverage user-space shared memory for intra-host socket communication.
+
+
+%%For inter-host communication inside data centers, there are two challenges for using RDMA.
+%%The first is to transparently determine whether or not the remote host supports \sys{}.
+%%We cannot use an out-of-band communication channel such as RDMA CM because it cannot pass through middleboxes in cloud network.
+%%The second is to bridge the semantics of socket and RDMA~\cite{dragojevic2014farm}.
+%The main challenge for leverage RDMA for inter-host socket communication is to bridge the semantics of socket and RDMA~\cite{dragojevic2014farm}.
+%For example, RDMA preserves messages boundaries while TCP does not.
+%For I/O multiplexing, RDMA provides a completion notification model while event polling in Linux socket requires a readiness model~\cite{han2012megapipe}.
+%Further, one-sided and two-sided RDMA verbs have different efficiency and overheads~\cite{kalia2014using,kaminsky2016design}.
+
+%We aim to use RDMA efficiently for inter-host socket communication, while falling back to TCP transparently in case of non-RDMA peers.
+
+%\parab{Many concurrent connections.}
+%Internet facing applications often need to serve millions of concurrent connections efficiently~\cite{jeong2014mtcp,lin2016scalable,belay2017ix}.
+%%In addition, because a socket connection provides a FIFO abstraction and the OS offers event multiplexing, 
+%Moreover, it is also common for two backend applications to create large number of connections between them, where each connection handles a concurrent task~\cite{ihm2011towards,jang2011sslshader,nishtala2013scaling}. In Linux, a socket connection has dedicated send and receive buffers, each is at least one page (4~KB) in size~\cite{davidskbs}. With millions of concurrent connections, the socket buffers can consume gigabytes of memory, most of which is empty. Random accesses to a large number of buffers also cause CPU cache misses and TLB misses. Similar issue exists in RDMA NICs with limited on-chip memory for caching connection states~\cite{mprdma,kaminsky2016design}.
+%%, which is slower than sequential access to a single buffer~\cite{li2017kv}. 
+%%This problem is exaggerated in RDMA. RDMA NIC caches connection states in limited on-board memory. Just over a few hundred active RDMA connections could cause cache misses and degrade performance~\cite{mprdma,kaminsky2016design}. 
+%%Moreover, event-driven applications use \texttt{epoll} to detect which connections are ready for send or receive. If the event queue is separated from data queues, each \texttt{recv} operation involves two cache migrations for event and data~\cite{yasukata2016stackmap}. 
+%
+%We aim to minimize memory cache misses per data transmission by multiplexing socket connections.
+
+
+\begin{table}[t]
+	\centering
+		\begin{tabular}{l|l|l|}
+			\hline
+			Operation	& Latency  & Throughput  \\
+			& ($\mu$s) & (M~op/s) \\
+			\hline
+			\hline
+			Inter-core cache migration	& 0.03 & 50 \\
+			\hline
+			Poll 32 empty queues & 0.04 & 24 \\
+			\hline
+			System call (before KPTI) & 0.05 & 21 \\
+			\hline
+			Spinlock (no contention) & 0.10 & 10 \\
+			\hline
+			Allocate and deallocate a buffer & 0.13 & 7.7 \\
+			\hline
+			Spinlock (contended) & 0.20 & 5 \\
+			\hline
+			Lockless shared memory queue & 0.25 & 27 \\
+			\hline
+			\textbf{Intra-host \sys} & 0.30 & 22 \\
+			\hline
+			System call (after KPTI) & 0.20 & 5.0 \\
+			\hline
+			Copy one page (4~KiB) & 0.40 & 5.0 \\
+			\hline
+			Cooperative context switch & 0.52 & 2.0 \\
+			\hline
+			Map one page (4~KiB) & 0.78 & 1.3 \\
+			\hline
+			NIC hairpin within a host & 0.95 & 1.0 \\
+			\hline
+			Atomic shared memory queue & 1.0 & 6.1 \\
+			\hline
+			Map 32 pages (128~KiB) & 1.2 & 0.8 \\
+			\hline
+			Open a socket FD & 1.6 & 0.6 \\
+			\hline
+			One-sided RDMA write & 1.6 & 13 \\
+			\hline
+			Two-sided RDMA send / recv & 1.6 & 8 \\
+			\hline
+			\textbf{Inter-host \sys} & 1.7 & 8 \\
+			\hline
+			Process wakeup & 2.8$\sim$5.5 & 0.2$\sim$0.4 \\
+			\hline
+			Linux pipe / FIFO & 8 & 1.2 \\
+			\hline
+			Unix domain socket in Linux & 9 & 0.9 \\
+			\hline
+			Intra-host Linux TCP socket & 11 & 0.9 \\
+			\hline
+			Copy 32 pages (128~KiB) & 13 & 0.08 \\
+			\hline
+			Inter-host Linux TCP socket & 30 & 0.3 \\
+			\hline
+		\end{tabular}
+	\caption{Round-trip latency and single-core throughput of operations (testbed settings in Sec.~\ref{socksdirect:subsec:methodology}). Message size is 8 bytes if not specified.}
+	\label{socksdirect:tab:operation-performance}
+	
+\end{table}
+
+
+\subsubsection{Per Packet Overheads}
+\label{socksdirect:subsec:per-packet-overhead}
+\quad
+
+\parab{Transport protocol (TCP/IP).}
+Traditionally, TCP/IP is the de-facto transport protocol in datacenters.
+TCP/IP protocol processing, congestion control and loss recovery consume CPU on every sent and received packet.
+In addition, loss detection, rate-based congestion control and TCP state machine use timers, which is hard to achieve both microsecond-level granularity and low overhead~\cite{jeong2014mtcp}.
+Fortunately, recent years witnessed large scale deployment of RDMA in many datacenters~\cite{guo2016rdma,zhu2015congestion,mittal2015timely}.
+RDMA provides a hardware-based transport comparable to TCP/IP, therefore it is desirable to offload the transport protocol to the RDMA NIC.
+For intra-host sockets, we aim to completely bypass the transport protocol. %as Linux \emph{pipe} does.
+
+\parab{Buffer management.}
+Traditionally, CPU send and receive packets from NICs via \emph{ring buffers}.
+A ring buffer is composed of a fixed number of fixed-length metadata entries.
+Each entry points to a buffer that stores the packet payload.
+To send or receive a packet, a buffer needs to be allocated and deallocated.
+The cost is shown in Table~\ref{socksdirect:tab:operation-performance}.
+Further, to ensure MTU-sized packets can be received, each receive buffer should have a size of at least one MTU.
+However, many packets are smaller than MTU~\cite{thompson1997wide}, so the internal fragmentation decreases memory utilization and locality.
+Although modern NICs support LSO and LRO~\cite{lsolro} to batch multiple packets in a buffer, we aim to completely remove the overhead.
+
+\parab{I/O multiplexing.}
+With legacy NICs, received packets of different connections are often mixed in the ring buffer, so the networking stack needs to sort the packets into corresponding socket buffers.
+Modern NICs support Receive Packet Steering~\cite{mellanox} that can map a specific connection to a dedicated ring buffer, which is used by high performance socket systems~\cite{jeong2014mtcp,lin2016scalable,libvma}.
+We leverage similar features in RDMA NICs which de-multiplex received packets to  QPs.
+
+\parab{Interrupt handling.}
+The Linux networking stack is separated into system call and interrupt contexts because it processes events from both applications and hardware devices.
+ACK clocking~\cite{mprdma} in TCP congestion control requires received packets to be responded timely.
+The interrupt context is not necessarily on the same core with application, resulting in poor core locality and inter-core synchronization.
+However, with RDMA NICs, packet processing that require accurate timing is handled by the NIC hardware.
+So, \libipc{} runs every socket operation to completion and use polling to wait for blocking operations.
+
+
+\begin{table*}[t]
+	\centering
+	\scalebox{0.68}{
+		\begin{tabularx}{1.45\textwidth}{l|X|X|X|X|X|X|X|X|X|X|}
+			\hline
+			& FastSocket & MegaPipe / StackMap & IX & Arrakis & SandStorm / mTCP & LibVMA & OpenOnload & Rsocket / SDP & FreeFlow & SocksDirect \\
+			\hline
+			\hline
+			Category & \multicolumn{2}{c|}{Kernel optimization} & \multicolumn{5}{c|}{User-space TCP/IP stack} & \multicolumn{3}{c|}{Offloading to RDMA NICs} \\
+			%\hline
+			%Changes needed for deployment & New kernel & New kernel & New kernel & New kernel & Lib+driver & Lib+driver & Lib+driver & Lib+driver & Lib+driver +daemon & Lib+driver +daemon \\
+			\hline
+			\hline
+			\multicolumn{11}{c|}{Compatibility} \\
+			\hline
+			\hline
+			Transparent to existing applications & \yes &   & \yes & \yes &   & \yes & \yes & \yes & \yes & \yes \\
+			\hline
+			\texttt{epoll} (Nginx, Memcached etc.) & \yes & \yes & \yes & \yes & \yes & \yes & \yes & & & \yes \\
+			\hline
+			Compatible with regular TCP peers &	\yes & \yes & \yes & \yes & \yes & \yes & \yes & & & \yes \\
+			\hline
+			Intra-host communication & \yes & \yes & & \yes & & & & & \yes & \yes \\
+			\hline
+			Multiple applications listen a port & \yes & \yes & & & & & & \yes & \yes & \yes \\
+			\hline
+			Full fork support & \yes & \yes & & & & & \yes & & & \yes \\
+			\hline
+			Container live migration & \yes & \yes & & & & & & & & \yes \\
+			\hline
+			\hline
+			\multicolumn{11}{c|}{Isolation} \\
+			\hline
+			\hline
+			Access control policy & Kernel & & Kernel & Kernel & & & & Kernel & Daemon & Daemon \\
+			\hline
+			Isolation among containers (VMs) & \yes & & \yes & \yes & & & & \yes & \yes & \yes \\
+			\hline
+			QoS (performance isolation) & Kernel & Kernel & Kernel & NIC & NIC & NIC & NIC & NIC & Daemon & NIC \\
+			\hline
+			\hline
+			\multicolumn{11}{c|}{Removed Performance Overheads} \\
+			\hline
+			\hline
+			Kernel crossing on data plane & & & Batched & \yes & Batched & \yes & \yes & \yes & \yes & $<$16KB msg \\
+			\hline
+			Socket FD locks & & & & & & & & & & \yes \\
+			\hline
+			Transport protocol & & & & & & & & \yes & \yes & \yes \\
+			\hline
+			Buffer management & & & & & & & & & & \yes \\
+			\hline
+			I/O multiplexing \& Interrupt handling & & Improved & \yes & \yes & Improved & \yes & \yes & \yes & \yes & \yes \\
+			\hline
+			Process wakeup & & & & & & & & & & \yes \\
+			\hline
+			Payload copy & & \yes & & & \yes & & & & & $\ge$16KB msg \\
+			\hline
+			Kernel FD allocation & & \yes &  &  & \yes & & & & & \yes \\
+			\hline
+			TCB mgmt \& Connection dispatch & \yes & \yes & \yes & \yes & \yes & & & & & \yes \\
+			\hline
+		\end{tabularx}
+	}
+	\caption{Comparison of high performance socket systems.}
+	\label{socksdirect:tab:related-work}
+	
+\end{table*}
+
+
+
+
+\parab{Process wakeup.}
+When a process calls an RPC and waits for the reply, should it relinquish CPU to other processes that are ready to run?
+The answer of Linux is yes, and waking up a sleeping process takes 3 to 5 $\mu$s as shown in Table~\ref{socksdirect:tab:operation-performance}.
+During the round-trip time of an intra-host RPC, two process wake-ups contribute more than half of the latency.
+%The wakeup costs of semaphore, mutex or futex are also in the 3 to 5 $\mu$s range.
+Noting that RPC latency via RDMA is even lower than the wakeup cost, many systems use polling, which only allow one process per core.
+In order to hide the microsecond scale RPC latency~\cite{barroso2017attack}, we observe that cooperative context switch via \texttt{sched\_yield} is much faster than process wakeup.
+We aim to share a core among processes efficiently.
+
+%\parab{Container network.}
+%Many container deployments use isolated network namespaces for containers, which communicate via a virtual overlay network.
+%In Linux, a virtual switch~\cite{pfaff2015design} forwards packets among host NIC and virtual NICs in containers.
+%This architecture incurs the overhead of multiple context switches and memory copies on each packet, and the virtual switch becomes the bottleneck~\cite{pfefferle2015hybrid}.
+%Slim~\cite{slim} reduces three kernel round-trips to one.
+%Several works~\cite{martins2014clickos,roghanchi2017ffwd,huang2017high,nsdi19freeflow} delegate all operations to a virtual switch running as a daemon process, so it adds delay and CPU cost on data path.
+%Our solution is a centralized control plane for isolation and distributed data plane for performance.
+
+
+\subsubsection{Per Byte Overheads}
+\label{socksdirect:subsec:per-byte-overhead}
+\quad
+
+\parab{Payload copy.}
+In most socket systems, the semantics of \texttt{send} and \texttt{recv} cause memory copies between application and network stack. For non-blocking \texttt{send}, the system needs to copy data out of the buffer because the application may overwrite the buffer right after \texttt{send} returns. Simply removing the copy may violate application correctness.
+Zero copy \texttt{recv} is even harder than \texttt{send}.
+Linux provides a readiness-based event model, i.e. the application is aware of the incoming data (e.g. via \texttt{epoll}) and then call \texttt{recv}, so the data received by the NIC but not delivered to the application must be stored in the system buffer.
+Because \texttt{recv} allows the application to provide any buffer as the data destination, system needs to copy data from system to application buffer. 
+%If we buffer data on the sender and only transmit it on \texttt{recv}, the receiver needs to wait for a round-trip time. For this reason, socket implementations buffer data on the receiver and copy it to application on \texttt{recv}.
+We aim to allow zero copy for large transfers in standard socket applications.
+
+
+
+\subsubsection{Per Connection Overheads}
+\label{socksdirect:subsec:per-connection-overhead}
+\quad
+
+\parab{Kernel FD allocation.}
+In Linux, each socket connection is a file in VFS, so an integer FD and an \emph{inode} need to be allocated.
+The challenge for a user-space socket is that there are many APIs (e.g. open, close and epoll) that support both socket and non-socket FDs (e.g. files and devices), so we must distinguish socket FDs from others.
+Linux compatible sockets in user space~\cite{libvma,rsockets} typically open a file in kernel to obtain a dummy FD for each socket, so they still need kernel FD allocation.
+LOS~\cite{huang2017high} partitions the FD space to user and kernel portions, but violates the property that Linux allocates the smallest available FD.
+However, many applications such as Redis~\cite{redis} and Memcached~\cite{memcached} rely on this property.
+We aim to bypass kernel in socket FD allocation while keeping compatibility.
+
+\parab{Locks in TCB management.}
+During connection establishment, Linux acquires several global locks to allocate the TCB (TCP control block).
+Recent works such as MegaPipe~\cite{han2012megapipe} and FastSocket~\cite{lin2016scalable} reduce lock contention by partitioning the global tables, but as Table~\ref{socksdirect:tab:operation-performance} shows, non-contended spinlocks are still expensive.
+We distribute the work to the user-space library \libipc{} in each process.
+
+\parab{New connection dispatch.}
+Multiple processes and threads may listen on a same port to accept incoming connections.
+In Linux, cores handling \texttt{accept} calls contend on the queue of incoming connections.
+We leverage the fact that delegation is faster than locking~\cite{roghanchi2017ffwd} and use the monitor daemon to dispatch new connections.
+
+
+%Most modern applications use socket in an event-driven style. similar to Figure~\ref{socksdirect:fig:socket-pseudo-code}.
+
+%Socket is a well-known bottleneck for communication intensive applications. We stress test Nginx load balancer, memcached and Redis with one request per TCP connection or a stream of requests on pre-established TCP connections, and find that 50\%$\sim$90\% CPU time is consumed in the kernel, mostly dealing with socket system calls. The one request per connection scenario shows much lower throughput, because of overhead in connection creation.
+
+%If we were able to mitigate the overhead associated with sockets, application performance would be 2x$\sim$10x.
+%As another example, we replaced socket with RDMA and enabled zero copy gRPC in distributed Tensorflow~\cite{abadi2016tensorflow}, and training a VGG network shows 5x speedup.
+
+%Socket is a well-known bottleneck in fast data center networks \RED{(cite)}. In a data center, we categorize systems that process queries from Internet users to be \textit{front-end} (\textit{e.g.} DNS server, load balancer and Web service), and the other systems (\textit{e.g.} database, stream processing and machine learning) to be \textit{back-end}.
+
+%For front-end systems, as shown in Figure~\ref{socksdirect:fig:socket-kernel-time}, 70\% -- 90\% CPU time is used in socket system calls. They maintain a large number of socket connections to Internet users. Establishing a socket connection takes $\approx$40$\mu$s CPU time, so a CPU core can only serve 25K new connections per second~\cite{lin2016scalable}.
+
+%For back-end systems, the performance using socket is significantly worse than using RDMA or shared memory. This is because back-end systems interact frequently with other nodes and services, consequently the latency is vital for their performance. As shown in Figure~\ref{socksdirect:fig:socket-comparison}, socket latency between different processes in a same server is $\approx$10~$\mu$s, even much higher than inter-server RDMA latency ($\approx$2~$\mu$s).
+
+%\textbf{Event-driven programming.}
+
+%\textbf{Socket process: connection setup and data transmission.}
+
+\subsection{High Performance Socket Systems}
+\label{socksdirect:subsec:related-work}
+
+
+
+
+Many high performance socket systems have been proposed from both academia and industry, as Table~\ref{socksdirect:tab:related-work} shows.
+
+\parab{Kernel network stack optimization:} The first line of work optimizes the kernel TCP/IP stack. FastSocket~\cite{lin2016scalable}, Affinity-Accept~\cite{pesterev2012improving}, FlexSC~\cite{soares2010flexsc} and zero-copy socket~\cite{thadani1995efficient,chu1996zero,linux-zero-copy} achieve good compatibility and isolation.
+
+MegaPipe~\cite{han2012megapipe} and StackMap~\cite{yasukata2016stackmap} propose new APIs to achieve zero copy and improve I/O multiplexing, at the cost of requiring application modifications.
+However, the bulk of kernel overheads are still there.
+The challenge for supporting zero copy is the socket semantics, as discussed in Sec.~\ref{socksdirect:subsec:per-byte-overhead}.
+
+\parab{User-space TCP/IP stack:} The second line of work completely bypasses kernel TCP/IP stack and implements TCP/IP in user space.
+In this category, IX~\cite{belay2017ix} and Arrakis~\cite{peter2016arrakis} are new OS architectures that use virtualization to ensure security and isolation. IX leverages LwIP~\cite{dunkels2001design} to implement TCP/IP in user space while using kernel to forward every packet for performance isolation and QoS. In contrast, Arrakis offloads QoS to NIC, therefore bypasses kernel for data plane.
+They use the NIC to forward packets between applications in a same host.
+As shown in Table~\ref{socksdirect:tab:operation-performance}, the hairpin latency from CPU to NIC is much higher than inter-core cache migration delay.
+The throughput is also bounded by Memory-Mapped I/O (MMIO) doorbell latency and PCIe bandwidth~\cite{neugebauer2018understanding,li2017kv}.
+
+Apart from these new OS architectures, many user space sockets use high performance packet I/O frameworks on Linux, e.g., Netmap~\cite{rizzo2012netmap}, Intel DPDK~\cite{dpdk} and PF\_RING~\cite{pf-ring}, in order to directly access NIC queues in user space.
+SandStorm~\cite{marinos2014network}, mTCP~\cite{jeong2014mtcp}, Seastar~\cite{seastar} and F-Stack~\cite{fstack} propose new APIs and thus need to modify applications.
+Most of the API changes aim to support zero copy, and the standard API still copies data.
+%FaSST~\cite{kalia2016fasst} and eRPC~\cite{kalia2018datacenter} provide RPC APIs rather than socket.
+LibVMA~\cite{libvma}, OpenOnload~\cite{openonload}, DBL~\cite{dbl} and LOS~\cite{huang2017high} conform to the standard socket API.
+
+User-space TCP/IP stacks provide much better performance than Linux, but it is still not close to RDMA and SHM.
+One important reason is that none of existing works support sharing a socket among threads and processes, causing compatibility problems in fork and container live migration, and multi-thread locking overhead as well.
+
+First, when a process forks, only one of the parent and child processes can use existing sockets.
+However, many web services~\cite{apache,nginx,php-fpm,python-gunicorn,vsftpd} and key-value stores~\cite{memcached} have a master process to accept a connection and (optionally) read the request header, then it may fork off a child process to handle the request, where the child needs to access the socket.
+At the same time, the parent process still needs to accept new connections via existing sockets.
+This makes such web services fail to work.
+A more tricky case is that parent and child processes may concurrently write to logging servers via existing sockets.
+
+Second, container live migration is related to fork.
+It resembles forking a container (to a new host) and the child container should still be able to access the socket.
+
+Third, multi-threading is common in applications.
+Either the application takes the risk of race conditions in socket operations, or a socket FD lock must be taken per operation.
+The latter approach guarantees correctness, but locking hurts performance even if there is no contention.
+
+%\RED{Wei: The above paragraph looks very confusing.}
+
+\parab{Offloading transport to NICs:}
+The third line of research offload part of the socket system to NIC hardware.
+TCP Offload Engines (TOE)~\cite{tcp-chimney-offload} offload part or full TCP/IP stack to the NIC, but they only took off in specialized areas (e.g. iSCSI HBA~\cite{iscsi-hba}) and stateless offloads (e.g. checksum, flow steering and LSO/LRO~\cite{lsolro}).
+The story of \emph{stateful} offloads is different in recent years because of hardware trends and application demands in datacenters~\cite{chuanxiong-rdma-keynote}.
+As a result, RDMA~\cite{infiniband2000infiniband} becomes widely available in production data centers~\cite{guo2016rdma}.
+RDMA uses hardware offloading to provide ultra low latency and near zero CPU overhead compared to software-based TCP/IP network stacks.
+To enable socket applications to use RDMA, RSocket~\cite{rsockets}, SDP~\cite{socketsdirect} and UNH EXS~\cite{russell2008extended} translate socket operations to RDMA verbs.
+They have similar designs, and RSocket is the most actively maintained one.
+FreeFlow~\cite{nsdi19freeflow} virtualizes an RDMA NIC for container overlay network, which leverages SHM for intra-host and RDMA for inter-host communication.
+FreeFlow uses RSocket to translate socket to RDMA.
+
+However, these works have limitations due to abstraction mismatch of RDMA and sockets.
+On the compatibility side, first, they lack support for several important APIs, e.g. \textit{epoll}, so it is not compatible with many applications including Nginx, Memcached, Redis, etc.
+This is because RDMA only provides transport functions, while \textit{epoll} is a file abstraction integrated with OS event notification.
+Second, RDMA QP does not support \textit{fork} and container live migration~\cite{nsdi19freeflow}, so RSocket has the same problems.
+Third, because RSocket uses RDMA as wire protocol, it cannot connect to regular TCP/IP peers.
+This is a deployment challenge because all hosts and applications in a distributed system must switch to RSocket simutanenously.
+We aim to transparently detect whether the remote side supports Rsocket, and fall back to TCP/IP if not.
+On the performance side, they fail to remove payload copy, socket FD locks, buffer management, process wakeup and the per connection overheads.
+For example, RSocket allocates buffers and copies payload on both send and receive sides.
+Similar to Arrakis, RSocket uses the NIC for intra-host communication, thus incurring a performance bottleneck.
+%In addition, they use two-sided RDMA \texttt{send} and \texttt{recv}, but one-sided RDMA \texttt{write} has higher throughput due to lower CPU cost on receive side (Table~\ref{socksdirect:tab:operation-performance}).
+%However, such simple translations suffer from throughput degradation with a large number of concurrent connections. This is because RDMA NIC keeps per-connection states using a $\approx$2~MB~\cite{kalia2018datacenter} on-NIC memory as cache. With hundreds of concurrent connections, we will suffer from frequent cache misses, resulting in serious throughput degradation~\cite{mprdma,kaminsky2016design}. 
+
+
+%Spinlock in kernel is implemented with Compare-And-Swap (CAS) instruction, which costs $100\sim200$~ns per acquire and release. In comparison, shared memory message passing only needs one cache migration~\cite{roghanchi2017ffwd} (30~ns).
+%In comparison, shared memory message passing
+%Scalability analysis of Linux system calls~\cite{boyd2010analysis,clements2015scalable} suggests that many socket operations are not commutable and thus impossible to scale for all cases. 
+%For example, socket provides \texttt{SO\_REUSEPORT} option. When this option is enabled, multiple processes on one host can \texttt{bind} to the same port and incoming connections are dispatched to the listeners. During connection setup, coordination is required to allocate file descriptors and port numbers, load balance connections and allocate buffers. In addition, a socket may be shared by multiple processes and threads in a same process share socket connections. When a process forks, the parent and child processes also share the sockets created before fork.
+
+
+%For inter-server data transmission, Linux kernel copies data four times: on the send side, from application to kernel socket buffer, then to NIC ring buffer; the receive side is similar. For intra-server, data is copied three times: from application to kernel send buffer, then to kernel receive buffer via loopback interface, and finally to another application. Each CPU core can copy $\approx$5~GiB data per second~\cite{panda2016netbricks}, that's why a kernel TCP connection is hard to saturate an 100~Gbps NIC.
+%Historically, \texttt{send} was designed as a blocking operation, and the send buffer may be overwritten by the application after \texttt{send} function call.
+%In a non-blocking \texttt{send}, the process could overwrite the send buffer after \texttt{send} function call returns. To avoid race condition on the data buffer, network stack needs to copy data to an internal buffer. %before \texttt{send} returns, and then send the copied data in background.
+%For the \texttt{recv} operation, application provides a buffer and read the data after \texttt{recv}.
+%If we implement \texttt{send} as a lazy operation, \textit{i.e.}, the data is buffered on the sender, the receiver needs to wait for a round-trip time on \texttt{recv}.
+%For this reason, most socket implementations send data to the receiver eagerly.
+%Because the receiver's network stack cannot predict the user-provided \texttt{recv} address, it needs to buffer received data internally, then copy to the desired destination when \texttt{recv} is called.
+%Our goal in \sys is to achieve zero copy for large data transfers without making changes to applications. We accomplish this by taking advantage of the page mapping mechanism in virtual memory. 
+
+
+
+
+
+
+
+%\textbf{Virtual file system.}
+%Each socket connection is a \textit{file descriptor} (FD) in Linux. First, each new connection involves expensive \texttt{inode} and \texttt{dentry} creation in the \texttt{proc} file system, which is not scalable and rarely used except for diagnostic and monitoring utilities. Second, socket operations need to pass through the virtual file system (VFS), which introduces CPU overhead and additional latency.
+
+
+
+
+
+%\subsection{High Performance Socket Systems}
+%\label{socksdirect:sec:related}
+
+
+\iffalse
+\begin{table*}[t]
+	\centering
+	\scalebox{0.88}{
+		\begin{tabular}{l|c|ccc|cc|ccc|}
+			\hline
+			Category	& \multicolumn{1}{c|}{Linux Opt.} & \multicolumn{3}{c|}{New Kernel Stack} & \multicolumn{2}{c|}{User-space Packet} & \multicolumn{3}{c|}{User-space Socket} \\
+			\hline
+			System	& FastSocket & IX & MegaPipe & StackMap & Arrakis & FreeFlow & mTCP & libvma & SocksDirect \\
+			\hline
+			\hline
+			Socket-like API & \yes & & \yes & \yes & \yes & & \yes & \yes & \yes \\
+			\hline
+			Linux Compatible & \yes & & & & & & & \yes & \yes \\
+			\hline
+			Process Isolation & \yes & \yes & \yes & \yes & \yes & \yes & \yes & \yes & \yes \\
+			\hline
+			\hline
+			Kernel Bypass & & & & & \yes & \yes & \yes & \yes & \yes \\
+			\hline
+			Cooperative Multitasking & & & & & & & & & \yes \\
+			\hline
+			Zero Copy & & \yes & & \yes & \yes & \yes & & & \yes \\
+			\hline
+			\hline
+			NIC-bypass IPC & \yes & & \yes & \yes & & \yes & \yes & & \yes \\
+			\hline
+			RDMA as Transport & & & & & & \yes & & & \yes \\
+			\hline
+			\hline
+			Scalable Socket Creation & \yes & \yes & \yes & \yes & \yes & \yes & \yes & & \yes \\
+			\hline
+			Lock-free Multi-thread & & & & & & & & & \yes \\
+			\hline
+			Scale to Many Sockets & \yes & \yes & \yes & \yes & & & \yes & & \yes \\
+			\hline
+		\end{tabular}
+	}
+	\caption{Comparison of high performance socket systems.}
+	\label{socksdirect:tab:old-related-work}
+	
+\end{table*}
+\fi

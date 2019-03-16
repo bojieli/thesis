@@ -1,0 +1,146 @@
+\section{Introduction}
+\label{socksdirect:sec:intro}
+
+%Most cloud applications use the socket API for inter-process communication among components or containers inside a same server and across data center network, in addition to serving Internet users. For example, communication intensive applications (\textit{e.g.} Nginx and memcached) spend 50\%$\sim$90\% of CPU time in the OS kernel, mostly processing socket operations.
+%The overhead of Linux socket attributes to kernel crossing in system calls, context switch, process scheduling, synchronization, memory copy, cache miss and TCP transport.
+%Applications in high performance computing have a long tradition of using shared memory for intra-server communication and RDMA for inter-server, thus avoiding the overheads above.
+%However, these abstractions are radically different from socket, so it is complicated and potentially insecure to port socket applications to shared memory and RDMA.
+%The overhead of Linux socket becomes salient given the rapid growth of network speed and number of CPU cores per server. %We benchmark communication intensive applications (\textit{e.g.} Nginx and memcached) and find that 50\%$\sim$90\% of CPU time is spent in the OS kernel. When more CPU cores are utilized, they even spend a larger portion of time in the kernel~\cite{boyd2010analysis}. In addition to CPU overhead, latency is also a problem. The round-trip time (RTT) between two processes communicating with shared memory can be as low as 0.2$\mu$s, while TCP socket RTT between two cores is $\approx$16$\mu$s. In a data center, the RTT between RDMA servers is also one order of magnitude lower than kernel TCP/IP stack.
+
+Socket API is the most widely used communication primitive in modern applications. It is used universally for communications among processes, containers and hosts.
+Linux socket can only achieve latency and throughput numbers which are an order of magnitude worse than the raw capability of hardware.
+%Socket operations have latency and throughput one order of magnitude worse than the raw hardware.
+%Socket operations are expensive and scale poorly with modern multi-core CPUs.
+%Communication intensive applications such as distributed key-value stores and web servers could spend 50\%$\sim$90\% of CPU time in the OS kernel~\cite{jeong2014mtcp}, mostly processing socket operations.
+
+There exists an extensive body of work aiming at improving socket performance.
+Existing approaches either optimize the kernel networking stack~\cite{lin2016scalable,han2012megapipe,yasukata2016stackmap}, or move TCP/IP stack to user-space~\cite{jeong2014mtcp,marinos2014network,seastar,fstack,libvma}, or offload transport to RDMA NICs~\cite{rsockets,socketsdirect}.
+However, all these solutions have limitations on compatibility and performance.
+Most of them are not fully compatible with native socket in areas such as process fork, event polling, multiple application socket sharing and intra-host communication.
+Some of them~\cite{jeong2014mtcp} have isolation problems that do not allow multiple applications to share a NIC.
+%To achieve full compatibility, these solutions often incur the overhead of kernel crossing or virtual switch
+%Second, some user-space sockets do not allow multiple applications to share the NIC hardware.
+%Those solutions that do achieve better compatibility often incur the overhead of kernel crossing or virtual switch.
+Even in the performance front, there is still much room for improvement. None of existing work can achieve performance close to raw RDMA, because they fail to remove some important overheads such as multi-thread synchronization, buffer management and memory copy.
+For example, a socket is shared among threads in a process, so, many systems use locking to avoid race conditions.
+
+%\textcolor{red}{Wei: This seems not promising because socket to RDMA has many solutions.}
+%It is often believed that the legacy socket API contributes most to the overheads, so many high performance socket systems propose alternative APIs that require developers to change application code.
+%In addition, when the number of active threads is larger than that of CPU cores, polling and kernel event notification are a dilemma.
+%Finally, they cannot take advantage of low latency networking provided by RDMA.
+%These approaches still have limitations, either not fully removing some of the important overheads such as context switch and synchronization~\cite{lin2016scalable,han2012megapipe,jeong2014mtcp,baumann2009multikernel}, not fully compatible with Linux socket API, or cannot take advantage of modern networking hardware capabilities such as RDMA~\cite{dunkels2001design,jeong2014mtcp,libvma,openonload}.
+%There has been extensive work aiming to release the bare metal performance of multi-core CPU and data center network. For intra-server communication, there are mainly three lines of research. The first category of work use the NIC as a switch~\cite{peter2016arrakis,belay2017ix,yasukata2016stackmap}, but going deep to the NIC introduces $\approx2 \mu$s delay due to PCIe latency, one order of magnitude higher than shared memory. A second line of work optimize or redesign the kernel socket stack~\cite{lin2016scalable,han2012megapipe,jeong2014mtcp,baumann2009multikernel}, where the kernel uses peer-to-peer shared memory communication among cores. However, this approach does not eliminate context switch overhead, while system call batching introduces extra latency. Some other works use dedicated cores as a virtual switch~\cite{huang2017high}, which limits multi-core scalability.
+
+%For inter-server communication, most works leverage a user-space stack~\cite{dunkels2001design,jeong2014mtcp,libvma,openonload} to achieve kernel bypass, but the CPU still needs to handle reliable transport. As RDMA becomes widely available in data centers, we hope to offload the transport to RDMA NICs when the peer supports RDMA. Furthermore, most works assume only one connection per pair of processes. However, load balancers, web servers and application gateways serve many concurrent connections~\cite{nishtala2013scaling,lin2016scalable,belay2017ix}. In light of this, both connection setup, event notification and data transmission under high concurrency need to be efficient.
+
+%To demonstrate high performance, most existing works propose new abstractions for inter-process and inter-server communication.  existing socket applications need modifications to use the new abstractions. Furthermore, these stacks are not optimized for a large number of concurrent or short-lived connections, which is an important workload to serve Internet users and large distributed systems.
+
+%One line of research optimize the kernel code or design user-space compatible stacks for higher socket performance. The kernel optimization approach does not eliminate context switch overhead, while system call batching introduces extra latency. User-space stacks are mostly designed for inter-server connections. With the trend of containerized micro-services, we expect an increasing number of applications or containers to be hosted on each server, where inter-process communication (IPC) inside server has more significance.
+
+%To simplify deployment, we hope to accelerate existing applications without modification to the code. \textit{Socket compatibility} adds another dimension of challenge. The socket interface was designed for networking and IPC in millisecond scale, when memory copy, context switch, synchronization, cache miss and cache migration were considered inexpensive~\cite{barroso2017attack,belay2017ix}. An efficient socket architecture for microsecond-scale networking and IPC requires minimizing all overheads above. The semantics lead to challenges. First, the send buffer can be modified by application after non-blocking \texttt{send}, and the receive buffer is not determined until application calls \texttt{recv}. Data copy on \texttt{send} and \texttt{recv} seems mandatory. Second, connections are shared by processes and threads after \texttt{fork} and thread creation. It is challenging to avoid synchronization in this multi-producer and multi-consumer FIFO model. Third, multiple processes listening on a same IP and port compete for incoming connections.
+
+%\textbf{The above part is motivation and related work.}
+
+%The goal of this work is to answer the question: Can a Linux compatible and general purpose socket system provide performance comparable to RDMA systems?
+Realizing these limitations, we design \sys{}, a user-space socket system to achieve compatibility, isolation and high performance simultaneously.
+\begin{ecompact}
+	\item \textbf{Compatibility}.
+	Applications can use \sys{} as a drop-in replacement without modifications.
+	It supports both intra-host and inter-host communication, and behaves correctly during process fork and thread creation.
+	%If a remote peer does not support \sys{}, the system falls back to TCP transparently.
+	\item \textbf{Isolation}.
+	\sys{} preserves isolation among applications and containers, and it enforces access control policies.
+	\item \textbf{High Performance}.
+	\sys{} delivers high throughput and low latency that is comparable to raw RDMA and scalable with number of CPU cores.
+\end{ecompact}
+
+
+To achieve high performance, \sys fully exploits the capability of modern hardware. It leverages RDMA for inter-host communication and uses \emph{shared memory} (SHM) for intra-host communication. However, translating socket functions to RDMA and SHM operations is non-trivial. Straightforward solutions may violate compatibility or leave much performance on the table. For example, after socket \emph{send()} returns, the application may overwrite the buffer. In contrast, send in RDMA needs to pin and write-protect the buffer. Existing works~\cite{rsockets} either provide a zero copy API incompatible with unmodified applications, or manage internal buffers and copy data from application buffer. %For example, \textcolor{red}{Take socket send() to RDMA send operations as an example here. If no memory copy, compatibility. If memory copy, performance degradation. Btw, how to point out isolation problem here?}
+
+To achieve all the three goals simultaneously, we first need to understand how Linux socket provides compatibility and isolation. Linux socket provides a virtual file system (VFS) abstraction to applications. With this abstraction, application developers can do communication like operating files, without digging into network protocol details. This abstraction also provides good isolation among applications that share an address and port space. However, the VFS abstraction is very complicated and many APIs are inherently not scalable~\cite{clark1989analysis,boyd2010analysis,jeong2014mtcp}.
+
+We find that many commonly used socket operations are actually simple despite the generality and complexity of VFS. Therefore, our design principle is optimizing for the common situations while staying compatible in general.
+
+To speedup data transmission while keeping isolation in connection management, \sys{} separates control and data plane~\cite{peter2016arrakis}.
+We design a \emph{monitor} daemon in each host as the \emph{control plane} to enforce access control policies, manage address/port resources, dispatch new connections, and establish transport channels between communication peers.
+The \emph{data plane} is handled by a dynamically loaded user-space library \libipc{}, which intercepts function calls to Linux \emph{glibc}. \libipc{} implements socket APIs in user space and forwards non-socket related APIs to the kernel.
+%Applications can take advantage of \libipc{} by simply using the \emph{LD\_PRELOAD} environment variable in Linux to load the library.
+
+
+In \sys{}, data transmission and event polling is handled in a peer-to-peer fashion between processes.
+%, while connection establishment is delegated to the monitor.
+We exploit multiple techniques to effectively utilize hardware and improve system efficiency.
+In general, a socket connection is shared among threads and forked processes.
+To avoid race conditions in accessing socket metadata and buffers, synchronization is needed. Rather than locking on each operation, we design a token-based approach for sharing that remove synchronization overhead for the common case.
+When sending and receiving data from NICs, existing systems allocate buffers for each packet.
+To remove buffer management overhead, we design a per-connection ring buffer with two copies on both sender and receiver, then leverage RDMA and SHM to synchronize from sender ring buffer to receiver.
+To achieve zero copy for large messages, we leverage the virtual memory to remap pages.
+%Finally, we observe that cooperative context switch is faster than process wakeup, so we design a mechanism to allow CPU time sharing among polling processes.
+%\fi
+
+\iffalse
+
+We face many challenges designing \sys{}. 
+(1) How to share a socket among threads and forked processes without locking?
+(2) How to scale to many concurrent connections?
+(3) How to utilize shared memory and RDMA efficiently for intra- and inter-host communication?
+
+In both multi-thread and multi-process scenarios, a connection may be shared by multiple senders and receivers.
+Existing approaches need locking to protect shared queue and metadata.
+To avoid locking overhead, we treat each thread as a separate process.
+%, even if the threads have shared memory address space.
+\libipc{} uses thread-specific storage and creates peer-to-peer queues between each pair of communicating threads.
+To preserve FIFO semantics, we optimize for the common case while prepare for the worst case, and take special care on fork and thread creation.
+
+To handle many concurrent connections efficiently, we need to save memory footprint and improve spatial locality.
+For each pair of threads, \sys multiplexes socket connections through one message queue.
+Rather than maintaining a separate buffer for each connection and an event notification queue, we receive events and data from the message queue directly.
+Observing the event-driven behavior of applications, in normal case the data in queue is fetched by the application in send order.
+We design carefully to enable fetching from the middle of queue and solve the head-of-line blocking problem.
+
+We leverage different transports to push performance to the limits of underlying hardware.
+For inter-process and inter-container sockets within a same host, we use shared memory in user space.
+For sockets among hosts in an RDMA enabled data center, \sys can transparently determine whether the remote endpoint supports \sys.
+we fall back to kernel TCP socket.
+We design different queue structures for shared memory and RDMA.
+We use batched one-sided RDMA write and amortize polling overhead with shared CQ.
+%In \sys, sending a small message involves only one cache migration or one-sided RDMA write.
+To remove memory copy for large messages, we use \emph{page remapping} to achieve transparent zero copy.
+To share a CPU core efficiently among multiple active threads, \sys uses \emph{cooperative multitasking} to remove thread wakeup overhead.
+
+\fi
+
+%The POSIX socket API was designed for networking and IPC in millisecond scale, leading to two performance challenges. First, connections are shared by processes and threads after \texttt{fork} and thread creation. Linux protects this multi-producer multi-consumer FIFO with locks. To scale a shared socket, we \textit{optimize for the common case and prepare for the worst case}. Senders transmit data via different queues in parallel. To ensure receiver ordering, based on the observation that applications seldom receive concurrently from a shared socket, the sender designates a receiver with exclusive access. We further develop mechanisms to avoid deadlock and starvation, in addition to handling unconsumed buffers during \texttt{fork} and thread creation.
+
+%Second, the send buffer can be modified by application after \texttt{send}, and the receive buffer is not determined until application calls \texttt{recv}. Data copy on \texttt{send} and \texttt{recv} seems mandatory. To avoid memory copy of large buffers, we extend the \textit{page remapping} approach~\cite{thadani1995efficient,chu1996zero}, which enables copy-on-write upon \texttt{send} and remaps send buffer to receiver's virtual address upon \texttt{recv}.
+%First, we intercept \texttt{memcpy} of full pages to reduce copy-on-write. Second, we move kernel-based page allocation to user-space while preserving security.
+%As a result, we achieve zero copy for both shared memory, RDMA and TCP transport.
+
+\sys{} achieves latency and throughput close to the raw performance achievable from the underlying SHM queue and RDMA.
+On the latency side, \sys{} achieves $0.3\mu$s RTT for intra-host socket, 1/35 of Linux and only $0.05\mu$s higher than a bare-metal SHM queue. For inter-host socket, \sys{} achieves $1.7\mu$s RTT between RDMA hosts, almost the same as raw RDMA write and 1/17 of Linux.
+On the throughput side, a single thread can send 23~M intra-host messages per second (20x of Linux) or 18~M inter-host (15x of Linux, 1.4x of raw RDMA write).
+For large messages, with zero copy, a single connection saturates NIC bandwidth.
+The performance above is scalable with number of cores.
+\sys{} offers significant speedup for real-world applications.
+For example, HTTP request latency of Nginx~\cite{nginx} improves by 5.5x, and RPCs are 50\% faster.
+
+In summary, this work makes the following contributions:
+\begin{ecompact}
+	\item An analysis of overheads in Linux socket.
+	\item Design and implementation of \sys{}, a high performance user space socket system that is compatible with Linux and preserves isolation among applications.
+	\item Techniques to support fork, lockless connection sharing, allocation free ring buffer and zero copy that may be useful in many scenarios other than sockets.
+	\item Evaluations show that \sys{} can achieve performance that is comparable to RDMA and SHM queue.
+\end{ecompact}
+
+%We evaluate end-to-end performance of \sys{} using two categories of applications: \textit{network functions} and \textit{web services}. For a multi-core pipelined network function (NF) chain, a socket application achieves comparable performance with a state-of-the-art NF framework~\cite{panda2016netbricks}. We also evaluate \sys{} on a standard web application composed of a load balancer, a web service and a key-value store.
+%For an HTTP request that involves multi-round-trip key-value store accesses, \sys{} reduces end-to-end latency by 2/3.
+
+\iffalse
+This paper makes the following contributions:
+\begin{ecompact}
+	\item A Linux compatible, secure and high performance user-space socket system that supports both inter-process, inter-container and inter-host communication.
+	\item A per-host monitor daemon for trusted control plane and peer-to-peer queues for scalable data plane.
+	\item A multi-sender and multi-receiver lockless queue to fully support fork and multi-thread socket sharing.
+	\item A memory efficient message queue that multiplexes multiple sockets and allows fetching from any socket, while using shared memory and RDMA transports efficiently.
+\end{ecompact}
+\fi

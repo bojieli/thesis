@@ -1,0 +1,28 @@
+\section*{Abstract}
+
+%Linux socket is implemented in the kernel space with shared data structures that needs concurrency protection, which incurs significant overhead.
+Communication intensive applications in hosts with multi-core CPU and high speed networking hardware often put considerable stress on the native socket system in an OS. 
+Existing socket replacements often leave significant performance on the table, as well have limitations on compatibility and isolation.
+%Communication intensive applications on modern computers with multi-core CPU and high-speed networking hardware 
+%often put considerable stress on traditional socket implementation. 
+%This design incurs significant kernel crossing and locking overhead.
+%Recent user-space sockets often do not support intra-host communication among containers and applications, or have limitations on compatibility, isolation and scalability with multiple threads and concurrent connections.
+
+%In this paper, we describe \sys{}, a high performance socket system that is fully compatible with Linux and can be used as a drop-in replacement with no modification to applications.
+%\sys{} is implemented in user space to avoid kernel crossing cost and simplify deployment.
+%Each host runs a monitor daemon to securely process the control plane, while the data plane bypasses the monitor.
+%We achieve multi-thread scalability by considering threads as a shared-nothing message passing distributed system.
+%To improve memory locality, we multiplex all connections and event notifications between a pair of threads via one queue.
+%We use a high performance shared memory queue for intra-host communication.
+%For inter-host communication, we take advantage of modern RDMA hardware, but can also transparently communicate with regular TCP/IP endpoints.
+%Together with carefully designed zero-copy mechanism and cooperative multitasking, it removes many overheads of existing socket systems.
+%Experiment shows that \sys{} achieves 4 to 24x message throughput, 10 to 60x better latency, and over 40x connection setup throughput compared with Linux socket.
+
+
+In this paper, we describe \sys, a user-space high performance socket system.
+\sys is fully compatible with Linux socket and can be used as a drop-in replacement with no modification to existing applications.
+To achieve high performance, \sys{} leverages RDMA and shared memory (SHM) for inter-host and intra-host communication, respectively.
+To bridge the semantics gap between socket and RDMA / SHM, we optimize for the common cases while maintaining compatibility in general.
+\sys achieves isolation by employing a trusted monitor daemon to handle control plane operations such as connection establishment and access control.
+The data plane is peer-to-peer between processes, in which we remove multi-thread synchronization, buffer management, large payload copy and process wakeup overheads in common cases.
+Experiments show that \sys achieves 7 to 20x better message throughput and 17 to 35x better latency compared with Linux socket, and reduces Nginx HTTP latency by 5.5 times.

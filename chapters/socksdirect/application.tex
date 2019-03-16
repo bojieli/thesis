@@ -1,0 +1,64 @@
+\subsection{Application Performance}
+\label{socksdirect:subsec:application}
+
+In this section, we demonstrate that \sys{} can significantly improve the performance of real-world applications without modifying the code.
+Rsocket~\cite{rsockets} is not compatible with any of the following applications.
+
+\subsubsection{Nginx HTTP Server}
+\quad
+
+To test a typical Web service scenario where the clients come from the network and served within a host, we use Nginx~\cite{nginx} v1.10 as a reverse proxy between an HTTP request generator and an HTTP response generator.
+Nginx and the response generator are in a same host, while the request generator is in a different host.
+The generators use a keep-alive TCP connection to communicate with Nginx.
+LibVMA~\cite{libvma} does not work with unmodified Nginx due to fork.
+In Figure~\ref{socksdirect:fig:eval-nginx}, the request generator measures the time from sending an HTTP request to receiving the whole response.
+For small HTTP response sizes, \sys{} reduces latency by 5.5x compared to Linux.
+For large responses, due to zero copy, \sys{} reduces latency by up to 20x.
+
+
+%In Figure B, to test the how Nginx throughput scales with multiple cores, we run Nginx with a fixed number of worker threads and response size 1KB.
+%The request generator sends multiple HTTP requests in parallel, and we use a sufficient number of generator threads to saturate Nginx throughput.
+%Figure B: throughput scalability with number of cores.
+
+\subsubsection{Redis Key-Value Store}
+\quad
+
+We measure Redis~\cite{redis} latency using redis-benchmark and 8-byte GET requests.
+Using Linux, the mean latency is 38.9 $\mu s$, with 1\% and 99\% percentile 31.6 and 56.1 $\mu s$.
+With \sys{}, the mean latency is 14.1 $\mu s$ (64\% lower than Linux), with 1\% and 99\% percentile 8.4 and 19.1 $\mu s$.
+
+%Figure: line chart, y axis: throughput, lines: (intra-, inter-) x (\sys{}, libvma, Linux). x axis: number of concurrent clients.
+
+%Utility: redis-benchmark.
+%Key point: concurrency low: test latency, concurrency high: test throughput.
+
+%\subsection{Real-time Stream Processing}
+
+%Apache Flink~\cite{carbone2015apache} (need to turn off durability on disk)
+
+%Scenario: Word Count (distributed system with one source, two mappers and one reducer)
+
+%Metrics: Latency, throughput
+
+\subsubsection{RPC library}
+\quad
+
+We measure RPC latency using RPClib~\cite{rpclib}.
+We run the example 1~KiB RPC in RPClib among two processes inside a host, and it takes 45 $\mu s$. Across two hosts, the RPC takes 79 $\mu s$.
+Using \sys{}, intra-host latency becomes 21 $\mu s$ (53\% reduction) and inter-host is 46 $\mu s$ (42\% reduction).
+
+
+\subsubsection{Network Function Pipeline}
+\quad
+
+64-byte packets in \emph{pcap} format originate from an external packet generator, pass through the network function (NF) pipeline, and sends back to the packet generator.
+We implement each NF as a process that inputs packets from \emph{stdin}, updates local counters, and outputs to \emph{stdout}.
+For Linux, we use \emph{pipe} and \emph{TCP socket} to connect NF processes inside a host.
+Figure~\ref{socksdirect:fig:eval-tun-tput} shows that the throughput of \sys{} is 15x and 20x of Linux pipe and TCP socket, respectively.
+It is even close to a state-of-the-art NF framework, NetBricks~\cite{panda2016netbricks}.
+
+%\subsubsection{GraphX on Spark}
+%\quad
+
+%Two nodes run distributed PageRank.
+%Test elapsed time per iteration with \sys{}, libvma and Linux. (Only need three numbers, no figure.)

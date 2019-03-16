@@ -1,0 +1,99 @@
+\section{Discussion and Future Work}
+\label{socksdirect:sec:discussion}
+
+%\textbf{Communicating with TCP/IP peers.}
+%We use a user-space networking stack to communicate with regular TCP/IP peers, but the compatibility may be limited~\cite{yasukata2016stackmap}.
+%To solve this problem, after receiving the TCP SYN+ACK, the monitor can create an established kernel TCP connection using TCP connection repair~\cite{tcp-connection-repair}.
+%Moreover, if the application and monitor share a network namespace, the monitor can send the kernel FD to the application via Unix domain socket, then \libipc{} can use the FD without delegation to the monitor.
+
+%\textbf{Connecting to many RDMA capable hosts.}
+%With a lot of hosts, the NIC still suffer from performance degradation due to large number of connections.
+%In contrast, user-space networking stack alleviates this problem because the NIC is stateless.
+%We provide a socket option to enable applications to delegate operations to the monitor and use user-space networking stack even if the peer supports RDMA.
+%An application can choose to use RDMA for latency sensitive and throughput demanding connections, and user-space networking stack for others.
+
+\parab{Scale to many connections.}
+The scalability of \sys{} to many connections is bounded by SHM and RDMA.
+To show that \libipc{} and monitor are not the bottleneck, we run a synthetic experiment that creates a lot of connections between two processes that reuse RDMA QPs and SHMs. An application thread with \libipc{} can create 1.4~M new connections per second, which is 20x of Linux and 2x of mTCP~\cite{jeong2014mtcp}. The monitor can create 5.3~M connections per second.
+
+Because the number of processes inside a host is limited, the number of SHM connections will probably not be very large.
+However, one host may connect to many other hosts, and the scalability of RDMA becomes a concern.
+This boils down to two problems.
+First, RDMA NIC keeps per-connection states using on-NIC memory as cache. With thousands of concurrent connections, the performance suffers from frequent cache misses~\cite{mprdma,kaminsky2016design,kalia2018datacenter}.
+However, NICs are equipped with small memory because RDMA was traditionally deployed in small-to-medium size clusters.
+With large-scale RDMA deployment in recent years~\cite{guo2016rdma}, commodity NICs have larger memory to store thousands of connections~\cite{kalia2018datacenter} and SmartNICs have gigabytes of DRAM on board~\cite{mellanox-innova,mellanox-bluefield,smartnic}.
+We believe the NIC cache miss problem will be less a concern in future datacenters.
+The second problem is that establishing an RDMA connection takes $\approx30 \mu s$ in our testbed, which is significant for short connections. However, this process only involves communication between local CPU and NIC, and we expect future works to improve.
+
+%Another promising direction to solve the RDMA concurrency issue is to implement the reliable transport in CPU, and the NIC remains stateless. However, RDMA UD does not support one-sided write, so the ring buffer in Sec.~\ref{socksdirect:subsec:lockless-queue} will not work. Existing software RDMA~\cite{soft-roce} has low performance. It would be interesting to co-design software and NIC.
+
+\textbf{QoS of RDMA.}
+We offload data-plane performance isolation and congestion control to the RDMA NIC, following an emerging line of work~\cite{peter2016arrakis,zhu2015congestion,lu2017memory,mprdma,mittal2018revisiting} in this direction, because NICs in data centers are becoming increasingly programmable~\cite{smartnic,cavium,kaufmann2015flexnic,mellanox-innova,mellanox-bluefield}, and public clouds already provide QoS in network functions outside guest VMs~\cite{li2016clicknp,panda2016netbricks,floem-osdi18}.
+
+%\textbf{Networking stack on other layers.}
+%RDMA: lower layer,
+%eRPC, message queue, etc: higher layer.
+
+%\section{Related Work}
+%\label{socksdirect:sec:related-work}
+
+%Several mostly related works have been discussed in Sec.~\ref{socksdirect:subsec:related-work}.
+
+\iffalse
+\parab{Linux kernel optimization.}
+One line of research optimizes the kernel stack for higher socket performance. FastSocket~\cite{lin2016scalable} and Affinity-Accept~\cite{pesterev2012improving} scale connection creation to multiple cores, but synchronization is still needed when multiple threads share a socket.
+FlexSC~\cite{soares2010flexsc} proposes exception-less system calls to reduce kernel crossing overhead.
+Zero-copy socket~\cite{thadani1995efficient,chu1996zero} still needs copy-on-write on senders.
+In addition, they fail to remove cache miss and transport overheads.
+
+
+\parab{New OS stacks.}
+Another line of research proposes new OS stacks with modified socket interface, mostly aiming at zero copy and fast event notification. Existing socket applications need modifications to use the new interfaces.
+For intra-server connections, Arrakis~\cite{peter2016arrakis} and IX~\cite{belay2017ix} use the NIC to forward packets from one process to another. The hairpin latency from CPU to NIC is at least two PCIe delays, which is one order of magnitude higher than inter-core cache migration delay. In addition, the data plane switching throughput of a NIC is constrained by PCIe bandwidth (Figure~\ref{socksdirect:fig:eval-corenum-tput}).
+
+For inter-server connections, most OS stacks implement transport in software. IX~\cite{belay2017ix} and Stackmap~\cite{yasukata2016stackmap} run in the kernel to enforce QoS policy or preserve protocol compatibility with Linux, while Arrakis~\cite{peter2016arrakis} and SandStorm~\cite{marinos2014network} run in user mode to maximize performance.
+RDMA and transport virtualization~\cite{tsai2017lite,niu2017network} also enforce QoS in the hypervisor.
+Due to the additional level of indirection, kernel stacks cannot remove kernel crossing, while batched syscalls add latency.
+Further, large-scale deployment of kernel-based stacks is more complicated than user-space libraries~\cite{andromeda}.
+\sys offloads transport and QoS to NIC hardware.
+RDMA transport has been deployed in many data centers~\cite{guo2016rdma}, and an emerging line of work~\cite{zhu2015congestion,lu2017memory,mprdma} improves congestion control and QoS in large-scale RDMA deployments.
+For flexibility, programmable NICs are being adopted in data centers~\cite{smartnic,cavium}, as they are more efficient than general-purpose CPUs for network processing~\cite{kaufmann2015flexnic,li2016clicknp}.
+
+
+
+\parab{User-space socket.}
+A third line of research runs socket in user space.
+mTCP~\cite{jeong2014mtcp}, Seastar~\cite{seastar}, 
+F-stack~\cite{fstack} and LOS~\cite{huang2017high} use a high performance packet I/O framework (\textit{e.g.} netmap~\cite{rizzo2012netmap}, DPDK~\cite{dpdk} and PF\_RING~\cite{pf-ring}) and achieves compatibility with most Linux socket functions and scalability with number of cores and sockets.
+LibVMA~\cite{libvma}, OpenOnload~\cite{openonload} and DBL~\cite{dbl} are fully compatible with existing applications. However, they use vendor-specific NIC features and do not scale to multiple threads or connections.
+In addition, user-space sockets do not support zero copy or efficient multitasking.
+
+Most user-space sockets focus on inter-server and do not optimize for intra-server connections.
+FreeFlow~\cite{freeflow} uses shared memory for intra-server communication and RDMA for inter-server, but it provides an RDMA interface.
+Existing socket to RDMA translation approaches, \textit{e.g.} SDP~\cite{socketsdirect} and rsockets~\cite{rsockets} are not fully compatible with Linux and do not address scalability challenges.
+
+
+%\parab{RDMA.}
+%First, RDMA is not suitable for WAN. Second, RDMA has scalability issue when one server connects to many servers. Software transport in CPU access connection states in host memory, while hardware RDMA transport caches connection states in NIC and swaps out to host memory when cache overflows. First, CPU cache miss costs less than 0.1$\mu$s, while NIC cache miss costs 0.5$\mu$s~\cite{kaminsky2016design}. Second, CPU memory bandwidth is an order of magnitude larger than NIC PCIe bandwidth. In light of this, a host should switch to software transport when it actively communicates with a large number of hosts. Fortunately, Modern NICs has an increasing size of memory and supports more active connections without performance degradation~\cite{kaminsky2016design}.
+\fi
+
+
+\iffalse
+\begin{itemize}
+	\item New abstraction (RDMA, lwip + DPDK etc.) 
+	\begin{itemize}
+		\item 
+	\end{itemize}
+	\item Compatible with socket (libvma, LOS etc.) 
+	\begin{itemize}
+		\item Violate goal 2: memory copy 
+		\item Violate goal 3: thread synchronization for multi-thread applications 
+	\end{itemize}
+	\item Common problems: 
+	\begin{itemize}
+		\item Designed for networking, does not support or optimize for IPC communication inside the same server 
+		\item Violate goal 4: Not optimized for many connections 
+	\end{itemize}
+\end{itemize}
+\fi
+
