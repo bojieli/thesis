@@ -1,98 +1,63 @@
 %!TEX root=main.tex
-\section{Architecture}
+\section{架构}
 \label{clicknp:sec:architecture}
 
-\subsection{System architecture}
+\subsection{系统架构}
 \label{clicknp:subsec:sysarch}
 
 \begin{figure}
 \centering
 \includegraphics[width=.8\textwidth]{clicknp-arch.pdf}
 
-\caption{The architecture of ClickNP.}
+\caption{ClickNP 架构。}
 \label{clicknp:fig:clicknp}
 
 \end{figure}
 
-Figure~\ref{clicknp:fig:clicknp} shows the architecture of \name.
-\name\ builds on the Catapult Shell architecture~\cite{putnam2014reconfigurable}.
-The \textit{shell} contains many reusable bits of logic that are common for all applications 
-and abstracts them into a set of well-defined interfaces,
-\eg, PCIe, Direct Memory Access (DMA), DRAM Memory Manage Unit (MMU), 
-and Ethernet MAC.
-%
-The \name\ FPGA program is synthesized as a Catapult \textit{role}.
-%
-However, since \name\ relies on commodity HLS tool-chains to generate FPGA HDL, 
-and different tools may generate their own (and different) interfaces for the resources managed by the shell, 
-we need a shim layer, called \textit{HLS-specific runtime}, to perform
-translations between HLS specific interfaces to the shell interfaces. 
+图 \ref{clicknp:fig:clicknp} 显示了 \name 的体系结构。
+\name 以 Catapult Shell 架构构建\cite {putnam2014reconfigurable}。
+\textit {shell}包含许多可重用的逻辑位，这些逻辑对所有应用程序都是通用的，并将它们抽象为一组明确定义的接口，例如，PCIe，直接内存访问（DMA），DRAM内存管理单元（MMU），和以太网MAC。
+\name FPGA程序合成为 Catapult \textit {role}。
+但是，由于\name 依赖于商品HLS工具链来生成FPGA HDL，并且不同的工具可以为shell管理的资源生成自己的（和不同的）接口，我们需要一个名为\textit {HLS-的垫片层特定运行时}，用于执行HLS特定接口与shell接口之间的转换。
 
-A \name\ host process communicates with the \name\ role through the \name\ library,
-which further relies on the services in Catapult PCIe driver 
-to interact with FPGA hardware.
-The \name\ library implements two important functions: 
-(1) It exposes a PCIe channel API to achieve high-speed and low latency communications 
-between the \name\ host process and the role; 
-(2) It calls several HLS specific libraries to pass initial parameters to
-the modules in the role, as well as control the start/stop/reset of these 
-modules.
-%
-The \name\ host process has one manager thread and zero or multiple 
-worker threads.
-%
-The manager thread loads the FPGA image into the hardware, starts worker threads, 
-initializes \name\ elements in both FPGA and CPU based on the configuration, 
-and controls their behaviors by sending \textit{signals} to elements 
-at runtime. 
-%
-Each worker thread may process one or more modules if they are assigned to CPU.
+\name host 进程通过 \name library与 \name role 进行通信，这进一步依赖于 Catapult PCIe 驱动程序中的服务与FPGA硬件进行交互。
+\name library 实现了两个重要的功能：
+（1）它暴露了一个PCIe通道API，以实现 \name host进程和角色之间的高速和低延迟通信;
+（2）它调用几个HLS特定库将初始参数传递给角色中的模块，并控制这些模块的启动/停止/复位。
+\name host进程有一个管理器线程和零个或多个工作线程。
+管理器线程将FPGA映像加载到硬件中，启动工作线程，根据配置初始化FPGA和CPU中的\name elements，并通过在运行时向元素发送\textit {signals}来控制它们的行为。
+如果将每个工作线程分配给CPU，则每个工作线程可以处理一个或多个模块。
 
-\subsection{\name\ programming}
+\subsection{\name 编程}
 
-\subsubsection{Abstraction}
+\subsubsection{抽象}
 
-\name\ provides a modular architecture and the basic processing module is called an \textit{element}.
-A \name\ element has the following properties: 
+\name 提供模块化架构，基本处理模块称为\textit{元件}。
+\name 元件具有以下属性：
 \begin{itemize}
-\item Local states. Each element can define a set of local variables that are only accessible inside the element. 
-\item Input and output ports. An element can have any number of input or output ports. 
-\item Handler functions. An element has three handler functions: (1) an initialization handler, which is called once when the
-element starts, (2) a processing handler, which is continuously called to check input ports and process available data,
-and (3) a signal handler, which receives and processes the commands (\textit{signals}) from the manager thread in the host program.
+\item 本地状态。 每个元素都可以定义一组只能在元素内部访问的局部变量。
+\item 输入和输出端口。 元素可以具有任意数量的输入或输出端口。
+\item 处理程序功能。 元素有三个处理函数：（1）初始化处理程序，在元素启动时调用一次，（2）处理处理程序，连续调用以检查输入端口和处理可用数据，以及（3）信号处理程序 ，它从主机程序中的管理器线程接收和处理命令（\textit {信号}）。
 \end{itemize}
 
-%
-An output port of an element can connect to an input port of another element through a \textit{channel}, as shown in Figure~\ref{clicknp:fig:element}(a).
-In \name, a channel is basically a FIFO buffer that is written to one end and read from the other end.
-The data unit of the read/write operations to a channel is called \textit{flit}, which has a fixed size of 64 bytes.
-The format of a flit is shown in Figure~\ref{clicknp:fig:element}(b). Each flit contains a header for meta-data and a payload of 32 bytes.
-A large piece of data, \eg, a full-sized packet, is broken into multiple flits, when flowing among \name\ elements.
-%Currently, we choose 32-byte data bus size, and therefor to allow up to 51.2Gbps throughput under 200MHz clock.}
-The first flit is marked with \textbf{sop} (start of packet), and the last flit is marked with \textbf{eop} (end of packet). 
-If the size of the data piece is not 32, the \textbf{pad} field of the last flit indicates how many bytes have been padded to the payload. 
-%Reserved field in a flit is optimized out by HDL synthesis tools.
-% why flit
-We note that breaking large data into flits not only reduces latency, but also potentially increases parallelism as
-different flits of a packet may be processed at different elements simultaneously.
-%
-Finally, to fulfill a network function, multiple \name\ elements can be interconnected to form a directed processing graph, which 
-is called a \name\ \textit{configuration}. 
+元素的输出端口可以通过\textit {channel}连接到另一个元素的输入端口，如图\ref {clicknp:fig:element}（a）所示。
+在 \name 中，通道基本上是一个FIFO缓冲区，写入一端并从另一端读取。
+对通道的读/写操作的数据单元称为 \textit {flit}，其具有64字节的固定大小。
+flit的格式如图 \ref {clicknp:fig:element}（b）所示。每个flit包含元数据的标头和32字节的有效负载。
+当在 \name elements之间流动时，大量数据（例如，完整大小的数据包）被分成多个flits。
+第一个flit标有 \textbf {sop}（数据包开始），最后一个flit标有 \textbf {eop}（数据包结束）。
+如果数据块的大小不是32，则最后一个flit的 \textbf {pad}字段表示已填充到有效负载的字节数。
+通过HDL综合工具优化了flit中的保留字段。
+我们注意到，将大数据分解为flits不仅可以减少延迟，还可以在不同元素处同时处理分组的不同片段，以增加并行性。
+最后，为了实现网络功能，可以将多个\name 元素互连以形成定向处理图，称为\name \textit {配置}。
 
-Clearly, the \name\ programming abstraction largely resembles Click software router~\cite{kohler2000click}. 
-However, there are three fundamental differences which make \name\ more suitable
-for FPGA implementation:
-(1) In Click, edges between elements are C++ function calls and a \textit{queue} element is required to store packets.
-However, in \name, an edge actually represents a FIFO buffer that can hold actual data. Additionally, \name\ channels break the data dependency among elements and allow them to run in parallel. 
-%	FIFO also leverages \textit{pipe} abstraction in OpenCL for efficient hardware generation.
-(2) Unlike Click, where each input/output port can be either \textit{push or pull}, 
-\name\ has unified these operations: An element can only \textit{write (push)}  to any output port, while \textit{read (pull)} can do so from any input port.
-%This is a more flexible model and allows elements to be reused in both ingress and egress pipeline.
-(3) While Click allows an element to directly call methods of another element (via flow-based router context), in \name,
-the coordination among elements is \textit{message-based}, \eg, a requester sends a request message to a responder and gets a response via another message.
-%
-Message-based coordination allows more parallelism and is more efficient in FPGA compared to coordination through shared memory, where accessing a shared memory location has to be serialized and would become a bottleneck.
-
+显然，\name 编程抽象很像Click软件路由器 \cite {kohler2000click}。
+但是，有三个基本差异使得 \name 更适合FPGA实现：
+（1）在Click中，元素之间的边是C ++函数调用，并且需要\textit {queue}元素来存储数据包。
+但是，在 \name 中，边实际上表示可以保存实际数据的FIFO缓冲区。此外，\name  channels打破了元素之间的数据依赖关系，并允许它们并行运行。
+（2）与Click不同，其中每个输入/输出端口可以是\textit {push或pull}，\name 统一了这些操作：一个元素只能\textit {write（push）}到任何输出端口，而 \textit {read（pull）}可以从任何输入端口执行此操作。
+（3）Click允许元素直接调用另一个元素的方法（通过基于流的路由器上下文），在 \name 中元素之间的协调是\textit {基于消息}，例如，请求者向响应者发送请求消息并通过另一个消息获得响应。
+与通过共享内存进行协调相比，基于消息的协调允许更多的并行性并且在FPGA中更有效，其中访问共享内存位置必须被序列化并且将成为瓶颈。
 \begin{figure}
 \centering
 \begin{tabular}{c}
@@ -102,59 +67,55 @@ Message-based coordination allows more parallelism and is more efficient in FPGA
 (b) \\
 \end{tabular}
 
-\caption{(a) Two \name\ elements are connected through a channel. (b) The format of a flit. }
+\caption{(a) 两个用管道相连接的 \name 元件。 (b) Flit 的格式。}
 \label{clicknp:fig:element}
 
 \end{figure}
 
-\subsubsection{Language}
+\subsubsection{语言}
 
-\name\ elements are alike objects in an object-oriented language, and can be defined using such languages, \ie, C++.
-Unfortunately, many existing HLS tools support only C. 
-To leverage the commercial HLS tools, we could write a compiler that converts a object-oriented language, \eg C++, to C.
-But this effort is non-trivial.
-In this work, we take an alternative path to extend C language to support element declaration.
-Figure~\ref{clicknp:fig:lang}(a) shows a code snippet of element \textit{Counter}, which simply counts how many packets have
-passed. An element is defined by \textbf{.element} keyword, followed by the element name and the number of input/output ports.
-The keyword \textbf{.state} defines the state variables of the element, and \textbf{.init}, \textbf{.handler}, and \textbf{.signal}
-specify the initialization, processing, and signal handler functions of the element.
-A set of built-in functions are implemented to operate on the input and output ports, as summarized in Table~\ref{clicknp:tab:built-in}.
+\name 元件（element）可以声明为面向对象语言（如 C++）中的一个对象。
+不幸的是，许多现有的HLS工具仅支持C语言。
+为了利用商业HLS工具，我们可以编写一个编译器，将面向对象的语言（例如 C++）转换为C，但这种努力并非易事。
+在本文中，我们采用一种替代路径来扩展C语言以支持元素声明。
+图 \ref {clicknp:fig:lang}（a）显示了element \textit {Counter}的代码片段，它只计算传递了多少个数据包。元素由 \textbf {.element}关键字定义，后跟元素名称和输入/输出端口数。
+关键字 \textbf {.state} 定义元素的状态变量，\textbf {.init}，\textbf {.handler} 和 \textbf {.signal}指定初始化，处理和信号处理函数元件。
+实现了一组内置函数来对输入和输出端口进行操作，如表 \ref {clicknp:tab:built-in} 中所述。
 
-Similar to Click, \name\ also uses a simple script to specify a configuration of a network function. The configuration has
-two parts: \textit{declarations} and \textit{connections}, following the similar syntax of Click language~\cite{kohler2000click}.
-One thing worth noting is that in \name\, we can use a keyword \textbf{host} to annotate an element, which will cause 
-the element to be compiled into CPU binary and executed on CPU.
+与Click类似，\name 也使用简单脚本来指定网络功能的配置。配置有两部分：\textit {declarations} 和 \textit {connections}，遵循Click语言的类似语法 \cite {kohler2000click}。
+值得注意的是，在 \name 中，我们可以使用关键字 \textbf {host}来注释元素，这将导致元素被编译为CPU二进制文件并在CPU上执行。
+
+\textbf{Verilog 元件。}
 
 \begin{table}
 
 \centering
-\caption{Built-in operations on \name\ channels.}
+\caption{\name\ 管道上的内置操作。}
 \label{clicknp:tab:built-in}
-\small
 \begin{tabular}{p{.4\textwidth}|p{.5\textwidth}}
 \toprule
-uint get\_input\_port() & Get bitmap of all input ports with available data. \\
+uint get\_input\_port() & 获取具有可用数据的所有输入端口的位图。 \\
 \midrule
-bool test\_input\_port(uint id) & Test the input port indicated by id. \\
+bool test\_input\_port(uint id) & 测试id指示的输入端口。 \\
 \midrule
-flit read\_input\_port(uint id) & Read the input port indicated by id. \\
+flit read\_input\_port(uint id) & 读取id指示的输入端口。 \\
 \midrule
-flit peek\_input\_port(uint id) & Peek input data from the port indicated by id. \\
+flit peek\_input\_port(uint id) & 获取id指示的输入端口数据，但不取走。 \\
 \midrule
-void set\_output\_port(uint id, flit x) & Set a flit to the output port. The flit is written to the channel when the handler returns.\\
+void set\_output\_port(uint id, flit x) & 将flit设置为输出端口。 处理程序返回时，flit将写入管道。\\
 \midrule
-ClSignal read\_signal() & Read a signal from signal port.\\
+ClSignal read\_signal() & 从信号端口读取信号。\\
 \midrule
-void set\_signal(ClSignal p) & Set an output signal on signal port.\\
+void set\_signal(ClSignal p) & 在信号端口上设置输出信号。\\
 \midrule
-return (uint bitmap) & Return value of \textbf{.handler} specifies a bitmap of input port(s) to be read on next iteration. \\
+return (uint bitmap) & \textbf{.handler} 的返回值指定下一次迭代时要读取的输入端口的位图。 \\
 \bottomrule
 \end{tabular}
 
 \end{table}
 
 \begin{figure}[t!]
-\scriptsize \lstset{style=numbers}
+\small \lstset{style=numbers}
 
 \lstset{ emph={%
  element, init, state, handler, signal,include
@@ -201,43 +162,29 @@ tee [2] -> logger
 \end{lstlisting} \vspace{3pt} \\
 {\normalsize \centering (b)} 
 \end{tabular}
-\caption{\name\ language to write elements and specify configurations. An element annotated with \textbf{host} keyword is compiled and executed on the CPU. An element annotated with ``@'' is required to receive control signals from the manager thread. 
-\textbf{``From\_tor''} and \textbf{``to\_tor''} are two built-in elements that represent input and output of an Ethernet port on FPGA. The return value of the handler function specifies
-a bit-mask of input ports that will be checked in next round.}
+\caption{用 \name 语言写入元素并指定配置的示例。 使用 \textbf {host}关键字注释的元素在CPU上编译和执行。 用“@”注释的元素需要从管理器线程接收控制信号。
+	\textbf {``From\_tor''} 和 \textbf {``to\_tor''}是两个内置元素，代表FPGA上以太网端口的输入和输出。 处理函数的返回值指定了将在下一轮中检查的输入端口的位掩码。}
 \label{clicknp:fig:lang}
 
 \end{figure}
 
-\subsubsection{\name\ tool-chain}
+\subsubsection{\name\ 工具链}
 \label{clicknp:subsec:toolchain}
-The \name\ tool-chain contains a \name\ compiler as the front-end, and a C/C++ compiler (\eg, Visual Studio or GCC) and an HLS tool 
-(\eg, Altera OpenCL SDK or Xilinx Vivado HLS) as the back-end.
-% Overview of ClickNP programming process
-As shown in Figure~\ref{clicknp:fig:clicknp}, to write a \name\ program, a developer needs to divide her code into three parts:
-% very similar to the Click Modular Router~\cite{kohler2000click}:
-(1) A set of elements, each of which implements a conceptually simple operation,
-(2) A configuration file that specifies the connectivity among these elements,
-and (3) A host manager that initialize each element and control their behavior during the runtime, \eg, according to the input of administrators.
-%
-These three parts of source code are fed into the \name\ compiler and translated 
-into intermediate source files for both host program and FPGA program. 
-The host program can be directly compiled by a normal C/C++ compiler, while the FPGA program is synthesized using commercial HLS tools.
-%
-Existing commercial HLS tools can determine a maximum clock frequency of 
-each element through timing analysis. 
-Then, the clock of a \name\ processing graph is constrained by the slowest element in the graph.
-%
-Additionally, HLS tools may also generate an optimization report which shows the 
-dependency among the operations in an element. An element is \textit{fully pipelined}
-if all dependency is resolved and the element achieves the optimal throughput by 
-processing one flit in every clock cycle.
-
+\name 工具链包含一个 \name 编译器作为前端，一个 C / C++ 编译器（例如，Visual Studio或GCC）和一个HLS工具（例如，Altera OpenCL SDK或Xilinx Vivado HLS）作为后端。
+如图\ref{clicknp:fig:clicknp}所示，要编写 \name 程序，开发人员需要将代码分为三部分：
+（1）一组元素，每个元素实现概念上简单的操作，
+（2）指定这些元素之间连接的配置文件，以及（3）主机管理器，它初始化每个元素并在运行时控制它们的行为，例如，根据管理员的输入。
+这三部分源代码被送入 \name 编译器并转换为主程序和FPGA程序的中间源文件。
+主程序可以由普通的C / C++编译器直接编译，而FPGA程序则使用商业HLS工具合成。
+现有的商用HLS工具可以通过时序分析确定每个元件的最大时钟频率。
+然后，\name 处理图的时钟受到图中最慢元素的约束。
+另外，HLS工具还可以生成优化报告，该报告显示元素中的操作之间的依赖性。如果解析了所有依赖关系并且元素通过在每个时钟周期中处理一个flit来实现最佳吞吐量，则元素是\textit {完全流水线化}的。
 \egg{
 Our ClickNP architecture is built on state-of-the-art data center reconfigurable hardware (Catapult FPGA \cite{putnam2014reconfigurable}) and FPGA programming framework (Altera OpenCL \cite{singh2011implementing}).
 
 \subsection{Catapult FPGA}
 
-Catapult \cite{putnam2014reconfigurable} is a reconfigurable hardware designed for offloading feature extraction, feature computation and scoring in search engine ranking. We modify the hardware to incorporate two on-board 40 GE MACs, so the FPGA can receive and send network packets via the two 40 GE ports without CPU intervention.
+Catapult \cite {putnam2014reconfigurable}是一个可重新配置的硬件，用于在搜索引擎排名中卸载特征提取，特征计算和评分。 我们修改硬件以包含两个板载40 GE MAC，因此FPGA可以通过两个40 GE端口接收和发送网络数据包，而无需CPU干预。
 
 \begin{figure}[!t]
 	\center

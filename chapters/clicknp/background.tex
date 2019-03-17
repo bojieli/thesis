@@ -1,30 +1,89 @@
 %!TEX root=main.tex
-\section{Background}
+\section{背景}
 \label{clicknp:sec:background}
 
-\subsection{FPGA architecture}
+\subsection{软件网络功能的性能局限}
+
+在诸如公共云的虚拟化环境的传统设备共享模型中，进出物理设备的所有网络I / O都专门在管理程序的主机软件分区中执行。 VM发送和接收的每个数据包都由主机网络堆栈中的虚拟交换机（vSwitch）处理。 接收数据包通常涉及管理程序将每个数据包复制到VM可见缓冲区，模拟到VM的软中断，然后允许VM的OS堆栈继续进行网络处理。 发送数据包类似，但顺序相反。 与非虚拟化环境相比，这种额外的主机处理：降低性能，需要对权限级别进行额外更改，降低吞吐量，增加延迟和延迟变化，并提高主机CPU利用率。
+
+除销售虚拟机外，销售基础架构即服务（IaaS）的云供应商必须提供丰富的网络语义，例如具有客户提供的地址空间的私有虚拟网络，可扩展的L4负载平衡器，安全组和ACL ，虚拟路由表，带宽计量，QoS等。 这些语义非常复杂，而且变化太频繁，以至于在传统交换机硬件中大规模实现这些语义是不可行的。 相反，这些是在vSwitch中的每个主机上实现的。 这可以很好地适应服务器的数量，并允许物理网络简单，可扩展且速度非常快。
+
+\textbf{列出性能数字。}
+
+我们仍然根据我们仅使用主机内核运行我们的SDN堆栈的原始策略来评估所有选项，特别是像DPDK [18]这样的技术表明我们可以通过绕过OS网络堆栈来显着降低数据包处理成本 并在轮询模式下运行核心。 考虑到我们无法使ASIC满足我们的可编程性要求，这个选项击败了ASIC，但是如第3节所述，将内核烧录到VM托管成本的成本和性能开销足够高，即使是效率低下的多核SoC也是如此 更好的方法。
+
+与其竞争对手一样，Azure作为IaaS产品直接向客户销售虚拟机，并竞争这些虚拟机的价格。我们在IaaS中的盈利能力是客户为虚拟机支付的价格与托管虚拟机的成本之间的差异。由于我们已经为每台服务器固定了成本，因此降低VM成本的最佳方法是将更多VM打包到每台主机服务器上。因此，大多数云通常在给定的2插槽（经济和性能标准）刀片上合理地部署最大数量的CPU核心。在撰写本文时，物理核心（2个超线程）的售价为0.10-0.11美元/小时1，或者最大潜在收入约为900美元/年，在服务器的生命周期内售价为4500美元（服务器通常持续3到5年）在我们的数据中心）。即使考虑到某些部分核心在任何时候都未售出，并且云通常为客户提供购买容量的折扣，与专用硬件相比，甚至使用一个物理核心进行主机网络也是相当昂贵的。我们的业务从根本上依赖于为每个主机销售尽可能多的内核到客户虚拟机，因此我们将竭尽全力减少主机开销。因此，应避免使用主机CPU内核运行高速SDN数据路径。
+
+\subsection{硬件加速的选择}
+
+传统上，微软与网络ASIC供应商（如英特尔，Mellanox，Broadcom等）合作，为Windows中的主机网络实现卸载 - 例如，在20世纪90年代的TCP校验和分段卸载[9]，接收端扩展（RSS）[ 10]和虚拟机器队列（VMQ）[11]用于2000年代的多核可扩展性，以及最近无状态卸载用于Azure的虚拟网络方案的NVGRE和VxLAN封装在2010年[12]。事实上，GFT最初设计为由ASIC供应商实施，与SR-IOV一起作为精确匹配行动表，我们在业界广泛分享早期设计理念，看看供应商是否能满足我们的要求。随着时间的推移，我们对这种方法的热情逐渐降低，因为没有出现能够满足第3节中规定的所有设计目标和约束的设计。
+
+SmartNIC供应商面临的一个主要问题是SR-IOV是一个全有或全无卸载的例子。如果在SmartNIC中无法成功处理任何所需的SDN功能，则SDN堆栈必须恢复为通过基于软件的SDN堆栈发送回流，几乎丧失了SR-IOV卸载的所有性能优势。
+
+我们看到了几种不同的可能方向：网络交换机，GPU，ASIC，SoC，FPGA。
+
+
+为了加速软件包处理，以前的工作已经提出使用GPU \cite {packetshader}，专用网络处理器（NP）\cite {cavium,netronome} 和硬件交换机 \cite {duet}。
+GPU主要用于图形处理，最近扩展到具有海量数据并行性的其他应用程序。 GPU更适合批量操作。 Han，\ etal~ \cite {packetshader}，表明使用GPU可以实现40Gbps的分组交换速度。
+但是，批量操作会导致高延迟。
+例如，\cite {packetshader}中报告的转发延迟约为$200 \mu{}s$，比 \name{} 大两个数量级。
+与GPU相比，FPGA更灵活，可以重新配置以捕获数据和流水线并行，这两者在NF中非常常见。
+然而，NP专门用于处理网络流量并且具有许多硬连线网络加速器。
+相比之下，FPGA是一种通用计算平台。
+除了NF之外，FPGA在数据中心还有许多其他应用，使其更具吸引力
+大规模部署 \cite {putnam2014reconfigurable}。
+硬件交换机功能有限，其应用受到很大限制 \cite {duet}。
+
+
+\subsubsection{用网络交换机实现网络功能}
+
+\subsubsection{用 GPU 实现网络功能}
+
+\subsubsection{基于 ASIC 的网卡}
+
+用于SDN处理的定制ASIC设计提供了最高的性能潜力。然而，随着时间的推移，它们缺乏可编程性和适应性。特别是，需求规格与硅的到货之间的长时间跨度大约为1  -  2年，并且在这个范围内需求持续变化，使得新的硅已经落后于软件要求。 ASIC设计必须继续为服务器的5年生命周期提供所有功能（以我们的规模改造大多数服务器是不可行的）。全有或全无卸载意味着今天制定的ASIC设计规范必须满足未来7年的所有SDN要求。
+
+ASIC供应商通常会添加嵌入式CPU内核来处理新功能。与其他NIC处理硬件相比，这些内核可能很快成为性能瓶颈。此外，随着新功能的增加，这些内核可能会随着时间的推移而增加处理负担，从而加剧了性能瓶颈。这些内核通常也通过NIC的固件更新进行编程，由ASIC供应商处理并减慢新功能的部署。
+
+\subsubsection{基于多核 SoC 的网卡}
+
+基于多核SoC的NIC使用大量嵌入式CPU内核来处理数据包，交换一些性能以提供比ASIC设计更好的可编程性。这些设计在10GbE NIC生成中得到广泛应用。有些像Cavium [13]那样使用通用CPU核心（MIPS，后来的ARM64），而其他像Netronome [14]和Tilera则使用特定的网络处理核心。在这个空间内，我们更多地推荐通用SoC  - 基于我们的评估，它们更容易编程（您可以采用标准的DPDK样式代码并在熟悉的Linux环境中运行）。令人惊讶的是，与类似的ASIC设计相比，这些在性能上没有太大的缺点。
+
+但是，在40GbE及以上的更高网络速度下，核心数量显着增加。分散和收集数据包的片上网络和调度程序变得越来越复杂和低效。我们经常看到10μs或更多的延迟与将数据包送入核心，处理数据包以及退回到网络相关 - 延迟明显高于ASIC，并且具有更大的可变性。有状态流往往只映射到一个核心/线程，以防止在单个流中进行状态分片和无序处理。因此，单个网络流量性能没有太大改善，因为嵌入式CPU不会以与网络带宽相同的速度增加性能。这导致开发人员必须在多个流中分布流量的问题，如第3节中所讨论的，将更快网络的性能优势限制为仅最大并行工作负载。
+
+SoC式网络卸载的未来也是值得怀疑的。在10GbE时，整个封装是可以容忍的，一些通用SoC内核就足够了。 40GbE需要近4倍的核心，尽管几个供应商仍然创造了可行的解决方案。尽管如此，具有基于软件的数据路径的40GbE部件已经出人意料地大，耗电量大且价格昂贵，并且它们对100GbE，200GbE和400GbE的可扩展性看起来很黯淡。
+
+因此，虽然我们发现SoC方法具有熟悉的编程模型的优点，但在更高的网络速度下，单流性能，更高的延迟和更差的可扩展性使我们寻找另一种解决方案。
+
+
+
+\textbf{需要合并：
+软件NF具有极大的灵活性和可扩展性。
+早期研究主要集中在基于软件的数据包转发 \cite {routebricks,Egi:2008:THP:1544012.1544032}。
+他们表明，多核x86 CPU可以以每服务器10Gbps的速度转发数据包，并且可以通过集群更多服务器来扩展容量。
+最近，许多系统被设计用于实现各种类型的NF \cite {comb,Greenhalgh:2009:FPR:1517480.1517484,martins2014clickos}。
+同样，所有这些系统都利用CPU中的多核并行性来实现每台机器接近10Gbps的吞吐量，并在需要更高容量时向外扩展以使用更多机器。
+Ananta \cite {ananta}是一个部署在Microsoft数据中心的软件负载均衡器，用于提供云规模的负载均衡服务。
+虽然软件NF可以扩展以提供更多容量，但这样做会在CAPEX和OPEX中增加相当大的成本 \cite {ananta,duet}。}
+
+
+
+\subsubsection{基于 FPGA 的网卡}
 \label{clicknp:subsec:fpga}
 % Focus on FPGA architecture
 
-As the name indicates, FPGA is a sea of \textit{gates}. 
-The basic building block of FPGA is \textit{logic element (LE)},
-which contains a Look-up Table (LUT) and a few registers. 
-The LUT can be programmed to compute any combinational logic 
-and registers are used to store states. 
-%
-Besides basic LEs, FPGA also contains Block RAMs (BRAMs) to store data, 
-and Digital Signal Processing (DSP) components for complex arithmetic operations.
-%
-Normally, FPGAs are attached to a PC through a PCIe add-in board, which
-may also contain a DRAM of multi-giga bytes and other communication
-interfaces, \eg, 10G/40G Ethernet ports. 
-Figure~\ref{clicknp:fig:fpga} shows a logic diagram of a FPGA board.
+顾名思义，FPGA（Field Programmable Gate Array）是\textit {逻辑门}的海洋。
+FPGA的基本构建块是\textit {逻辑元件（LE）}，它包含一个查找表（LUT）和一些寄存器。
+LUT可以编程为计算任何组合逻辑，寄存器用于存储状态。
+除基本LE外，FPGA还包含用于存储数据的Block RAM（BRAM）和用于复杂算术运算的数字信号处理（DSP）组件。
+通常，FPGA通过PCIe附加板连接到PC，PCIe附加板也可能包含数千兆字节的DRAM和其他通信接口，例如10G / 40G以太网端口。
+图\ref{clicknp:fig:fpga}显示了FPGA板的逻辑图。
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.6\textwidth]{fpga-board.pdf}
 
-\caption{A logic diagram of a FPGA board.}
+\caption{FPGA板的逻辑图。}
 \label{clicknp:fig:fpga}
 
 \end{figure}
@@ -33,115 +92,67 @@ Figure~\ref{clicknp:fig:fpga} shows a logic diagram of a FPGA board.
 % we need to make more points here: parallelism, memory hierarchy, or code?
 %
 
-% setup the context of fpga parallelism
-Compared to CPU or GPU, FPGAs usually have a much lower clock frequency
-and a smaller memory bandwidth.
-For example, typical clock frequency of a FPGA is about 200MHz, 
-more than an order of magnitude slower than CPU (at 2\approx 3~GHz). 
-Similarly, the bandwidth to a single Block memory or external DRAM of FPGA 
-is usually 2\approx 10~GBps, while the memory bandwidth
-is about 40~GBps of Intel XEON CPU and 100~GBps for a GPU. 
-%
-However, the CPU or GPU have only limited cores, which limits parallelism.
-FPGAs have a massive amount of parallelism built-in. 
-Modern FPGAs may have millions of LEs, hundreds K-bit registers, tens of M-bits of BRAM, 
-and thousands 
-of DSP blocks. In theory, each of them can work in parallel. 
-Therefore, there could be thousands of parallel ``\textit{cores}'' 
-running simultaneously inside a FPGA chip. 
-Although the bandwidth of a single BRAM may be limited, if we access the  
-thousands of BRAMs in parallel, the aggregate memory bandwidth can be multiple TBps! 
-%
-Therefore, to achieve high performance, a programmer
-must fully utilize this massive parallelism.
+与CPU或GPU相比，FPGA通常具有更低的时钟频率和更小的存储器带宽。
+例如，FPGA的典型时钟频率约为200MHz，比CPU慢一个数量级（2至3~GHz）。
+同样，FPGA的单块存储器或外部DRAM的带宽通常为2至10~GBps，而内存带宽约为Intel XEON CPU的40~GBps，GPU为100~GBps。
+但是，CPU或GPU只有有限的内核，这限制了并行性。 FPGA内置了大量的并行性。
+现代FPGA可能拥有数百万个LE，数百个K位寄存器，数十个M位BRAM和数千个DSP模块。从理论上讲，它们中的每一个都可以并行工作。
+因此，FPGA芯片内部可能会同时运行数千个并行的``\textit {核}''。
+虽然单个BRAM的带宽可能有限，但如果我们并行访问数千个BRAM，则总内存带宽可以是多TBps！
+因此，为了实现高性能，程序员必须充分利用这种大规模的并行性。
 
-% lead back to programming
-Conventionally, FPGAs are programmed using HDLs like Verilog and VHDL.
-These languages are too low level, hard to learn and complex to program.
-As a consequence, the large community of software programmers has stayed away from FPGA for years~\cite{bacon2013fpga}. 
-To ease this, many high level synthesis (HLS) 
-tools/systems have been developed in
-both industry and academia that try to convert a program in high level
-language (predominately C) into HDLs. 
-However, as we will show in the next subsection, none of them is 
-suitable for network function processing, which is the focus of this work.
+传统上，FPGA使用诸如Verilog和VHDL之类的HDL进行编程。
+这些语言水平太低，难以学习，编程也很复杂。
+因此，大型软件程序员社区已经远离FPGA多年了~\cite {bacon2013fpga}。
+为了简化这一点，许多高级综合（HLS）工具/系统已经在工业界和学术界开发，试图将高级语言（主要是C）的程序转换为HDL。
+但是，正如我们将在下一小节中所示，它们都不适合网络功能处理，这是本工作的重点。
 
+\subsection{基于 FPGA 的网络功能编程}
 
-\subsection{Programming FPGA for NFs}
+我们的目标是利用FPGA加速构建一个多功能，高性能的网络功能平台。这样的平台应满足以下要求。
 
-Our goal is to build a versatile, high performance network function 
-platform with FPGA-acceleration. Such a platform should satisfy 
-the following requirements.
+\textbf {灵活性。} 平台应该\textit {完全使用高级语言编程。}
+开发人员使用高级抽象和熟悉的工具编程，并具有类似的编程经验，就像在多核处理器上编程一样。
+我们相信这是使大多数软件程序员可以使用FPGA的必要条件。
 
-\smalltitle{Flexibility.} The platform should be 
-\textit{fully programmed using high-level languages.} 
-Developers program with high-level abstractions and familiar tools, and
-have similar programming experience as if programming on a multi-core processor.
-We believe this is a necessary condition for FPGA to be accessible to
-most software programmers.
+\textbf {模块化。} 我们应该支持\textit {模块化架构}进行数据包处理。以前关于虚拟化NF的经验表明，正确的模块化架构可以很好地捕获数据包处理中的许多常见功能~\cite {kohler2000click,martins2014clickos}，使它们易于在各种NF中重用。
 
-\smalltitle{Modularized.} We should support a \textit{modular architecture}
-for packet processing. Previous experiences on virtualized NFs
-have demonstrated that a right modular architecture can well capture many common 
-functionalities in packet processing~\cite{kohler2000click,martins2014clickos},
-making them easy to reuse in various NFs.
+\textbf {高性能和低延迟。} 数据中心的NF应该以40 / 100~Gbps的线路速率处理大量数据包，具有超低延迟。以前的工作已经显示~\cite {rollback-mb}，即使NF添加的几百微秒的延迟也会对服务体验产生负面影响。
 
-\smalltitle{High performance and low latency.} NFs in datacenters
-should handle a large amount of packets flowing at the line-rates of 40/100~Gbps
-with ultra-low latency. Previous work has shown~\cite{rollback-mb} that even a few
-hundred microseconds of latency added by NFs would have 
-negative impacts on service experience.
-
-\smalltitle{Support joint CPU/FPGA packet processing.} We'd say FPGA is no panacea. 
-As inferred from the FPGA architecture discussed earlier in \S\ref{clicknp:subsec:fpga}, not all tasks are 
-suitable for FPGA. For example, algorithms that are naturally sequential and
-processing that has very large memory footprint with low locality, should process  
-better in CPU.
-Additionally, FPGA has a strict area constraint. 
-That means you cannot fit an arbitrarily large logic into a chip.
-Dynamically swapping FPGA configurations without data plane interruption
-is very difficult, as the reconfiguration time may take
-seconds to minutes, depending on the FPGA's size.
-%
-Therefore, we should support fine-grained processing 
-separation between CPU and FPGA. This requires high-performance communication 
-between CPU and FPGA.
+\textbf {支持联合CPU / FPGA数据包处理。} 我们说FPGA不是灵丹妙药。
+正如之前在\S \ref {clicknp:subsec:fpga} 中讨论的FPGA架构所推断的那样，并非所有任务都适用于FPGA。例如，自然顺序的算法和具有非常大的内存占用和低局部性的处理应该在CPU中处理得更好。
+此外，FPGA具有严格的区域约束。
+这意味着您无法将任意大的逻辑放入芯片中。
+在没有数据平面中断的情况下动态交换FPGA配置非常困难，因为重新配置时间可能需要几秒到几分钟，具体取决于FPGA的大小。
+因此，我们应该支持CPU和FPGA之间的细粒度处理分离。这需要CPU和FPGA之间的高性能通信。
 
 
-No of existing high level programming tools for FPGA satisfy all aforementioned requirements.
-% HLS
-Most HLS tools, \eg, Vivado HLS~\cite{vivado}, are only auxiliary tools 
-for HDL tool chains. 
-Instead of directly compiling a program into FPGA images, these tools generate only hardware 
-modules, \ie, IP cores, which must be manually embedded in a HDL project and connected to other HDL modules
--- a mission impossible for most software programmers. 
+现有的FPGA高级编程工具都不能满足上述所有要求。
+大多数HLS工具，例如 Vivado HLS~\cite{vivado}，只是HDL工具链的辅助工具。
+这些工具不是直接将程序编译成FPGA映像，而是仅生成硬件模块，即IP核，必须手动嵌入在HDL项目和连接到其它HDL模块，这是大多数软件程序员无法完成的任务。
 
-% OpenCL
-Altera OpenCL, however, may directly compile an OpenCL program to FPGA~\cite{aoc}. 
-However, the OpenCL programming model is directly derived from GPU programming and 
-is not modularized for packet processing. 
-%
-Further, OpenCL does not support joint packet processing between CPU and FPGA very well:
-%
-First, communication between a host program and a kernel in FPGA must always go through the onboard DDR memory. This adds non-trivial latency
-and also causes the on-board memory a bottleneck.
-%
-Second, OpenCL kernel functions are \textit{called} from the host program. 
-Before a kernel terminates, the host program cannot control the kernel behavior, \eg setting new parameters, nor reading any kernel state. 
-But NFs face a continuous stream of packets and should be always running.
+但是，Altera OpenCL可以直接将OpenCL程序编译为FPGA~ \cite {aoc}。
+但是，OpenCL编程模型直接源自GPU编程，并且不是用于数据包处理的模块化。
+此外，OpenCL不支持CPU和FPGA之间的联合数据包处理：
+首先，主机程序和FPGA内核之间的通信必须始终通过板载DDR内存。 这增加了非平凡的延迟，并且还导致板载内存成为瓶颈。
+其次，OpenCL内核函数需要宿主机上的软件程序显式\textit {调用}。
+在内核终止之前，主机程序无法控制内核行为，例如设置新参数，也不能读取任何内核状态。
+但是NF面临着连续的数据包流，应该始终在运行。
 
-Click2NetFPGA~\cite{Click2NetFPGA} provides a modular architecture by 
-directly compiling a Click modular router~\cite{kohler2000click} program into FPGA.
-%
-However, the performance of \cite{Click2NetFPGA} is much lower (two orders of magnitude) than what we report in this paper, as there are several bottlenecks in their system design (\eg, memory and packet I/O) and they also miss 
-several important
-optimizations to ensure fully pipelined processing (as discussed in~\S\ref{clicknp:sec:optimization}). 
-Additionally, \cite{Click2NetFPGA} does not support FPGA/CPU joint processing and thus unable to update configuration or read states while data plane is running.
+FPGA是一项成熟的技术，最近已经部署用于加速数据中心服务，包括网络功能 \cite {putnam2014reconfigurable,smartnic,rubow2010chimpp,lavasani2012compiling}。
+众所周知，FPGA的可编程性很低，有丰富的前人工作提供了高级编程抽象 \cite {bluespec,auerbach2010lime,bacon2013fpga,singh2011implementing,bachrach2012chisel,wester2015transformation}。
+Gorilla \cite {lavasani2012compiling} 为FPGA上的数据包交换提出了一种特定于域的高级语言。
+然而，Chimpp \cite {rubow2010chimpp} 试图将Click模型引入HDL来开发模块化路由器。
+\name 沿此方向工作，与以前的工作互补。
+\name 致力于数据中心的NF，通过提供高度灵活的模块化架构和利用商业HLS工具解决可编程性问题。
+
+Click2NetFPGA~\cite {Click2NetFPGA}通过直接将Click模块化路由器〜\ cite {kohler2000click}程序编译到FPGA中来提供模块化架构。
+然而，\cite {Click2NetFPGA}的性能比我们在本文中报告的要低得多（两个数量级），因为它们的系统设计存在几个瓶颈（例如，内存和数据包I / O），它们也是 错过几个重要的优化以确保完全流水线处理（如\S \ref {clicknp:sec:optimization}中所述）。
+此外，\cite {Click2NetFPGA}不支持FPGA / CPU联合处理，因此无法在数据平面运行时更新配置或读取状态。
 
 
-In the following, we will present \name, a novel FPGA-accelerated 
-network function platform that satisfies all aforementioned four requirements.
 
+在下面，我们将介绍\name{}，一种新颖的FPGA加速网络功能平台，满足上述四个要求。
 
 \egg{
 Today's data centers rely on a wide range of network functions to implement network virtualization, ensure security (e.g. firewalls and intrusion detection/prevention systems), perform measurements and improve performance (e.g. traffic scheduling). As data centers are moving towards 40 Gbps bandwidth at end hosts, where the line-rate is 60 M packets per second for minimum-sized packets, higher throughput requirement is imposed upon network processors. Furthermore, as data center services are evolving rapidly, programmability becomes indispensable for network processors. However, existing network processors has a large mismatch to the performance and programmability requirements.

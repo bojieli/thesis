@@ -1,27 +1,19 @@
 %!TEX root=main.tex
-\section{Evaluation}
+\section{评估}
 \label{clicknp:sec:eval}
 
-\subsection{Testbed and methodology}
+\subsection{测试床与方法}
 
-We evaluate \name\ in a testbed of 16 Dell R720 servers (\S\ref{clicknp:subsec:sysarch}).
-For each FPGA board, both Ethernet ports are connected to a Top-of-Rack (ToR) Dell S6000 switch~\cite{dells6000}.
-All \name\ NFs are running on a Windows Server 2012 R2.
-%
-We compare \name\ with other state-of-the-art software NFs. 
-For those NFs running on Linux, we use CentOS 7.2 with kernel version 3.10.
-% delay measurement
-In our test, we use PktGen to generate testing traffic at different rates 
-with various packet sizes (up to 56.4~Mpps with 64B packets).
-%
-To measure the NF processing latency, we embed a generation timestamp in every testing packet.
-When packets pass the NF, they are looped back to a PktCap which is located with PktGen 
-in the same FPGA. 
-%
-Then we can determine the latency by subtracting the generation timestamp from the receiving 
-time of the packet. 
-%
-The delay induced by the PktGen and PktCap was pre-calibrated via direct loop-back (without NFs) and removed from our data.
+我们在16台Dell R720服务器的测试台中评估\name。
+对于每个FPGA板，两个以太网端口都连接到架顶式（ToR）Dell S6000交换机\cite {dells6000}。
+所有\name NF都在Windows Server 2012 R2上运行。
+我们将\name 与其他最先进的软件NF进行比较。
+对于在Linux上运行的那些NF，我们使用内核版本为3.10的CentOS 7.2。
+在我们的测试中，我们使用PktGen发包工具以不同的速率生成具有不同数据包大小的测试流量（64B 数据包，最高吞吐量为 56.4 Mpps）。
+为了测量NF处理延迟，我们在每个测试数据包中嵌入了一个生成时间戳。
+当数据包通过NF时，它们被循环回到PktCap抓包工具，该PktCap与PktGen位于同一FPGA中。
+然后我们可以通过从数据包的接收时间中减去生成时间戳来确定延迟。
+由PktGen和PktCap引起的延迟通过直接环回（无NF）进行预校准，并从我们的数据中删除。
 
 \egg{
 To measure NF processing latency, we forward packets to an \textit{Echo} server using the second port. 
@@ -85,61 +77,52 @@ The wire loopback RTT of TrafficGen is 0.85$\mu$s for 64B packets and 1.39$\mu$s
 		\label{clicknp:fig:IPSec}
 \end{figure*}
 
-\subsection{Throughput and latency}
+\subsection{吞吐量和延迟}
 
 %In this subsection, we benchmark the throughput and latency of \name\ NFs.
 
-\smalltitle{OpenFlow firewall.} 
-In this experiment, we compare OFW with Linux firewall as well as Click+DPDK~\cite{barbette2015fast}.
-For Linux, we use IPSet to handle exact-match rules, while use IPTables for wildcard rules.
-As a reference, we also include the performance of Dell S6000 switch, which has limited firewall capability 
-and supports 1.7K wild-card rules.
-It is worth noting that the original Click+DPDK~\cite{barbette2015fast} does not support Receive Side Scaling(RSS).
-In this work, we have fixed this issue and find when using 4 cores, Click+DPDK already achieves the best performance. 
-But for Linux, we use as many cores as possible (up to 8 due to RSS limitation) for best performance. 
+\textbf {A2. OpenFlow防火墙。}
+在本实验中，我们将OpenFlow防火墙与Linux防火墙以及Click + DPDK~ \cite {barbette2015fast}进行比较。
+对于Linux，我们使用IPSet来处理完全匹配规则，同时将IPTable用于通配符规则。
+作为参考，我们还包括Dell S6000交换机的性能，该交换机具有有限的防火墙功能并支持1.7K通配符规则。
+值得注意的是，最初的Click + DPDK~ \cite {barbette2015fast}不支持接收端缩放（RSS）。
+在这项工作中，我们已经修复了这个问题并发现当使用4个内核时，Click + DPDK已经达到了最佳性能。
+但对于Linux，我们使用尽可能多的内核（由于RSS限制，最多8个内核）以获得最佳性能。
 
-Figure~\ref{clicknp:fig:firewall}(a) shows packet processing rates of different firewalls with different number of wild-card rules.
-The packet size is 64B.
-We can see that both \name\ and S6000 can achieve a maximum speed of 56.4~Mpps. 
-Click+DPDK can achieve about 18~Mpps. 
-Since Click uses a static classification tree to implement wildcard-match, the processing speed 
-does not change with the number of rules inserted. 
-%
-Linux IPTables has a low processing speed of 2.67~Mpps, and the speed decreases as the number of rules
-increases. This is because IPTables performs linear matching for wild-card rules.
+图 \ref {clicknp:fig:firewall}（a）显示了具有不同数量的通配符规则的不同防火墙的数据包处理速率。
+数据包大小为64B。
+我们可以看到\name 和S6000都可以达到56.4~Mpps的最大速度。
+Click + DPDK可以达到约18~Mpps。
+由于Click使用静态分类树来实现通配符匹配，因此处理速度不会随插入规则的数量而变化。
+Linux IPTables具有2.67~Mpps的低处理速度，并且随着规则数量的增加速度降低。这是因为IPTables为通配符规则执行线性匹配。
 
-Figure~\ref{clicknp:fig:firewall}(b) shows the processing latency under different loads with small packets (64B) and 8K rules. 
-Since each firewall has significantly different capacity, the load factor is normalized to the maximum processing speed of each system. 
-%
-Under all levels of load, FPGA (\name) and ASIC (S6000) solutions have $\mu$s-scale latency (1.23$\mu$s for ClickNP and 0.62$\mu$s for S6000) with very low variance (1.26$\mu$s for ClickNP and 0.63$\mu$s for S6000 at 95\% percentile).
-However, the software solutions have much larger delay, and also much larger variance. 
-For example, with Click+DPDK, when the load is high, the latency can be as high as $50\mu s$.
-%
-Figure~\ref{clicknp:fig:firewall}(c) shows the processing latency with different packet sizes and 8K rules.
-With software solutions, the latency increases with the packet size, mainly due to the larger 
-memory to be copied.
-In contrast, FPGA and ASIC retain the same latency irrespective to the packet size. 
-In all experiments, the CPU usage of \name\ OFW is very low ($<5\%$ of a core).
+图 \ref {clicknp:fig:firewall}（b）显示了使用小数据包（64B）和8K规则的不同负载下的处理延迟。
+由于每个防火墙具有显着不同的容量，因此将负载因子标准化为每个系统的最大处理速度。
+在所有负载水平下，FPGA（\name{}）和ASIC（S6000）解决方案具有 $\mu$s 级别的延迟（\name{} 为1.23 $\mu$s，S6000为0.62 $\mu$s），方差非常小（ ClickNP为1.26 $\mu$s，对于S6000为95％（百分位数）为0.63 $\mu$s）。
+但是，软件解决方案具有更大的延迟，并且方差也更大。
+例如，使用Click + DPDK，当负载很高时，延迟可能高达$ 50 \mu{}s $。
+图 \ref {clicknp:fig:firewall}（c）显示了不同数据包大小和8K规则的处理延迟。
+使用软件解决方案，延迟随数据包大小的增加而增加，这主要是由于要复制的内存较大。
+相比之下，FPGA和ASIC保持相同的延迟，而与数据包大小无关。
+在所有实验中，\name 防火墙的CPU使用率非常低（单个 CPU 核的$ <5 ％$）。
 
-Finally, Figure~\ref{clicknp:fig:firewall}(d) shows rule insertion latency when there are already 8K rules. Click's static classification tree requires a prior knowledge of all rules, and generating tree for 8K rules takes one minute.
-IPTables rule insertion takes 12ms, which is proportional to the number of existing rules in the table.
-Rule insertion in Dell S6000 takes 83.7$\mu$s.
-For \name, inserting a rule into HashTCAM table takes 6.3\approx9.5$\mu$s for 2\approx3 PCIe round-trips, while SRAM TCAM table takes 44.9$\mu$s on average to update 13 lookup tables.
-\name\ data plane throughput does not degrade during rule insertion.
-We conclude that OFW has similar performance as ASIC in packet processing, but is flexible and reconfigurable.
+最后，图 \ref {clicknp:fig:firewall}（d）显示了已有8K规则时的规则插入延迟。 Click的静态分类树需要事先了解所有规则，而生成8K规则的树需要一分钟。
+IPTables规则插入需要12 ms，这与表中现有规则的数量成比例。
+Dell S6000中的规则插入需要83.7 $\mu$s。
+对于\name{}，在HashTCAM表中插入一个规则需要6.3至9.5$\mu$s用于2至3次PCIe往返，而SRAM TCAM表平均需要44.9 $\mu$s来更新13个查找表。
+\name 数据平面吞吐量在规则插入期间不会降低。
+我们得出结论，\name{} 防火墙在数据包处理方面具有与ASIC类似的性能，但具有灵活性和可重构性。
 
 
-
-\smalltitle{IPSec gateway.} We compare IPSecGW with StrongSwan~\cite{strongswan}, using the same cipher suite of
-AES-256-CTR and SHA1. We setup one IPSec tunnel and Figure~\ref{clicknp:fig:IPSec}(a) shows the throughput with different packet sizes.
-With all sizes, IPSecGW achieves line rates, \ie, 28.8Gbps with 64B packets and 37.8 Gbps with 1500B packets. 
-%
-StrongSwan, however, achieves only a maximum of 628Mbps, and the throughput decreases as packets become smaller.
-This is because with smaller size, the number of packets needed to be processed increases, 
-and therefore the system needs to compute more SHA1 signatures.
-%
-Figure~\ref{clicknp:fig:IPSec}(b) shows the latency under different load factors. Again, IPSecGW yields constant latency of 13$\mu$s, 
-but StrongSwan incurs larger latency with higher variance, up to 5ms!
+\textbf {A3. IPSec 网关。}
+我们比较IPSec 网关和StrongSwan~ \cite {strongswan}，使用相同的密码套件AES-256-CTR和SHA1。
+我们设置了一个IPSec隧道，图 \ref {clicknp:fig:IPSec}（a）显示了不同数据包大小的吞吐量。
+对于所有规模，IPSecGW实现了线路速率，即64B数据包为28.8 Gbps，1500B数据包为37.8 Gbps。
+然而，StrongSwan最多只能达到628 Mbps，随着数据包变小，吞吐量也会降低。
+这是因为尺寸越小，需要处理的数据包数量就越多，
+因此系统需要计算更多的SHA1签名。
+图 \ref {clicknp:fig:IPSec}（b）显示了不同负载因子下的延迟。 同样，IPSecGW产生的恒定延迟为13 $\mu$s，
+但是StrongSwan会产生更大的延迟和更高的方差，最长可达5 ms！
 
 \begin{figure*}[t!]
 	\centering
@@ -161,34 +144,67 @@ but StrongSwan incurs larger latency with higher variance, up to 5ms!
 \end{figure*}
 
 
-\smalltitle{L4 load balancer.} We compare L4LB with Linux Virtual Server (LVS)~\cite{lvs}.
-To stress test the system, we generate a large number of concurrent UDP flows with 64B packets, targeting one virtual IP (VIP).
-Figure~\ref{clicknp:fig:l4}(a) shows the processing rates with different number of concurrent flows.
-When the number of concurrent flows is less than 8K, L4LB achieves the line rate of 51.2Mpps.
-However, when the number of concurrent flows becomes larger, the processing rate starts to drop.
-This is because of flow cache misses in L4LB. 
-When a flow is missing in the flow cache,  L4LB has to access the onboard DDR memory,
-which results in lower performance.
-When there are too many flows, \eg, 32M, cache miss dominates and for most of the packets, 
-L4LB needs to have one access to the DDR memory. So the processing rate reduces to 11Mpps.
-In any case, the processing rate of LVS is low.  
-Since LVS associates a VIP to only one CPU core, its processing rate is bound to 200Kpps.
+\textbf {A4. L4负载均衡器。}
+我们将L4LB与Linux虚拟服务器（LVS）进行比较 \cite {lvs}。
+为了对系统进行压力测试，我们使用64B数据包生成大量并发UDP流，目标是一个虚拟IP（VIP）。
+图 \ref {clicknp:fig:l4}（a）显示了具有不同并发流数的处理速率。
+当并发流量小于8K时，L4LB达到51.2Mpps的线路速率。
+但是，当并发流的数量变大时，处理速率开始下降。
+这是因为L4LB中的流缓存未命中。
+当流缓存中缺少流时，L4LB必须访问板载DDR内存，
+这会导致性能下降。
+当流量太多时，例如32M，缓存未命中占主导地位且对于大多数数据包而言，
+L4LB需要一次访问DDR内存。因此处理速度降低到11Mpps。
+在任何情况下，LVS的处理速率都很低。
+由于LVS将VIP关联到仅一个CPU核心，因此其处理速率必须达到200Kpps。
 
-Figure~\ref{clicknp:fig:l4}(b) shows the latency under different load conditions. 
-In this experiment, we fix the number of concurrent flows to 1 million. 
-We can see that L4LB achieves very low latency of $4\mu$s.
-LVS, however, incurs around $50\mu$s delay.
-This delay goes up quickly when the offered load is higher than 100Kpps, which exceeds the  capacity of LVS. 
+图 \ref {clicknp:fig:l4}（b）显示了不同负载条件下的延迟。
+在这个实验中，我们将并发流的数量修复为100万。
+我们可以看到L4LB实现了4美元/秒的非常低的延迟。
+然而，LVS会导致约50美元的延迟。
+当提供的负载高于100Kpps时，这种延迟会迅速上升，超过LVS的容量。
 
-Finally, Figure~\ref{clicknp:fig:l4}(c) compares the capability of L4LB and LVS to accept new flows. 
-In this experiment, we instruct PktGen to generate as many one-packet tiny flows as possible.
-We can see that L4LB can accept up to 10M new flows per second.
-%
-Since a single PCIe slot can transfer 16.5M flits per second, the bottleneck is still DDR access.
-%
-Our \textit{DIPAlloc} element simply allocates DIP in a round-robin manner.
-For complex allocation algorithms, the CPU core of \textit{DIPAlloc} will be the bottleneck, and the performance can be improved by duplicating \textit{DIPAlloc} elements on more CPU cores.
-For LVS, due to the limited packet processing capacity, it can only accept up to 75K new flows per second.
+最后，图 \ref {clicknp:fig:l4}（c）比较L4LB和LVS接受新流的能力。
+在这个实验中，我们指示PktGen生成尽可能多的单包微流。
+我们可以看到L4LB每秒可以接受高达10M的新流量。
+由于单个PCIe插槽每秒可以传输16.5M的传输，因此瓶颈仍然是DDR访问。
+我们的 \textit {DIPAlloc} 元素只是以循环方式分配DIP。
+对于复杂的分配算法，\textit {DIPAlloc} 的CPU核心将成为瓶颈，并且可以通过在更多CPU核心上复制 \textit {DIPAlloc} 元素来提高性能。
+对于LVS，由于数据包处理能力有限，它每秒最多只能接受75K新流量。
+
+
+\textbf {A5. pFabric 验证。}
+\name 也是网络研究的好工具。
+由于灵活性和高性能，我们可以快速制作最新研究的原型并将其应用于真实环境。
+例如，我们可以使用\name 轻松实现pFabric调度程序\cite {pfabric}，并将其应用于我们的测试平台。
+在本实验中，我们修改了一个软件TCP流生成器\cite {mqecn}，以便在数据包有效负载中放置流优先级，即流的总大小。
+我们根据\cite {pfabric}中的数据挖掘工作负载生成流，并使用\textit {RateLimit}元素将限制出口端口进一步设置为10~Gbps。
+我们应用pFabric根据流优先级调度出口缓冲区中的流量。
+图 \ref {clicknp：fig：pfabric}显示了pFabric，具有Droptail队列的TCP的平均流完成时间（FCT）和理想值。
+该实验验证了pFabric在这种简单的场景中实现了接近理想的FCT。
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=0.6\textwidth]{eval/pfabric}
+	
+	\caption{Validation of pFabric.}
+	\label{clicknp:fig:pfabric}
+	
+\end{figure}
+
+
+
+\textbf{A6. RoCE 传输协议。}
+
+\textbf{A7. MP-RDMA 拥塞控制协议。}
+
+\textbf{A8. HTTPS RSA 加速。}
+
+\textbf{A9. 端口扫描检测。}
+
+\textbf{A10. 正则表达式匹配。}
+
+\textbf{A11. 神经网络推理。}
 
 \egg{
 \textbf{Stateful L4 load balancer.} We compare our ClickNP implementation with Linux Virtual Server (LVS) \cite{lvs} using both real-world traffic trace on a L4 load balancer \cite{gandhi2014duet} and synthetic traces to simulate adversary scenarios.
@@ -208,47 +224,97 @@ First we test the performance under real-world data center traffic. We adopted t
 Next we tested the performance with adversary traffic to thest the worst case performance. We fixed every flow to be one 1504 byte packet, and test the throughput under different flow numbers, and latency under different new flow rates.
 }
 
-\subsection{Resource utilization}
+\subsection{资源利用率}
 
-In this subsection, we evaluate the resource utilization of \name\ NFs.
-Table~\ref{clicknp:tab:applications} summarizes the results. 
-Except for IPSec gateway which uses most BRAMs to hold coding books, 
-all other NFs only use moderate resources (5\approx 50\%).  
-There is still room to accommodate even more complex NFs.
+\begin{table}[t!]
+	\centering
+	
+	\caption{ClickNP 网络功能汇总。}
+	\label{clicknp:tab:applications}
+	\begin{tabular}{l|r|r|r|r}
+		\toprule
+		Network Function & LoC$^\dagger$ & \#Elements & LE & BRAM \\
+		\midrule
+		\egg{
+			Pkt generator & 13 & 6 & 16\% & 12\% \\
+			Pkt capture & 12 & 10 & 8\% & 5\% \\
+			OpenFlow firewall & 23 & 7 & 32\% & 54\% \\
+			IPSec gateway & 37 & 10 & 35\% & 74\% \\
+			L4 load balancer & 42 & 13 & 36\% & 38\% \\
+			pFabric scheduler & 23 & 7 & 11\% & 15\% \\
+		}
+		Pkt generator & 665 & 6 & 16\% & 12\% \\
+		Pkt capture & 250 & 11 & 8\% & 5\% \\
+		OpenFlow firewall & 538 & 7 & 32\% & 54\% \\
+		IPSec gateway & 695 & 10 & 35\% & 74\% \\
+		L4 load balancer & 860 & 13 & 36\% & 38\% \\
+		pFabric scheduler & 584 & 7 & 11\% & 15\% \\
+		\bottomrule
+		\multicolumn{5}{l}{$^\dagger$ Total line of code of all element declarations and} \\
+		\multicolumn{5}{l}{configuration files.}
+	\end{tabular}
+	
+\end{table}
 
-Next, we study the overhead of fine-grained modularization of \name. 
-Since every element will generate a logic block boundary and use only FIFO buffers to communicate with other blocks,
-there should be an overhead.
-To measure this overhead, we create a simple element that only passes data from one input port to an output port.
-The resource utilization of this \textit{empty} element should well capture the overhead of modularization.
-Different HLS tools may use different amount of resources, but all are low, with a min of 0.15\% to a max of 0.4\%.
-So we conclude \name\ incurs little overhead due to modularization.
+\egg{
+	To evaluate ClickNP's area cost overhead compared to hand-written HDL, we implemented several ClickNP elements resembling network functions in NetFPGA 10G \cite{netfpga} reference router and Openflow switch projects.
+	Table \ref{clicknp:tab:netfpga} compares ClickNP's relative area cost over NetFPGA using Vivado HLS 2015.4 and Altera OpenCL 15.1.
+	Most ClickNP implementations show less than 100\% logic overhead and less than 30\% BRAM overhead. For tiny elements (\eg IP checksum), a fixed element overhead dominates.
+}
 
-Finally, we want to study the efficiency of RTL code generated by \name, compared to hand-written HDL. 
-To do so, we use NetFPGA~\cite{netfpga} as our reference.
-We extract the key modules in NetFPGA, which are well optimized by experienced Verilog programmers, 
-and implement counterpart elements in \name\ with the same functionality. 
-We compare the relative area cost between these two implementations using different HLS tools as a backend.
-The results are summarized in Table~\ref{clicknp:tab:netfpga}.
-Since different tools may have different area costs, we record both the maximum and minimal value.
-%
-We can see generally, automatically generated HDL code uses more area compared to hand-optimized code.
-The difference, however, is not very large. 
-For complex modules (shown in the top part of the table), the relative area cost is less than 2x.
-%
-For tiny modules (shown in the bottom part of the table), the relative area cost appears larger, but the absolute 
-resource usage is small.
-This is because all HLS tools
-would generate a fixed overhead that dominates the area cost for tiny modules. 
+\begin{table}[t!]
+	\centering
+	
+	\caption{相比 NetFPGA 的面积开销。}
+	\label{clicknp:tab:netfpga}
+	\begin{tabular}{l|r|r|r}
+		\toprule
+		\multirow{2}{2.2cm}{NetFPGA Function} & LUTs & Registers & BRAMs \\
+		& Min / Max & Min / Max & Min / Max \\
+		\midrule
+		Input arbiter  & 2.1x / 3.4x & 1.8x / 2.8x & 0.9x / 1.3x \\
+		Output queue   & 1.4x / 2.0x & 2.0x / 3.2x & 0.9x / 1.2x \\
+		Header parser  & 0.9x / 3.2x & 2.1x / 3.2x & N/A \\
+		Openflow table & 0.9x / 1.6x & 1.6x / 2.3x & 1.1x / 1.2x \\
+		\midrule
+		\midrule
+		IP checksum    & 4.3x / 12.1x & 9.7x / 32.5x & N/A \\
+		Encap          & 0.9x / 5.2x & 1.1x / 10.3x & N/A \\
+		\bottomrule
+	\end{tabular}
+	
+\end{table}
 
-In summary, \name\ can generate efficient RTL for FPGA that incurs only moderate area cost, 
-which is capable of building practical NFs.
-Looking forward, FPGA technology is still evolving very rapidly. For example, the next
-generation FPGA from Altera, Arria 10, would have 2.5x more capacity than the chip we use
-currently. 
-Therefore, we believe the area cost of HLS would be less of a concern in the future. 
 
-\vspace{10pt}
+在本小节中，我们评估\name NFs的资源利用率。
+表 \ref {clicknp:tab:applications}总结了结果。
+除了使用大多数BRAM来保存编码书的IPSec网关之外，所有其他NF仅使用中等资源（5 至 50 ％）。
+仍有空间容纳更复杂的NF。
+
+接下来，我们研究了\name 的细粒度模块化的开销。
+由于每个元素都将生成逻辑块边界并仅使用FIFO缓冲区与其他块进行通信，因此应该存在开销。
+为了衡量这种开销，我们创建了一个只将数据从一个输入端口传递到输出端口的简单``\textit{空}''元素。
+此\textit {空}元素的资源利用率应该很好地捕获模块化的开销。
+不同的HLS工具可能使用不同数量的资源，但都很低，最小值为0.15％，最大值为0.4％。
+因此，我们得出结论：由于模块化，名称产生的开销很小。
+
+最后，我们要研究\name 与手写HDL相比生成的RTL代码的效率。
+为此，我们使用NetFPGA \cite {netfpga}作为参考。
+我们提取NetFPGA中的关键模块，这些模块由经验丰富的Verilog程序员进行了优化，
+并在\ name中实现具有相同功能的对应元素。
+我们使用不同的HLS工具作为后端来比较这两种实现之间的相对面积成本。
+结果总结在表 \ref {clicknp:tab:netfpga}中。
+由于不同的工具可能具有不同的面积成本，因此我们记录最大值和最小值。
+我们可以看到，与手工优化代码相比，自动生成的HDL代码使用更多区域。
+然而，差异并不是很大。
+对于复杂模块（如表格顶部所示），相对面积成本小于2倍。
+对于微小模块（如表格底部所示），相对面积成本看起来更大，但绝对资源使用量很小。
+这是因为所有的HLS工具都会产生一个固定的开销，占据微小模块的面积成本。
+
+
+总之，\name 可以为FPGA生成高效的RTL，只需要适度的面积成本，可以构建实用的NF。
+展望未来，FPGA技术仍在迅速发展。 例如，Altera的下一代FPGA Arria 10的容量将比我们目前使用的芯片多2.5倍。
+因此，我们认为HLS的面积成本将来不会受到关注。
 
 
 \egg{
@@ -256,64 +322,6 @@ Figure \ref{clicknp:tab:applications} shows Logic Elements (LE) and BRAM footpri
 Catapult shell and OpenCL runtime take 30\% LEs and 18\% BRAMs in addition to ClickNP applications.
 }
 
-\begin{table}[t!]
-	\centering
-	
-	\caption{Summary of ClickNP NFs.}
-	\label{clicknp:tab:applications}
-		\begin{tabular}{l|r|r|r|r}
-			\toprule
-			Network Function & LoC$^\dagger$ & \#Elements & LE & BRAM \\
-			\midrule
-			\egg{
-			Pkt generator & 13 & 6 & 16\% & 12\% \\
-			Pkt capture & 12 & 10 & 8\% & 5\% \\
-			OpenFlow firewall & 23 & 7 & 32\% & 54\% \\
-			IPSec gateway & 37 & 10 & 35\% & 74\% \\
-			L4 load balancer & 42 & 13 & 36\% & 38\% \\
-			pFabric scheduler & 23 & 7 & 11\% & 15\% \\
-			}
-			Pkt generator & 665 & 6 & 16\% & 12\% \\
-			Pkt capture & 250 & 11 & 8\% & 5\% \\
-			OpenFlow firewall & 538 & 7 & 32\% & 54\% \\
-			IPSec gateway & 695 & 10 & 35\% & 74\% \\
-			L4 load balancer & 860 & 13 & 36\% & 38\% \\
-			pFabric scheduler & 584 & 7 & 11\% & 15\% \\
-			\bottomrule
-			\multicolumn{5}{l}{$^\dagger$ Total line of code of all element declarations and} \\
-			\multicolumn{5}{l}{configuration files.}
-		\end{tabular}
-
-\end{table}
-
-\egg{
-To evaluate ClickNP's area cost overhead compared to hand-written HDL, we implemented several ClickNP elements resembling network functions in NetFPGA 10G \cite{netfpga} reference router and Openflow switch projects.
-Table \ref{clicknp:tab:netfpga} compares ClickNP's relative area cost over NetFPGA using Vivado HLS 2015.4 and Altera OpenCL 15.1.
-Most ClickNP implementations show less than 100\% logic overhead and less than 30\% BRAM overhead. For tiny elements (\eg IP checksum), a fixed element overhead dominates.
-}
-
-\begin{table}[t!]
-	\centering
-	
-	\caption{Relative area cost compared to NetFPGA.}
-	\label{clicknp:tab:netfpga}
-		\begin{tabular}{l|r|r|r}
-			\toprule
-			\multirow{2}{2.2cm}{NetFPGA Function} & LUTs & Registers & BRAMs \\
-						& Min / Max & Min / Max & Min / Max \\
-			\midrule
-			Input arbiter  & 2.1x / 3.4x & 1.8x / 2.8x & 0.9x / 1.3x \\
-			Output queue   & 1.4x / 2.0x & 2.0x / 3.2x & 0.9x / 1.2x \\
-			Header parser  & 0.9x / 3.2x & 2.1x / 3.2x & N/A \\
-			Openflow table & 0.9x / 1.6x & 1.6x / 2.3x & 1.1x / 1.2x \\
-			\midrule
-			\midrule
-			IP checksum    & 4.3x / 12.1x & 9.7x / 32.5x & N/A \\
-			Encap          & 0.9x / 5.2x & 1.1x / 10.3x & N/A \\
-			\bottomrule
-		\end{tabular}
-
-\end{table}
 
 \egg{
 Original data:
@@ -326,31 +334,6 @@ Openflow table	3923	6322	3535	4438	10171	7140	33.5	40	38
 IP checksum	207	2511	884	162	5269	1576	N/A		
 Encap	684	3536	636	821	8493	871	N/A	
 }
-
-\subsection{Validation of pFabric}
-Before we end this section, we show that \name\ is also a good tool for network research.
-Thanks to the flexibility and high performance, we can quickly prototype the latest research 
-and apply it to real environments.
-For example, we can easily implement pFabric scheduler~\cite{pfabric} using \name, and 
-apply it in our testbed.
-%
-In this experiment, we modify a software TCP flow generator~\cite{mqecn} to place the flow
-priority, \ie, the total size of the flow, in packet payload.
-We generate flows according to the data-mining workload in~\cite{pfabric} and further
-the restrict egress port to be 10~Gbps using a \textit{RateLimit} element.
-We apply pFabric to schedule flows in egress buffer according to flow priorities. 
-Figure~\ref{clicknp:fig:pfabric} shows the average flow completion time (FCT) of pFabric, TCP with Droptail queue, and the ideal.
-This experiment validates that pFabric achieves near ideal FCT in this simple scenario.
-
-\begin{figure}[h!]
-\centering
-\includegraphics[width=0.6\textwidth]{eval/pfabric}
-
-\caption{Validation of pFabric.}
-\label{clicknp:fig:pfabric}
-
-\end{figure}
-
 
 \egg{
 \subsection{Network Benchmark Suite}

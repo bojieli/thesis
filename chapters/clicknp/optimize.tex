@@ -1,70 +1,48 @@
 %!TEX root=main.tex
-\section{Parallelizing in FPGA}
+\section{FPGA 内部并行化}
 \label{clicknp:sec:optimization}
 
-As discussed in \S\ref{clicknp:subsec:fpga}, it is critical to fully utilize the parallelism inside FPGA in order to speed up processing.
-\name\ exploits FPGA parallelism both at element-level and inside an element.
+正如\S \ref {clicknp:subsec:fpga}中所讨论的，充分利用FPGA内部的并行性以加速处理至关重要。
+\name 利用元件级和元件内部的FPGA并行性。
 
-\subsection{Parallelism across elements}
+\subsection{元件间并行化}
+\name 的模块化体系结构使得在不同元素之间利用并行性变得很自然。
+\name 工具链将每个元素映射到FPGA中的硬件块。
+这些逻辑块与FIFO缓冲器互连，可以完全并行工作。
+为此，可以将 \name 配置中的每个元素视为具有自定义逻辑的微小独立核心。
+数据包沿着\textit {处理管道}从一个元素流向另一个元素。
+这种类型的并行性称为\textit {流水线并行}。
+此外，如果单个处理流水线没有足够的处理能力，我们可以在FPGA中复制多个这样的流水线，并使用负载平衡元素将数据划分到这些流水线中，即利用\textit{数据并行}。
+对于网络流量，存在数据并行性（在数据包级或流级别）和流水线并行性，可用于加速处理。
+\name 非常灵活，可以轻松配置两种类型的并行，如图 \ref{clicknp:fig:element-para}。
 
-The modular architecture of \name\ makes it natural to exploit parallelisms across different elements.
-The \name\ tool-chain maps each element into a hardware block in FPGA. 
-These logic blocks are interconnected with FIFO buffers, and can work completely in parallel.
-%
-To this end, one can think of each element in a \name\ configuration as a tiny, independent core with customized logic.
-Packets flow from one element to another along a \textit{processing pipeline}.
-This type of parallelism is called \textit{pipeline parallelism} or \textit{task parallelism}. % (Figure~\ref{clicknp:fig:element-para}(a)).
-%
-Furthermore, if a single processing pipeline does not have enough processing power, we can duplicate multiple such pipelines 
-in FPGA and divide data into these pipelines using a load-balancing element, \ie, exploiting \textit{data parallelism}. %(Figure~\ref{clicknp:fig:element-para}(b)).
-For network traffic, there are both data parallelism (at packet-level or flow-level)
-and pipeline parallelism that can be utilized  to speed up processing.
-\name\ is very flexible and can be configured to capture both types of parallelism with little efforts.
-
-\egg{
 \begin{figure}
 \centering
 \begin{tabular}{c}
-\includegraphics[width=0.28\textwidth]{pipeline.jpg}\\
+\includegraphics[width=0.56\textwidth]{pipeline.jpg}\\
 (a)\\
-\includegraphics[width=0.35\textwidth]{data.jpg}\\
+\includegraphics[width=0.7\textwidth]{data.jpg}\\
 (b)\\
 \end{tabular}
-\caption{(a) Pipeline parallelism among elements. (c) Data parallelism among elements.}
+\caption{(a) 元件间并行。 (b) 元件内并行。}
 \label{clicknp:fig:element-para}
 \end{figure}
-}
 
-\subsection{Parallelism inside element}
+\subsection{元件内并行}
 \label{clicknp:subsec:paral_in_elem}
 
-%
-% We need to get the processing pipeline concept clear here.
-%
-Unlike CPU, which executes instructions in memory with limited parallelism, 
-FPGA synthesizes operations into hardware logic, and therefore
-can be evaluated in parallel without instruction load overhead.
-If a datum requires multiple dependent
-operations in one handler function, HLS tools will 
-schedule these operations into pipeline stages in a synchronized manner. 
-At every clock, the result of one stage moves to the next stage, and 
-at the same time, a new datum is inputed into this stage, as shown in
-Figure~\ref{clicknp:fig:dependency}(a).
-This way, the handler function can process a datum at every clock cycle
-and achieve maximum throughput.
-%
-However, in practice, this efficient pipeline processing 
-could break under two situations: (1) there is \textit{memory dependency} among operations; 
-and (2) there are \textit{unbalanced} stages.
-%
-In the following two subsections, we will discuss these two issues in 
-details and present our solutions.
+与在内存中以有限并行性执行指令的CPU不同，FPGA将操作合成为硬件逻辑，因此可以在没有指令负载开销的情况下并行处理。
+如果数据在一个处理函数中需要多个相关操作，则HLS工具将以同步方式将这些操作调度到管道阶段。
+在每个时钟，一个阶段的结果移动到下一个阶段，同时，一个新的数据被输入到这个阶段，如图 \ref{clicknp:fig:dependency}（a）所示。
+这样，处理函数可以在每个时钟周期处理数据并实现最大吞吐量。
+但是，实际上，这种有效的流水线处理可能会在两种情况下发生：（1）操作中存在\textit {内存依赖}; （2）有\textit {不平衡} 的流水线阶段。
+在以下两个小节中，我们将详细讨论这两个问题，并提出我们的解决方案。
 %Finally, in \S~\ref{clicknp:subsubsec:pipeline-control}, we discuss how to explicitly
 %control the pipelining to get better clock frequency in \name.
 
 
 
-\subsubsection{Minimize memory dependency}
+\subsubsection{减少内存依赖}
 
 \begin{figure}
 \lstset{style=numbers}
@@ -81,7 +59,6 @@ morekeywords={get_input_port,read_input_port,from_tor, to_tor, set_output_port, 
 \includegraphics[width=.5\textwidth]{pipeline-w-data.jpg} \\
 (a) \vspace{3pt} \\
 {
-\scriptsize 
 \begin{lstlisting}[escapechar=@]
     r = read_input_port (PORT_1);
 S1: y = mem[r.x]+1;
@@ -91,7 +68,7 @@ S2: mem[r.x] = y;
 }\\
 (b) \vspace{3pt}\\
 {
-\scriptsize 
+\small
 \begin{lstlisting}[escapechar=@]
     r = read_input_port (PORT_1);
 P1: if ( r.x == buf_addr ) {
@@ -108,7 +85,7 @@ S2: buf_addr = r.x;
 }\\
 (c)
 \end{tabular}
-\caption{Illustration of dependency. (a) No dependency. S$n$ means a pipeline stage, D$n$ is a datum. (b) Memory dependency occurs when states are stored in memory and need to be updated. (c) Resolve memory dependency using delayed write.}
+\caption{依赖的例子。 （a）没有依赖性。 S$n$ 表示流水线的一个阶段，D$n$是一个数据。（b）当状态存储在内存中并需要更新时，会发生内存依赖性。 （c）使用延迟写入解决内存依赖性。}
 
 \label{clicknp:fig:dependency}
 \end{figure}
@@ -128,56 +105,30 @@ Stratix V, and therefore \name\ aggressively assigns scalar variables
 using registers to increase the parallelism.
 }
 
-%\smalltitle{Minimize memory dependency.}
-If two operations access the same memory location, and at least one of them
-is \textit{write}, we call these two operations depend on each other~\cite{dependence}. 
-Operations with \textit{memory dependency} cannot be evaluated at the same time,
-as each memory access has one cycle latency and the semantic correctness of the program strongly depends on the order
-of operations.
-%
-As shown in Figure~\ref{clicknp:fig:dependency}(b), \textbf{S1} and \textbf{S2}
-depend on each other: \textbf{S2} has to be delayed until \textbf{S1} finishes, 
-and only after \textbf{S2} finishes can \textbf{S1} operate on new input data.
-Therefore, the function will take two cycles to process one datum.
-%
-Memory dependency can be rather complicated for some processing algorithms,
-but thanks to the modular architecture of \name, most elements perform 
-only simple tasks and the \textit{read-write} memory dependency shown in 
-Figure~\ref{clicknp:fig:dependency}(b) is the most common case we have encountered.
+如果两个操作访问相同的内存位置，并且其中至少有一个是 \textit {写操作}，我们称这两个操作相互依赖 \cite {dependence}。
+我们无法同时处理具有 \textit {memory dependency}的操作，因为每个内存访问都有一个周期延迟，并且程序的语义正确性很大程度上取决于操作的顺序。
+如图 \ref {clicknp:fig:dependency}（b），\textbf {S1}和 \textbf {S2}相互依赖：\textbf {S2}必须延迟到\textbf {S1}结束 ，只有在\textbf {S2}完成后，\textbf {S1}才能对新的输入数据进行操作。
+因此，该函数将需要两个周期来处理一个数据。
+对于某些处理算法，内存依赖性可能相当复杂，但是由于 \name 的模块化体系结构，大多数元素只执行简单的任务，而\textit {读写操作}之间的内存依赖关系是我们遇到的最常见的情况，如图 \ ref{clicknp:fig:dependency}（b）所示。
 
-One way to remove this memory dependency is to store data in registers only. 
-%
-Since registers are fast enough to perform read, computation and write back within one cycle,
-there would be no \textit{read-write} dependency at all. 
-Indeed, compared to CPU, FPGA has a much larger number of 
-registers, \ie, 697Kbit for Altera Stratix V, which can be used
-whenever possible to reduce memory dependency.
-The \name\ compiler aggressively assigns registers to variables as long as
-all accesses to the variable refer to a constant address -- either the variable is a scalar or an array entry with constant offset.
-%
-Certainly, the programmer can use ``register'' or ``local/global'' keywords to explictly instruct the compiler to place a variable (can also be an array)
-in register, BRAM or onboard DDR memory.
-%declare the  in array declaration to force the compiler to use registers and generate multiplexers for memory access.}
+消除此内存依赖性的一种方法是仅将数据存储在寄存器中。
+由于寄存器足够快，可以在一个周期内执行读取，计算和回写，根本就没有\textit {读写}依赖。
+的确，与CPU相比，FPGA的寄存器数量要大得多，如Altera Stratix V的697Kbit，因此可以使用寄存器尽可能减少内存依赖性。
+\name 编译器只要向变量主动分配寄存器即可，对变量的所有访问都引用一个常量地址 - 变量是标量或具有常量偏移的数组条目。
+当然，程序员可以使用``register''或``local / global''关键字来明确地指示编译器放置一个变量（也可以是一个数组）在寄存器，BRAM或板载DDR内存。
 
-For large data, they have to be stored in memory. 
-%
-Fortunately, we can still use a technique called \textit{delayed write} to
-resolve the \textit{read-write} memory dependency in Figure~\ref{clicknp:fig:dependency}(b).
-The core idea is to buffer the new data in a register and delay the write
-operation until the next read operation. 
-If the next read accesses the same location, it will read the value from
-the buffer register directly. Otherwise, the read can operate in parallel 
-with the delayed write operation as they are going to access different
-memory locations\footnote{Most BRAM in FPGA has two ports.}.
-Figure~\ref{clicknp:fig:dependency}(c) shows the code snippet with delayed write.
-Since there is no longer memory dependency in the code, the element can 
-process a datum in one cycle.
-%
-By default, \name\ compiler automatically applies \textit{delayed write} 
-for an array (generating similar code as shown in Figure~\ref{clicknp:fig:dependency}(b)).
-%
-\egg{But Currently the compiler can generate only one delayed write per array.
-For complex memory dependencies, the programmer should rewrite the code into multiple elements accessing disjoint memory regions, and use message-based coordination if necessary.}
+对于大数据，它们必须存储在内存中。
+幸运的是，我们仍然可以使用一种名为\textit {延迟写入}的技术
+在图 \ref {clicknp:fig:dependency}（b）中解析\textit {读写操作}之间的内存依赖。
+核心思想是将新数据缓冲在寄存器中并延迟写入操作，直到下一次读操作。
+如果下一个读取访问相同的位置，它将从缓冲寄存器中直接读取值。
+否则，读取和被延迟的写入操作可以并行执行，因为他们将访问不同的内存位置。
+\footnote{FPGA中的大多数BRAM都有两个端口。}
+图 \ref {clicknp:fig:dependency}（c）显示了延迟写入的代码片段。
+由于代码中不再存在内存依赖性，因此元素可以在一个周期内处理一个数据。
+默认情况下，\name 编译器会对一个数组自动应用 \textit {延迟写入}，生成类似图 \ref {clicknp:fig:dependency}（b）的代码。
+但目前编译器每个阵列只能生成一个延迟写入。
+对于复杂的内存依赖性，程序员应该将代码重写为访问不相交内存区域的多个元素，并在必要时使用基于消息的协调。
 
 
 \begin{figure}
@@ -189,10 +140,9 @@ For complex memory dependencies, the programmer should rewrite the code into mul
 morekeywords={get_input_port,read_input_port,from_tor, to_tor, set_output_port, host, begin, VLAN, IPv4, GRE} 
 }
 \centering
-
+\small
 
 \begin{tabular}{cc}
-\scriptsize 
 \begin{lstlisting}[escapechar=@]
 struct hash_entry
 {
@@ -215,39 +165,24 @@ S2: A[idx].cnt ++;
 (a) & (b)
 \end{tabular}
 
-\caption{Memory scattering. }
-
+\caption{内存散射. }
 \label{clicknp:fig:memscattering}
 \end{figure}
 
 
 %\smalltitle{Remove pseudo-dependency.}
-One subtle issue will occur when using an array of \textit{struct} variables. 
-Figure~\ref{clicknp:fig:memscattering}(a) shows such an example, where
-a hash table is used to maintain a count for every flow.
-We find \textbf{S2} will have a memory dependency to \textbf{S1}, although
-they are accessing different fields of a \textbf{struct}.
-The reason is that almost all current HLS tools will treat a \textbf{struct}
-array as a single-dimension array with a large bit-width -- equal to
-the size of the \textbf{struct}, and use only one arbitrator to control 
- access.
-We call this type of memory dependency \textit{pseudo dependency}, 
-as physically, the two fields, \textit{key} and \textit{cnt}, can be on different 
-memory locations.
-%
-To resolve this issue, \name\ employs a simple technique called \textit{memory scattering}, which automatically 
-translates a \textbf{struct} array into several 
-independent arrays, each for a field in the \textbf{struct}, and assigns them into different BRAMs (Figure~\ref{clicknp:fig:memscattering}(b)).
-With \textit{memory scattering}, \textbf{S1} no longer depends on \textbf{S2}.
-So the pipeline can be inferred by HLS tools, and when \textbf{S2} is 
-still operating, a new datum can be clocked in and processed 
-by \textbf{S1}.
-It is worth noting that memory scattering is only applied for elements 
-in FPGA and disabled if elements are assigned to run on the host CPU.
+使用\textit {struct}变量数组时会出现一个微妙的问题。
+图\ref {clicknp:fig:memscattering}（a）显示了这样一个例子，其中哈希表用于维护每个流的计数。
+我们发现\textbf {S2}将具有与\textbf {S1}的内存依赖关系，尽管它们正在访问\textbf {struct}的不同字段。
+原因是几乎所有当前的HLS工具都会将\textbf {struct}数组视为具有较大位宽的单维数组 - 等于\textbf {struct}的大小，并且只使用一个仲裁器控制访问。
+我们称这种类型的内存依赖性\textit {伪依赖}，在物理上，两个字段\textit {key}和\textit {cnt}可以位于不同的内存位置。
+为了解决这个问题，\name 采用了一种名为\textit {内存散射}的简单技术，它自动将\textbf {struct}数组转换为几个独立的数组，每个数组都用于\textbf {struct}中的一个字段，并分配它们进入不同的BRAM（图 \ref {clicknp:fig:memscattering}（b））。
+使用\textit {内存散射}，\textbf {S1}不再依赖于\textbf {S2}。
+因此，管道可以由HLS工具推断，并且当\textbf {S2}仍然在运行时，新的数据可以由\textbf {S1}计时和处理。
+值得注意的是，内存散射仅适用于FPGA中的元素，如果元素分配在主机CPU上运行则禁用。
 
-We note that the above techniques may not resolve all memory dependencies. 
-In many cases, it requires programmers to re-factor their code or even change
-the algorithms to ensure their implementation can be fully pipelined in FPGA. 
+我们注意到上述技术可能无法解决所有内存依赖性。
+在许多情况下，它需要程序员重新考虑他们的代码，甚至改变算法，以确保他们的实现可以在FPGA中完全流水线化。
 
 \egg{
 \begin{figure}
@@ -304,38 +239,32 @@ struct hash_entry
 \end{figure}
 }
 
-\subsubsection{Balance pipeline stages}
-Ideally, we require every stage in one processing pipeline to have the same speed. \ie, processing a datum at one clock cycle.
-However, if the process at each stage is unbalanced and some stages need more cycles than others, these fat stages will
-limit the whole throughput of the pipeline.  
-For example, in Figure~\ref{clicknp:fig:unbalance}(a), \textbf{S1} is a loop operation. 
-Since each iteration takes one cycle (\textbf{S2}), the whole loop will need $N$ cycles to finish, significantly reducing the pipeline
-throughput.
-Figure~\ref{clicknp:fig:unbalance}(b) shows another example, which implements a cache in BRAM for a global table (\textit{gmem}) in DDR.
-Although the ``else'' branch is seldom hit, it generates a fat stage in the 
-pipeline (taking hundreds of cycles!), and slows down
-the processing greatly.
+\subsubsection{平衡流水级}
+理想情况下，我们要求一个处理管道中的每个阶段具有相同的速度。 即，在一个时钟周期处理数据。
+但是，如果每个阶段的过程不平衡并且某些阶段需要比其他阶段更多的循环，则这些阶段将限制管道的整个吞吐量。
+例如，在图 \ref {clicknp:fig:unbalance}（a）中，\textbf {S1}是一个循环操作。
+由于每次迭代需要一个周期（\textbf {S2}），整个循环将需要$N$周期才能完成，从而显着降低了管道吞吐量。
+图 \ref {clicknp:fig:unbalance}（b）显示了另一个示例，它在BRAM中为DDR中的全局表（\textit {gmem}）实现了一个缓存。
+虽然``else''分支很少被击中，但它会在管道中产生一个胖阶段（需要数百个周期！），并且大大减慢了处理速度。
 
-\name\ uses two techniques to balance the stages inside a pipeline. First, we \textit{unroll} the loop whenever possible. 
-When unrolled, the loop operation effectively breaks into a sequence of small operations, each of which can be finished in one cycle.
-It is worth noting that unrolling a loop will duplicate the operations in the loop body and thus increase area cost. 
-Therefore, it may be only applicable to loops with simple bodies and 
-small number of iterations. 
-In NFs, we find such small loops are rather common, \eg calculating checksums, shifting packet payload and iterating through possible configurations.
-ClickNP compiler provides the \textbf{.unroll} directive to unroll a loop. 
-%
-While many HLS tools support loop unroll for a known number of iterations, 
-ClickNP extends this capability to unroll a loop whose  
-number of iterations is unknown but under an upper bound 
-that is specified by programmers.
+\name 使用两种技术来平衡管道内的各个阶段。首先，我们尽可能地\textit {unroll}循环。
+展开时，循环操作有效地分解为一系列小操作，每个操作都可以在一个循环中完成。
+值得注意的是，展开循环将复制循环体中的操作，从而增加面积成本。
+因此，它可能仅适用于具有简单主体和少量迭代的循环。
+在NF中，我们发现这种小循环是相当常见的，例如计算校验和，移位数据包有效负载并迭代可能的配置。
+ClickNP编译器提供\textbf {unroll}指令来展开循环。
+虽然许多HLS工具支持循环展开已知次数的迭代，但ClickNP扩展此功能以展开循环，其循环次数未知但在程序员指定的上限之下。
 
-Second, if we identify that an element has both heavy and light-weight operations, we try to separate each type of operations in an individual element.
-For example, to implement a cache as shown in Figure~\ref{clicknp:fig:unbalance}(b), we move the slow ``else'' branch into another element.
-This way, the fast path and the slow path would be running asynchronously.
-If cache miss is rare, the overall processing speed is dominated by the fast path.
-We will return to this point later in \S\ref{clicknp:sec:application}.
-Currently, \name\ compiler cannot automatically perform such separation for 
-programmers.
+其次，如果我们确定元素具有重量级和轻量级操作，我们会尝试将单个元素中的每种类型的操作分开。
+例如，要实现一个缓存，如图 \ref {clicknp:fig:unbalance}（b）所示，我们将慢“`else”分支移动到另一个元素中。
+这样，快速路径和慢速路径将异步运行。
+如果缓存未命中很少，则整个处理速度由快速路径决定。
+稍后我们将在\S \ref {clicknp:sec:application}中返回到这一点。
+目前，\name 编译器不能为程序员自动执行此类分离。
+
+\textbf{讨论 async}。
+
+\textbf{更新 ClickNP 语法，端口名称}。
 
 \begin{figure}
 \lstset{style=numbers}
@@ -349,7 +278,7 @@ morekeywords={get_input_port,read_input_port,from_tor, to_tor, set_output_port, 
 
 \begin{tabular}{c}
 {
-\scriptsize 
+\small
 \begin{lstlisting}[escapechar=@]
 .handler {
    r = read_input_port (PORT_1);
@@ -362,7 +291,7 @@ S2:  sum += p[i];
 } \\
 (a) \vspace{3pt} \\
 {
-\scriptsize 
+\small 
 \begin{lstlisting}[escapechar=@]
 .handler {
    r = read_input_port (PORT_1);
@@ -383,7 +312,7 @@ S2:} else {
 (b) \vspace{3pt} 
 \end{tabular}
 
-\caption{Unbalanced pipeline stages. }
+\caption{不平衡的流水级。}
 \label{clicknp:fig:unbalance}
 
 \end{figure}

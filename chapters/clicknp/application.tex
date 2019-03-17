@@ -1,137 +1,89 @@
 %!TEX root=main.tex
-\section{Applications}
+\section{应用}
 \label{clicknp:sec:application}
 
-To evaluate the flexibility of \name, we have created five common NFs based on \name. 
-All of them can run in our test-bed processing real-time traffic. 
-%
-Table~\ref{clicknp:tab:applications} summarizes the number of elements included in each network function and the total LoC, including all elements specification and the cofiguration files.
-%
-Our experience also confirms the \name\ modular architecture greatly improves the code reuse and simplifies 
-the construction of new NFs. 
-As shown in Table~\ref{clicknp:tab:elements}, there are many chances to reuse one element in many applications, \eg, L4\_Parser 
-is used in all five NFs in this paper (A1-5).
-%
-Each NF may take 1\approx 2 weeks for one programmer to develop and debug. 
-We find that the ability of joint CPU/FPGA processing would also greatly help 
-debugging, as we can move 
-an element in question to CPU, so that we can easily print logs to track the problem.
+为了评估 \name 的灵活性，我们基于 \name 创建了五个常见的NF。
+所有这些都可以在我们的测试床处理实时流量中运行。
+表 \ref {clicknp:tab:applications}总结了每个网络功能中包含的元素数量和总LoC，包括所有元素规范和配置文件。
+我们的经验也证实了\name 的模块化架构极大地改善了代码重用并简化了新NF的构建。
+如表 \ref {clicknp:tab:elements}所示，在许多应用程序中有很多机会重用一个元素，例如，本文（A1-5）中所有五个NF都使用了L4\_Parser。
+每个NF可能需要1个左右的时间才能让一个程序员进行开发和调试。
+我们发现联合CPU / FPGA处理的能力也将极大地帮助调试，因为我们可以将有问题的元素移动到CPU，以便我们可以轻松地打印日志来跟踪问题。
 
-%In the following, we discuss these NFs in details.
+在下文中，我们将详细讨论这些NF。
 
-\smalltitle{A1. Packet generator (PktGen) and capture (PktCap).} PktGen can generate various
-traffic patterns based on different profiles. 
-It can generate different sized flows and schedule them to start at different time, 
-following given distributions. 
-%
-Generated flows can further pass through different traffic shapers to control the flow rates and their burstiness. 
-PktCap simply redirects all packets it receives to \textit{logger} elements, which are usually located in the host.
-Since a single logger cannot fully utilize the PCIe I/O channel capacity, PktCap has a Receive Side Scaling (RSS)
-element in FPGA to distribute packets to multiple loggers based on the hash of flow 5-tuple.
-%
-Since our PCIe channel has less capacity than 40G NIC, we add an \textit{extractor} element that extracts only important
-fields of a packet (\eg 5-tuple, DSCP and VLAN tag if any) and forwards these fields (total 16B), together with a timestamp
- (4B) to the logger element across PCIe.
-%
-PktCap is one example demonstrating the importance of joint CPU/FPGA processing. 
-Compared to FPGA, CPU has 
-more memory for buffering and can easily access other storages, \eg, HDD/SSD drives as in \cite{lee2015flosis}, and therefore it makes more sense to run loggers on CPU.
-
-\smalltitle{A2. Openflow firewall (OFW).} Our Openflow~\cite{mckeown2008openflow} firewall supports 
-both exact- and wildcard-matching of flows.
-The exact-match table is implemented using Cuckoo Hashing~\cite{cuckoo} and contains 128K entries that match against flow 5-tuples. 
-The wild-card match is based on TCAM.
-However, a naive TCAM implementation with 512 104-bit entries takes 65\% logic resource of our FPGA.
-Instead, we use BRAM-based TCAM~\cite{jiang2013scalable}. 
-BRAM-based TCAM breaks search key into 8-bit keys and use them to address lookup tables, which trades memory for logic area. A BRAM TCAM with 2K entries takes 14\% logic and 43\% BRAM.
-Additionally, we design a HashTCAM to leverage the fact that many entries in flow tables 
-share the same bit-masks.
-HashTCAM divides the table space into a number of smaller hash tables, each of which 
-is associated with a bit-mask.
-%
-Any incoming packet will first perform an ``and'' operation before looking up the hash table.
-Each entry in the table is also associated with a priority. 
-An arbitrator logic is applied to  
-select the matched entry with the highest priority. 
-HashTCAM has better tradeoff between capability and area cost.
-A HashTCAM with 16K flow entries and 16 distinct bit-masks (similar to Broadcom Trident II~\cite{broadcomethernet}) takes 19\% logic and 22\% BRAM.
-%
-The manager program always tries to group rules based on their bit-masks and places
-groups with most rules into HashTCAM. 
-%
-The rest rules, which casnnot fit into any groups in HashTCAM, are then put into 
-BRAM-based TCAM. 
+\textbf {A1. 数据包生成器（PktGen）和捕获（PktCap）。}
+PktGen可以根据不同的配置文件生成各种流量模式。
+它可以生成不同大小的流，并根据给定的分布安排它们在不同的时间开始。
+生成的流可以进一步通过不同的流量整形器来控制流速及其突发性。
+PktCap只是将收到的所有数据包重定向到\textit {logger}元素，这些元素通常位于主机中。
+由于单个记录器无法充分利用PCIe I / O通道容量，因此PktCap在FPGA中具有接收端缩放（RSS）元素，以根据流5元组的散列将数据包分发到多个记录器。
+由于我们的PCIe通道的容量小于40G NIC，我们添加了一个\textit {extractor}元素，它只提取数据包的重要字段（例如，如果有5个元组，DSCP和VLAN标记），并转发这些字段（总共16B） ，以及跨PCIe的记录器元素的时间戳（4B）。
+PktCap就是一个展示联合CPU / FPGA处理重要性的例子。
+与FPGA相比，CPU具有更多的内存用于缓冲，并且可以轻松访问其他存储，例如，\cite{lee2015flosis}中的HDD / SSD驱动器，因此在CPU上运行记录器更有意义。
 
 
-\smalltitle{A3. IPSec gateway (IPSecGW).}
-One issue with software NFs is that the CPU soon becomes a bottleneck when packets require some
-computation intensive processing, \eg, IPSec~\cite{packetshader}.
-%
-We have built an IPSec datapath that is able to process IPSec packets with AES-256-CTR encryption and SHA-1 authentication. 
-As shown in \S\ref{clicknp:subsec:lib}, a single AES\_CTR element can achieve only 27.8~Gbps throughput. Therefore, we need two
-AES\_CTR elements to run in parallel to achieve line rate.
-SHA-1, however, is tricky. The SHA-1 divides a packet into smaller data blocks (64B). 
-Although the computation in one data block can be pipelined, 
-there is a dependency between successive blocks inside one IP packet -- the computation of the next block cannot start before the previous
-block has finished! 
-If we process these data blocks sequentially, the throughput would be as low as 1.07 Gbps. 
-Fortunately, we can leverage parallelism among different packets. 
-While the processing of a data block of the current packet is still going, we feed a data block of a different packet. 
-Since these two data blocks do not have dependency, they can be processed in parallel. 
-To implement this, we design a new element called \textit{reservo} (short for reservation station), which buffers up to 64 packets and schedules 
-independent blocks to SHA-1 element. After the signature of one packet has been computed, the \textit{reservo} element will 
-send it to a next element that appends SHA-1 HMAC to the packet.
-%
-There is one more tricky thing. 
-Although SHA-1 element has a fixed latency, the overall latency of a packet is different, \ie, proportional to packet size. 
-When multiple packets are scheduled in SHA-1 computation, these packets may be
-out-of-order, \eg, a smaller packet behind a large packet may finish earlier.
-%
-To prevent this, we further design a \textit{reorder buffer} element after SHA-1 element
-that stores the out-of-order packets and restore the original order
- according to sequence numbers of packets. 
+\textbf {A2. OpenFlow 防火墙（OFW）。}
+我们的Openflow~\cite {mckeown2008openflow} 防火墙支持流的精确匹配和通配符匹配。
+精确匹配表是使用Cuckoo Hashing \cite{cuckoo} 实现的，包含与流5元组匹配的128K条目。
+模糊匹配匹配基于TCAM。
+	但是，具有512个104位条目的简单TCAM实现占用了FPGA的65％逻辑资源。
+	相反，我们使用基于BRAM的TCAM \cite {jiang2013scalable}。
+	基于BRAM的TCAM将搜索密钥分解为8位密钥，并使用它们来寻址查找表，这些表将内存换成逻辑区域。具有2K条目的BRAM TCAM需要14％逻辑和43％的BRAM。
+	此外，我们设计了一个HashTCAM来利用流表中的许多条目共享相同的位掩码这一事实。
+	HashTCAM将表空间划分为许多较小的哈希表，每个哈希表都与一个位掩码相关联。
+	在查找哈希表之前，任何传入的数据包都将首先执行“和”操作。
+	表中的每个条目也与优先级相关联。
+	仲裁器（multiplexer）选择具有最高优先级的匹配条目。
+	HashTCAM在功能和区域成本之间有更好的权衡。
+	具有16K流条目和16个不同位掩码的HashTCAM（类似于Broadcom Trident II~\cite {broadcomethernet}）需要19％逻辑和22％BRAM。
+	管理器程序总是尝试根据其位掩码对规则进行分组，并将具有大多数规则的组放入HashTCAM。
+	然后将其余规则放入基于BRAM的TCAM中，这些规则不适合HashTCAM中的任何组。
 
-\smalltitle{A4. L4 load balancer (L4LB).} We implement L4LB according to \textit{multiplexer} (MUX) in Ananta~\cite{ananta}.
-%
-The MUX server basically looks into the packet header and sees if a \textit{direct address} (DIP) has been assigned to the flow.
-If so, the packet is forwarded to the server indicated by DIP via a NVGRE tunnel. Otherwise, the MUX server will call a local controller to
-allocate a DIP for the flow.
-%
-\egg{Per-flow state is required in MUX server.
-Hash-based ECMP cannot be used since there are failures and avoiding black holes requires changing backend server list on-the-fly. Further, advanced LB may also require load-aware 
-balancing.}
-%
-A flow table is used to record the mapping of flows to their DIPs.
-%
-To handle the large traffic volume in datacenters, it requires the L4LB to support up to 32 million flows in the flow table.
-Clearly, such a large flow table cannot fit into the BRAM of FPGA, and has to be stored in onboard DDR memory.
-However, accessing DDR memory is slow. 
-To improve performance, we create a 4-way associative flow cache in BRAM with 16K 
-cache lines. The Least Recently Used (LRU) algorithm is used to replace entries 
-in the flow cache.
 
-In our implementation, an incoming packet first passes a \textit{parser} element 
-which extracts the 5-tuple and sends them to the \textit{flow cache} element.
-If the flow is not found in the flow cache, the packet's metadata is forwarded
-to the global flow table, which reads the full table in DDR.
-%
-If there is still no matching entry, the packet is the first packet of a flow and 
-a request is sent to an \textit{DIPAlloc} element to allocate a DIP for the flow 
-according to load balancing policy.
-After the DIP is determined, an entry is inserted into the flow table. 
+\textbf{A3. IPSec网关（IPSecGW）。}
+软件NF的一个问题是，当数据包需要一些计算密集型处理时，CPU很快就会成为瓶颈，例如，IPSec \cite {packetshader}。
+我们构建了一个IPSec数据路径，能够使用AES-256-CTR加密和SHA-1身份验证处理IPSec数据包。
+如\S \ref {clicknp：subsec：lib}所示，单个AES\_CTR元素只能实现27.8~Gbps的吞吐量。因此，我们需要两个AES\_CTR元素并行运行以实现线速率。
+然而，SHA-1很棘手。 SHA-1将数据包分成较小的数据块（64B）。
+虽然一个数据块中的计算可以流水线化，但是一个IP数据包内的连续块之间存在依赖关系 - 下一个块的计算无法在前一个块完成之前开始！
+如果我们按顺序处理这些数据块，吞吐量将低至1.07 Gbps。
+幸运的是，我们可以利用不同数据包之间的并行性。
+虽然当前数据包的数据块的处理仍在进行，但我们提供了不同数据包的数据块。
+由于这两个数据块没有依赖关系，因此可以并行处理它们。
+为了实现这一点，我们设计了一个名为\textit {reservo}的新元素（保留站的简称），它可以缓冲多达64个数据包，并为SHA-1元素调度独立的块。在计算了一个数据包的签名之后，\textit {reservo}元素将它发送到将SHA-1 HMAC附加到数据包的下一个元素。
+还有一件棘手的事情。
+虽然SHA-1元素具有固定的延迟，但数据包的总延迟是不同的，即与数据包大小成比例。
+当在SHA-1计算中调度多个分组时，这些分组可能是无序的，例如，大分组后面的较小分组可能更早地完成。
+为了防止这种情况，我们在SHA-1元素之后进一步设计了一个\textit {reorder buffer}元素，该元素存储无序数据包并根据数据包的序列号恢复原始顺序。
 
-After deciding the DIP of a packet, an encapsulation element will 
-retrieve the next-hop information, \eg, IP address and VNET ID, and 
-generate a NVGRE encapsulated packet accordingly. 
-%
-%For remaining packets of the flow, DIP is extracted from flow state.
-A flow entry would be invalidated if a FIN packet is received, or a timeout occurs
-before receiving any new packets from the flow.
-%After DIP is determined, we retrieve next-hop metadata from BRAM and encapsulate an NVGRE header to direct the packet to assigned DIP.
+\textbf {A4. L4负载平衡器（L4LB）。}
+我们根据Ananta~ \cite {ananta}中的\textit {multiplexer}（MUX）实现L4LB。
+MUX服务器基本上查看数据包标头，并查看是否已为该流分配了\textit {直接地址}（DIP）。
+如果是，则通过NVGRE隧道将分组转发到由DIP指示的服务器。否则，MUX服务器将调用本地控制器为流分配DIP。
+MUX服务器中需要按流状态。
+由于存在故障并且避免黑洞需要即时更改后端服务器列表，因此无法使用基于散列的ECMP。此外，高级LB还可能需要负载感知平衡。
+流表用于记录流向其DIP的映射。
+为了处理数据中心的大流量，它需要L4LB在流表中支持多达3200万个流。
+显然，如此大的流量表不能适应FPGA的BRAM，必须存储在板载DDR存储器中。
+但是，访问DDR内存很慢。
+为了提高性能，我们在BRAM中创建了一个带有16K高速缓存行的4路关联流缓存。最近最少使用（LRU）算法用于替换流缓存中的条目。
 
-We put all elements in FPGA except for the \textit{DIPAlloc} element.
-Since only the first packet of a flow may hit \textit{DIPAlloc} and the allocation policy also could be complex, it is more suitable to run 
-\textit{DIPAlloc} on CPU, being another example of joint CPU-FPGA processing.
+在我们的实现中，传入的数据包首先传递一个\textit {解析器}（parser）元素，该元素提取5元组并将它们发送到\textit {流缓存}（flow cache）元素。
+如果在流缓存中找不到流，则将数据包的元数据转发到全局流表，该表读取DDR中的完整表。
+如果仍然没有匹配的条目，则该数据包是流的第一个数据包，并且请求被发送到\textit {DIPAlloc}元素，以根据负载平衡策略为该流分配DIP。
+确定DIP后，将一个条目插入到流表中。
+
+在确定分组的DIP之后，封装元件将检索下一跳信息，例如IP地址和VNET ID，并相应地生成NVGRE封装的分组。
+对于流的剩余分组，从流状态提取DIP。
+如果收到FIN数据包或发生超时，则流条目将无效
+在从流中接收任何新数据包之前。
+在确定DIP之后，我们从BRAM检索下一跳元数据并封装NVGRE头以将分组引导到分配的DIP。
+
+除了\textit {DIPAlloc}元素之外，我们将所有元素都放在FPGA中。
+由于只有流的第一个数据包可能会出现\textit {DIPAlloc}并且分配策略也可能很复杂，因此更适合运行
+CPU上的\textit {DIPAlloc}，是联合CPU-FPGA处理的另一个例子。
+
 %
 \egg{
 To handle the large traffic volume in datacenters, it requires the L4LB to support up to 32 million flows in the flow table.
@@ -140,32 +92,36 @@ Accessing DDR memory is slow. To improve performance, we further create a 4-way 
 cache lines. The flow cache is replaced based on the Least Recently Used (LRU) algorithm.
 DDR memory access is a fat pipeline stage as shown in Figure \ref{clicknp:fig:unbalance}. We move the DDR access part to a separate element to make the fast path run asynchronously with slow path.}
 
-\smalltitle{A5. pFabric flow scheduler.} As the last application, we use \name\ to implement one recently proposed packet
-scheduling discipline -- pFabric~\cite{pfabric}. 
-pFabric scheduling is simple. It keeps only a shallow buffer (32 packets), and always dequeues the
-packet with the highest priority. When the buffer is full, the packet with the lowest priority is dropped.
-%
-pFabric is shown to achieve near-optimal flow completion time in datacenters. 
-%
-In the original paper, the authors proposed using a binary comparison tree (BCT) to select the packet with the highest priority. 
-However, while BCT takes only $O(log_2N)$ cycles to compute the highest priority packet, there is a dependency between 
-successive selection processes. It is because only when the previous selection finishes can we know the highest priority packet, and
-then the next selection process can be started reliably.
-This limitation would require the clock frequency to be at least 300MHz to achieve the line rate of 40Gbps, 
-which is not possible for our current FPGA platform.
-%
-In this paper, we use a different way to implement pFabric scheduler which is much easier to  parallelize. 
-The scheme is based on \textit{shift register priority queue}~\cite{moon2000scalable}.
-Entries are kept in a line of $K$ registers in non-increasing priority order.
-When dequeuing, all entries are shifted right and the head is popped. This takes just 1 cycle.
-For an enqueue operation, the metadata of a new packet is forwarded to all entries.
-And now, with each entry, a local comparison can be performed among 
-the packet in the entry, the new packet, and the packet in the neighboring entry. 
-Since all local comparisons can be carried in parallel, the enqueue operation can 
-also finish in 1 cycle.
-Enqueue and dequeue operations can further be parallelized. 
-Therefore, a packet can be processed in one cycle.
 
+
+\textbf {A5. pFabric 流调度程序。}
+我们使用\name 来实现一个最近提出的数据包调度规则--pFabric \cite {pfabric}。
+pFabric调度很简单。它只保留浅缓冲区（32个数据包），并始终使具有最高优先级的数据包出列。当缓冲区已满时，优先级最低的数据包将被丢弃。
+pFabric显示在数据中心中实现接近最佳的流完成时间。
+在原始论文中，作者提出使用二进制比较树（Binary Comparison Tree，BCT）来选择具有最高优先级的数据包。
+但是，虽然BCT只需要$O(log_2 N)$个周期来计算最高优先级的数据包，但在连续的选择过程之间存在依赖关系。这是因为只有当前一个选择完成后我们才能知道最高优先级的数据包，然后才能可靠地启动下一个选择过程。
+这种限制要求时钟频率至少为300MHz才能实现40Gbps的线速，这对我们当前的FPGA平台来说是不可能的。
+在本文中，我们使用不同的方式来实现pFabric调度程序，它更容易并行化。
+该方案基于\textit{移位寄存器优先级队列}（shift register priority queue） \cite {moon2000scalable}。
+条目以非增加优先级顺序保存在$K$个寄存器中。
+出列时，所有条目都向右移动并弹出头部。这只需要1个周期。
+对于入队操作，新数据包的元数据将转发到所有条目。
+现在，对于每个条目，可以在条目中的分组，新分组和相邻条目中的分组之间执行本地比较。
+由于所有局部比较都可以并行进行，因此入队操作也可以在1个周期内完成。
+入队和出队操作可以进一步并行化。
+因此，可以在一个周期中处理分组。
+
+\textbf{A6. RoCE 传输协议。}
+
+\textbf{A7. MP-RDMA 拥塞控制协议。}
+
+\textbf{A8. HTTPS RSA 加速。}
+
+\textbf{A9. 端口扫描检测。}
+
+\textbf{A10. 正则表达式匹配。}
+
+\textbf{A11. 神经网络推理。}
 
 \egg{
 pFabric \cite{alizadeh2013pfabric} is a near-optimal datacenter transport based on priority scheduling and dropping. Packets are scheduled based on its flow size or remaining flow size in a small queue. Our pFabric scheduler implementation (Figure \ref{clicknp:fig:PFabric}) support 4-giga strict priorities, including a PriorityQueue which deques the packet with highest priority and drops overflow packets with lowest priority, a ReorderQueue to find the earliest packet from the flow with highest priority to avoid starvation and keep packet ordering, and a PacketBuffer to receive packets into buffer and schedule or drop packets out of buffer. Since queue size in a perfectly load balanced fabric should be small, we choose shift register priority queue for maximum throughput and clock frequency.
