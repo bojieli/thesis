@@ -16,7 +16,7 @@
 % \secretlevel{秘密}        % 绝密|机密|秘密，注释本行则不保密
 % \secretyear{20}           % 保密年限
 
-\entitle{High Performance Data Center Systems with Programmable NIC}
+\entitle{High Performance Data Center Systems with Programmable Network Interface Cards}
 \enauthor{Bojie Li}
 \enmajor{Computer Science and Technology}
 \ensupervisor{Prof. Enhong Chen}
@@ -38,6 +38,7 @@
 \usepackage{import}
 \DeclareRobustCommand\cs[1]{\texttt{\char`\\#1}}
 \newcommand\pkg{\textsf}
+\renewcommand\textbf[1]{\textsf{#1}}
 
 
 \usepackage{epsfig}
@@ -62,6 +63,7 @@
 \usepackage{eucal}
 \usepackage{pifont}
 \usepackage{comment}
+\usepackage{rotating}
 
 \renewcommand\vec{\symbf}
 \newcommand\mat{\symbf}
@@ -103,11 +105,11 @@
 \import*{chapters/kvdirect/}{main}
 \import*{chapters/socksdirect/}{main}
 \input{chapters/conclusion}
-\input{chapters/floats}
-\input{chapters/math}
-\input{chapters/citations}
+%\input{chapters/floats}
+%\input{chapters/math}
+%\input{chapters/citations}
 
-\bibliography{bib/ustc,chapters/clicknp/reference,chapters/kvdirect/reference,chapters/socksdirect/reference}
+\bibliography{chapters/clicknp/reference,chapters/kvdirect/reference,chapters/socksdirect/reference}
 
 %\appendix
 %\input{chapters/complementary}
