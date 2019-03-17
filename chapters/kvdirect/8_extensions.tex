@@ -57,16 +57,20 @@ Fortunately, for a small number of partitions (\textit{e.g.} 10), the load imbal
 %In comparison, to achieve matching performance with 240 CPU cores, the load of the hottest core will be 10x of the average.
 Figure~\ref{kvdirect:fig:multiple-nics} shows that KV-Direct throughput scales almost linearly with the number of NICs on a server.
 
-\subsubsection{访问 SSD}
+\subsection{访问 SSD}
 
 \textbf{TODO}
 
 
+\subsection{有状态网络功能的存储}
 
-\subsection{Discussion}
+\textbf{TODO，网卡大量并发连接……}
+
+
+\section{Discussion}
 \label{kvdirect:sec:discussion}
 
-\subsubsection{NIC hardware with different capacity.}
+\subsection{NIC hardware with different capacity.}
 \label{kvdirect:sec:different-nic}
 
 The goal of KV-Direct is to leverage existing hardware in data centers to offload an important workload (KV access), instead of designing a special hardware to achieve maximal KVS performance. We use programmable NICs, which usually contain limited amount of DRAM for buffering and connection-state tracking. Large DRAMs are expensive in both die size and power consumption.
@@ -134,8 +138,12 @@ In 40~Gbps networks, network bandwidth bounds non-batched KV throughput, so we u
 KV-Direct leverages widely-deployed programmable NICs with FPGAs~\cite{putnam2014reconfigurable,caulfield2016cloud}. FlexNIC~\cite{kaufmann2015flexnic,kaufmann2016krishnamurthy} is another promising architecture for programmable NICs with Reconfigurable Match-action Tables (RMT)~\cite{bosshart2013forwarding}.
 NetCache~\cite{netcache-sosp17} implements a KV cache in RMT-based programmable switches, showing potential for building KV-Direct in an RMT-based NIC.
 
-\subsubsection{Implications for real-world applications.}
+\subsection{Implications for real-world applications.}
 
 Back-of-the-envelope calculations show potential performance gains when KV-Direct is applied in end-to-end applications. In PageRank~\cite{page1999pagerank}, because each edge traversal can be implemented with one KV operation, KV-Direct supports 1.22G TEPS on a server with 10 programmable NICs. In comparison, GRAM~\cite{wu2015g} supports 250M TEPS per server, bound by interleaved computation and random memory access.
 
 KV-Direct supports user-defined functions and vector operations (Table~\ref{kvdirect:tab:kv-operations}) that can further optimize PageRank by offloading client computation to hardware. Similar arguments hold for parameter server~\cite{li2014scaling}. We expect future work to leverage hardware-accelerated key-value stores to improve distributed application performance.
+
+\subsection{键值映射以外的其他数据结构}
+
+\textbf{TODO}

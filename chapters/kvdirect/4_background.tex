@@ -149,6 +149,8 @@ KV-Direct extends the application of programmable NICs to a novel area: key-valu
 \subsection{Workload Shift in KVS}
 \label{kvdirect:sec:workload-shift}
 
+\textbf{讨论 serverless computing 中的 shared storage}
+
 Historically, KVS such as Memcached~\cite{fitzpatrick2004distributed} gained popularity as an object caching system for web services.
 In the era of in-memory computation, KVS goes beyond caching and becomes an infrastructure service to store shared data structure in a distributed system.
 Many data structures can be expressed in a key-value hash table, \eg, data indexes in NoSQL databases~\cite{chang2008bigtable}, model parameters in machine learning~\cite{li2014scaling}, nodes and edges in graph computing~\cite{shao2013trinity, xiao17tux2} and sequencers in distributed synchronization~\cite{kalia2016design,eris}.
