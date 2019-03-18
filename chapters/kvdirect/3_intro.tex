@@ -1,4 +1,5 @@
-\section{Introduction}
+%!TEX root=main.tex
+\section{引言}
 \label{kvdirect:sec:introduction}
 
 %\subsection{outline}
@@ -40,42 +41,40 @@
 
 \begin{figure*}[t]
 \centering
-\subfloat[Software / two-sided RDMA.\label{kvdirect:fig:memaccess-a}]
+\subfloat[软件 / 双侧 RDMA。\label{kvdirect:fig:memaccess-a}]
 {\includegraphics[width=.33\textwidth,page=1]{cropped_access.pdf}}
-\subfloat[One-sided RDMA.\label{kvdirect:fig:memaccess-b}]
+\subfloat[单侧 RDMA。\label{kvdirect:fig:memaccess-b}]
 {\includegraphics[width=.33\textwidth,page=2]{cropped_access.pdf}}
-\subfloat[KV-Direct.\label{kvdirect:fig:memaccess-c}]
+\subfloat[\oursys{}。\label{kvdirect:fig:memaccess-c}]
 {\includegraphics[width=.33\textwidth,page=3]{cropped_access.pdf}}
-\caption{Design space of KVS data path and processing device. Line indicates data path. One KV operation (thin line) may require multiple address-based memory accesses (thick line). Black box indicates where KV processing takes place.}
+\caption{KVS数据通路和处理装置的设计空间。 行表示数据路径。 一个KV操作（细线）可能需要多个基于地址的存储器访问（粗线）。 黑框表示KV处理发生的位置。}
 \label{kvdirect:fig:memaccess}
 
 \end{figure*}
 
-In-memory key-value store (KVS) is a key distributed system component in many data centers. KVS enables access to a shared key-value hash table among distributed clients. Historically, KVS such as Memcached~\cite{fitzpatrick2004distributed} gained popularity as an object caching system for web services. Large web service providers such as  Amazon~\cite{decandia2007dynamo} and Facebook~\cite{atikoglu2012workload, nishtala2013scaling}, have deployed distributed key-value stores at scale. More recently, as main-memory based computing becomes a major trend in the data centers~\cite{ousterhout2010case,dragojevic2014farm}, KVS starts to go beyond caching and becomes an infrastructure to store shared data structure in a distributed system.
-Many data structures can be expressed in a key-value hash table, \eg, data indexes in NoSQL databases~\cite{chang2008bigtable}, model parameters in machine learning~\cite{li2014scaling}, nodes and edges in graph computing~\cite{shao2013trinity, xiao17tux2} and sequencers in distributed synchronization~\cite{kalia2016design}. For most of these applications, the performance of the KVS is the key factor that directly determines the system efficiency. Due to its importance, over the years significant amount of research effort has been invested on improving KVS performance. 
+内存中键值存储（KVS）是许多数据中心中的关键分布式系统组件。 KVS允许在分布式客户端之间访问共享键值哈希表。从历史上看，诸如Memcached \cite {fitzpatrick2004distributed}之类的KVS作为Web服务的对象缓存系统获得了普及。亚马逊\cite {decandia2007dynamo}和Facebook \cite {atikoglu2012workload,nishtala2013scaling}等大型网络服务提供商已大规模部署了分布式键值存储。最近，随着基于主内存的计算成为数据中心的一个主要趋势 \cite{ousterhout2010case,dragojevic2014farm}，KVS开始超越缓存并成为在分布式系统中存储共享数据结构的基础架构。
 
-Earlier key-value systems~\cite{decandia2007dynamo, fitzpatrick2004distributed, nishtala2013scaling} are built on top of traditional OS abstractions such as OS lock and TCP/IP stack. This puts considerable stress on the performance of the OS, especially the networking stack. The 　bottleneck is exacerbated by the fact that physical network transport speed has seen huge improvements in the last decade due to heavy bandwidth demand from data center applications. 
+许多数据结构可以在键值哈希表中表示，例如，NoSQL数据库中的数据索引\cite {chang2008bigtable}，机器学习中的模型参数\cite {li2014scaling}，图形计算中的节点和边缘\cite {shao2013trinity,xiao17tux2}和分布式同步中的序列发生器\cite {kalia2016design}。对于大多数这些应用，KVS的性能是直接决定系统效率的关键因素。由于其重要性，多年来已投入大量研究工作来改善KVS性能。
 
-More recently, as both the single core frequency scaling and multi-core architecture scaling are slowing down~\cite{sutter2005free,esmaeilzadeh2011dark}, a new research trend in distributed systems is to leverage Remote Direct Memory Access (RDMA) technology on NIC to reduce network processing cost. One line of research~\cite{kalia2014using, kalia2016design} uses two-sided RDMA to accelerate communication (Figure~\ref{kvdirect:fig:memaccess-a}). KVS built with this approach are bounded by CPU performance of the KVS servers. Another line of research uses one-sided RDMA to bypass remote CPU and shift KV processing workload to clients~\cite{dragojevic2014farm, mitchell2013using} (Figure~\ref{kvdirect:fig:memaccess-b}). This approach achieves better GET performance but degrades performance for PUT operations due to high communication and synchronization overhead. Due to lack of transactional support, the abstraction provided by RDMA is not a perfect fit for building efficient KVS. 
+早期的键值系统\cite {decandia2007dynamo,fitzpatrick2004distributed,nishtala2013scaling} 建立在传统操作系统抽象的基础之上，例如OS锁和TCP / IP堆栈。这给操作系统的性能带来了相当大的压力，尤其是网络堆栈。由于数据中心应用带宽需求过大，物理网络传输速度在过去十年中有了巨大的改进，这加剧了瓶颈。
 
-In the meantime, another trend is emerging in data center hardware evolution. More and more servers in data centers are now equipped with \ournic{}s~\cite{caulfield2016cloud, greenberg2015sdn,putnam2014reconfigurable}.
-At the heart of a programmable NIC is a field-programmable gate array (FPGA) with an embedded NIC chip to connect to the network and a PCIe connector to attach to the server.
-Programmable NIC is initially designed to enable network virtualization~\cite{vfp,li2016clicknp}.
-However, many found that FPGA resources can be used to offload some workloads of CPU and significantly reduce CPU resource usage~\cite{ouyang14hotchips, MaZC17fpga, huang16socc, cong16dac}. Our work takes this general approach.
+最近，随着单核频率提升和多核架构扩展速度的减慢，分布式系统的一项新研究趋势是利用NIC上的远程直接内存访问（RDMA）技术来减少网络处理成本。一系列研究\cite {kalia2014using,kalia2016design}使用双面RDMA加速通信（图\ref {kvdirect:fig:memaccess-a}）。使用这种方法构建的KVS受到KVS服务器的CPU性能的限制。另一系列研究使用单侧RDMA绕过远程CPU并将KV处理工作量转移到客户端\cite {dragojevic2014farm,mitchell2013using}（图\ref {kvdirect:fig:memaccess-b}）。这种方法实现了更好的GET性能，但由于高通信和同步开销，降低了PUT操作的性能。由于缺乏事务支持，RDMA提供的抽象不适合构建高效的KVS。
 
-We present \oursys{}, a new in-memory key-value system that takes advantage of \ournic{} in data center.
-\oursys{}, as its name implies, directly fetches data and applies updates in the host memory to serve KV requests, bypassing host CPU (Figure~\ref{kvdirect:fig:memaccess-c}).
-%We leverage the insight of one-sided RDMA-based KV systems to bypass CPU, while offload the computation logic to FPGA-based NIC to ensure the consistency in server side, which results in the remarkable performance improvement through network traffic reduction and less synchronization overhead, furthermore, the client side becomes transparent to all KV operations.
-\oursys{} extends the RDMA primitives from memory operations (READ and WRITE) to key-value operations (GET, PUT, DELETE and ATOMIC ops). Compared with one-sided RDMA based systems, \oursys{} deals with the consistency and synchronization issues at server-side, thus remove the computation load in client and reduce network traffic.
-In addition, to support vector-based operations and reduce network traffic, \oursys{} also provides new vector primitives UPDATE, REDUCE, and FILTER, allowing users to define active messages~\cite{eicken1992active} and delegate certain computation to programmable NIC for efficiency.
+与此同时，数据中心硬件发展的另一个趋势正在出现。数据中心中越来越多的服务器现在配备了可编程网卡 \cite{caulfield2016cloud,greenberg2015sdn,putnam2014reconfigurable}。
+可编程NIC的核心是现场可编程门阵列（FPGA），其具有用于连接到网络的嵌入式NIC芯片和用于连接到服务器的PCIe连接器。
+可编程NIC最初设计用于启用网络虚拟化\cite {vfp,li2016clicknp}。
+但是，许多人发现FPGA资源可以用来卸载CPU的一些工作负载，并显着降低CPU资源的使用量\cite {ouyang14hotchips,MaZC17fpga,huang16socc,cong16dac}。我们的工作采用这种一般方法。
 
-Since the key-value operations are offloaded to the \ournic{}, we focus our design on optimizing the PCIe traffic between the NIC and host memory. \oursys{} adopts a series of optimizations to fully utilizing PCIe bandwidth and hide latency. Firstly, we design a new hash table and memory allocator to leverage parallelism available in FPGA and minimize the number of PCIe DMA requests. On average, \oursys{} achieves close to one PCIe DMA per READ operation and two PCIe DMAs per WRITE operation. Secondly, to guarantee consistency among dependent KV operations, \oursys{} includes an out-of-order execution engine to track operation dependencies while maximizing the throughput of independent requests. Thirdly, \oursys{} exploits on-board DRAM buffer available on \ournic{} by implementing a hardware-based load dispatcher and caching component in FPGA to fully utilize on-board DRAM bandwidth and capacity. 
+我们提出\oursys{}，一个新的内存中键值系统，利用数据中心的可编程网卡。
+顾名思义，\oursys{} 直接获取数据并在主机内存中应用更新来为KV请求提供服务，绕过主机CPU（图 \ref {kvdirect:fig:memaccess-c}）。
+我们利用单侧基于RDMA的KV系统的洞察力来绕过CPU，同时将计算逻辑卸载到基于FPGA的NIC，以确保服务器端的一致性，从而通过减少网络流量和减少同步开销实现显着的性能提升此外，客户端对所有KV操作都变得透明。
+\oursys{} 将RDMA原语从内存操作（READ和WRITE）扩展到键值操作（GET，PUT，DELETE和ATOMIC操作）。与基于单面RDMA的系统相比，\oursys{} 处理服务器端的一致性和同步问题，从而消除了客户端的计算负荷并减少了网络流量。
+此外，为了支持基于矢量的操作并减少网络流量，\oursys{} 还提供了新的矢量原语UPDATE，REDUCE和FILTER，允许用户定义活动消息（active message）\cite {eicken1992active}并将某些计算委托给可编程网卡。
 
-%%\textbf{TODO:performance highlight}
-%three key results:
-%
-A single NIC \oursys{} is able to achieve up to 180~M KV operations per second (Ops), equivalent to the throughput of 36 CPU cores~\cite{li2016full}. Compared with state-of-art CPU KVS implementations, \oursys{} reduces tail latency to as low as 10~\mus{} while achieving a 3x improvement on power efficiency. Moreover, \oursys{} can achieve near linear scalability with multiple NICs. With 10 \ournic{} cards in a server, we achieve 1.22 billion KV operations per second in a single commodity server, which is more than an order of magnitude improvement over existing systems.
+由于键值操作已卸载到可编程网卡，因此我们将设计重点放在优化NIC和主机内存之间的PCIe流量上。 \oursys{} 采用一系列优化来充分利用PCIe带宽和隐藏延迟。首先，我们设计了一个新的哈希表和内存分配器，以利用FPGA中可用的并行性，并最大限度地减少PCIe DMA请求的数量。平均而言，\oursys{} 每次READ操作接近一个PCIe DMA，每个WRITE操作两个PCIe DMA。其次，为了保证从属KV操作之间的一致性，\oursys{} 包括一个无序执行引擎来跟踪操作依赖性，同时最大化独立请求的吞吐量。第三，\oursys{} 通过在FPGA中实现基于硬件的负载调度程序和缓存组件来充分利用板载DRAM带宽和容量，利用可编程网卡上可用的板载DRAM缓冲区。
 
-\oursys{} supports general atomic operations up to 180~Mops, equal to normal KV operation and significantly outperforms the number reported in state-of-art RDMA-based system: 2.24~Mops~\cite{kalia2014using}. The atomic operation agnostic performance is mainly a result of our out-of-order execution engine that can efficiently track the dependency among KV operations without explicitly stalling the pipeline.
+单网卡 \oursys{} 系统能够实现每秒高达180~M KV的操作（Ops），相当于36个CPU核心的吞吐量\cite {li2016full}。与最先进的CPU KVS实现相比，\oursys{} 可将尾延迟降低至10 $\mu$s，同时将功率效率提高3倍。而且，\oursys{} 可以通过多个网卡实现接近线性的可扩展性。在服务器中使用10个可编程网卡，我们在单个商品服务器中每秒实现12.2亿KV操作，这比现有系统提高了一个数量级。
 
-%The rest of the paper is organized as follows. \S\ref{kvdirect:sec:background} shows the background, clarifies our design goals as well as challenges. \S\ref{kvdirect:sec:architecture} describes \oursys{} design. \S\ref{kvdirect:sec:implementation} presents the implementation details of \oursys{}. \S\ref{kvdirect:sec:evaluation} is the evaluation of \oursys{}. \S\ref{kvdirect:sec:extensions} talks about the further extensions. We discuss the related work in \S\ref{kvdirect:sec:related} and conclude in \S\ref{kvdirect:sec:conclusion}.
+\oursys{} 支持高达180~Mops的一般原子操作，等于正常的KV操作，并且明显优于最先进的基于RDMA的系统中报告的数量：2.24~Mops \cite {kalia2014using}。原子操作的性能主要是我们的乱序执行引擎的结果，该引擎可以有效地跟踪KV操作之间的依赖性，而不会阻塞管道。
+
+本章的其余部分安排如下。 \S \ref {kvdirect:sec:background}显示了背景，阐明了我们的设计目标和挑战。 \S \ref {kvdirect:sec:architecture}描述了\oursys{} 的设计。 \S \ref {kvdirect:sec:implementation}显示了\oursys{} 的实现细节。 \S \ref {kvdirect:sec:evaluation}是对\oursys{} 的评估。 \S \ref {kvdirect:sec:extensions}讨论了进一步的扩展。 我们在\S \ref {kvdirect:sec:related}中讨论相关工作，并在\S \ref {kvdirect:sec:conclusion}中得出结论。

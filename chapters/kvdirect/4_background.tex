@@ -1,4 +1,4 @@
-\section{Background}
+\section{背景}
 \label{kvdirect:sec:background}
 
 
@@ -146,87 +146,72 @@ There has been research on leveraging the reconfigurability of the NIC for netwo
 KV-Direct extends the application of programmable NICs to a novel area: key-value stores.
 }
 
-\subsection{Workload Shift in KVS}
+\subsection{KVS 的工作负载变化}
 \label{kvdirect:sec:workload-shift}
 
 \textbf{讨论 serverless computing 中的 shared storage}
 
-Historically, KVS such as Memcached~\cite{fitzpatrick2004distributed} gained popularity as an object caching system for web services.
-In the era of in-memory computation, KVS goes beyond caching and becomes an infrastructure service to store shared data structure in a distributed system.
-Many data structures can be expressed in a key-value hash table, \eg, data indexes in NoSQL databases~\cite{chang2008bigtable}, model parameters in machine learning~\cite{li2014scaling}, nodes and edges in graph computing~\cite{shao2013trinity, xiao17tux2} and sequencers in distributed synchronization~\cite{kalia2016design,eris}.
+从历史上看，诸如Memcached \cite {fitzpatrick2004distributed}之类的KVS作为Web服务的对象缓存系统获得了普及。
+在内存计算的时代，KVS超越了缓存，成为在分布式系统中存储共享数据结构的基础结构服务。
+许多数据结构可以在键值哈希表中表示，例如，NoSQL数据库中的数据索引\cite {chang2008bigtable}，机器学习中的模型参数\cite {li2014scaling}，图形计算中的节点和边缘\cite {shao2013trinity,xiao17tux2}和分布式同步中的序列发生器\cite {kalia2016design,eris}。
 
-The workload shifts from object cache to generic data structure store implies several design goals for KVS.
+工作负载从对象缓存转移到通用数据结构存储意味着KVS的几个设计目标。
 
-\textbf{High batch throughput for small KV.}
-In-memory computations typically access small key-value pairs in large batches, \eg, sparse parameters in linear regression~\cite{li2014algorithmic, xiao17tux2} or all neighbor nodes in graph traversal~\cite{shao2013trinity}, therefore a KVS should be able to benefit from batching and pipelining.
-%If the throughput of remote key-value access is comparable to accessing a local hash table, distributed computation on shared memory could be easier to scale linearly.
+\textbf {小KV的高批量吞吐量。}
+内存计算通常以大批量访问小键值对，例如线性回归中的稀疏参数\cite {li2014algorithmic,xiao17tux2}或图遍历中的所有邻居节点 \cite {shao2013trinity}，因此KVS能够受益于批处理和流水线操作。
 
-\textbf{Predictable low latency.}
-For many data-parallel computation tasks, the latency of an iteration is determined by the slowest operations~\cite{ousterhout2015ramcloud}. Therefore, it is important to control the tail latency of KVS. CPU based implementations often have large fluctuations under heavy load due to scheduling irregularities and inflated buffering.
-%CPU-based designs may need to trade-off latency and throughput by adjusting batch size~\cite{li2016full}, while hardware-accelerated designs can leverage pipelining to boost throughput without sacrificing latency~\cite{kalia2016design}.
-%Additionally, CPU processing time may have large fluctuations under high load due to scheduling irregularities, while hardware pipelines often have stable latency~\cite{li2016clicknp}.
+\textbf {可预测的低延迟。}
+对于许多数据并行计算任务，迭代的延迟由最慢的操作决定\cite {ousterhout2015ramcloud}。 因此，控制KVS的尾部潜伏期非常重要。 由于调度不规则和膨胀缓冲，基于CPU的实现通常在重负载下具有大的波动。
+%基于CPU的设计可能需要通过调整批量大小来解决延迟和吞吐量问题 \cite {li2016full}，而硬件加速设计可以利用流水线技术提高吞吐量而不会牺牲延迟 \cite {kalia2016design}。
+%此外，由于调度不规则，CPU处理时间在高负载下可能会有很大的波动，而硬件流水线通常具有稳定的延迟 \cite {li2016clicknp}。
 
-\textbf{High efficiency under write-intensive workload.}
-For cache workloads, KVS often has much more reads than writes~\cite{atikoglu2012workload}, but it is no longer the case for distributed computation workloads
-such as graph computation~\cite{page1999pagerank}, parameter servers~\cite{li2014scaling}.
-%For PageRank computation in a graph~\cite{page1999pagerank} or gradient descent in parameter servers~\cite{li2014scaling}, each node or parameter is read and written once per iteration, and the KVS would serve an equal number of GET and PUT operations.
-%Sequencers~\cite{kalia2016design} require atomic increment operations and no read-only operations.
-These workloads favor hash table structures that can handle both read and write operations efficiently.
+\textbf {写入密集型工作负载下的高效率。}
+对于缓存工作负载，KVS通常具有比写入更多的读取数量\cite {atikoglu2012workload}，但分布式计算工作负载不再是这种情况
+例如图形计算\cite {page1999pagerank}，参数服务器\cite {li2014scaling}。
+对于图表中的PageRank计算\cite {page1999pagerank} 或参数服务器中的梯度下降\cite {li2014scaling}，每次迭代读取和写入每个节点或参数一次，并且KVS将提供相同数量的GET和PUT操作。
+序列号发生器（sequencer）\cite {kalia2016design}需要原子增量操作而不需要只读操作。
+这些工作负载支持散列表结构，可以有效地处理读写操作。
 
+\textbf {快速原子操作。}
+几个非常流行的原子操作出现在应用程序中，例如集中式调度程序\cite {perry2014fastpass}，序列号发生器 \cite {kalia2016design,eris}，counter \cite {zhu2015packet}和 Web 应用程序中临时值\cite {atikoglu2012workload}。
+这需要单个键上的高吞吐量原子操作。
 
-\textbf{Fast atomic operations.}
-Atomic operations on several extremely popular keys appear in applications such as centralized schedulers~\cite{perry2014fastpass}, sequencers~\cite{kalia2016design,eris}, counters~\cite{zhu2015packet} and short-term values in web applications~\cite{atikoglu2012workload}.
-This requires high throughput on single-key atomics.
-%CPU-based KVS atomics is bottlenecked by either core contention or per-core throughput~\cite{li2016full}, and atomics based on one-sided RDMA is bottlenecked by PCIe latency~\cite{kalia2016design}.
+\textbf {支持矢量型操作。}
+机器学习和图计算工作负载\cite {li2014scaling,shao2013trinity,xiao17tux2} 通常需要对向量中的每个元素进行操作，
+例如，使用标量递增向量中的每个元素或将向量减少为其元素的总和。
+没有向量支持的KVS要求客户端为每个元素发出一个KVS操作，或者将向量检索回客户端并执行操作。
+支持KVS中的矢量数据类型和操作可以大大减少网络通信和CPU计算开销。
 
-\textbf{Support vector-type operations.}
-Machine learning and graph computing workloads~\cite{li2014scaling,shao2013trinity,xiao17tux2} often require operating on every element in a vector,
-\eg, incrementing every element in a vector with a scalar or reducing a vector into the sum of its elements.
-KVS without vector support requires the client to either issue one KVS operation per element, or retrieve the vector back to the client and perform the operation.
-Supporting vector data type and operations in KVS can greatly reduce network communication and CPU computation overhead.
-
-
-\subsection{Achilles' Heel of High-Performance KVS Systems}
+\subsection{高性能KVS系统的阿基里斯之踵}
 \label{kvdirect:sec:state-of-the-art-kvs}
 
-Building a high performance KVS is a non-trivial exercise of optimizing various software and hardware components in a computer system.
-Characterized by where the KV processing takes place, state-of-the-art high-performance KVS systems basically falls into three categories:
-on the CPU of KVS server
-%~\cite{mao2012cache,fan2013memc3,li2014algorithmic,ousterhout2010case, ousterhout2015ramcloud, kapoor2012chronos, lim2014mica,li2016full,kalia2014using, kalia2016design}
-(Figure~\ref{kvdirect:fig:memaccess-a}),
-on KVS clients
-%~\cite{mitchell2013using,szepesi2014designing,dragojevic2014farm,kalia2014using}
-(Figure~\ref{kvdirect:fig:memaccess-b})
-or on a hardware accelerator
-%~\cite{zhang2015mega,berezecki2011many,liang16fpl,blott13hotcloud,lavasani2014fpga,chalamalasetti2013fpga}
-(Figure~\ref{kvdirect:fig:memaccess-c}).
+构建高性能KVS是优化计算机系统中各种软件和硬件组件的重要工作。
+KV处理的特点是，最先进的高性能KVS系统基本上分为三类：
+在 KVS 服务器的 CPU 上
+(图~\ref{kvdirect:fig:memaccess-a}),
+在 KVS 客户端上
+(图~\ref{kvdirect:fig:memaccess-b})
+或者在硬件加速器上
+(图~\ref{kvdirect:fig:memaccess-c}).
 
-When pushed to the limit, in high performance KVS systems the throughput bottleneck can be attributed to the computation in KV operation and the latency in random memory access.
-CPU-based KVS needs to spend CPU cycles for key comparison and hash slot computation.
-Moreover, KVS hash table is orders of magnitude larger than the CPU cache, therefore the memory access latency is dominated by cache miss latency for practical access patterns.
+当推到极限时，在高性能KVS系统中，吞吐量瓶颈可归因于KV操作中的计算和随机存储器访问中的延迟。
+基于CPU的KVS需要花费CPU周期来进行密钥比较和散列槽计算。
+此外，KVS散列表比CPU高速缓存大几个数量级，因此存储器访问等待时间由实际访问模式的高速缓存未命中等待时间决定。
 
-By our measurement, a 64-byte random read latency for a contemporary computer is \approx110~ns. A CPU core can issue several memory access instructions concurrently when they fall in the instruction window, limited by the number of load-store units in a core (measured to be 3\approx4 in our CPU)~\cite{gharachorloo1992hiding, han2010packetshader, zhang2015mega}. In our CPU, we measure a max throughput of 29.3~M random 64B access per second per core. On the other hand, an operation to access 64-byte KV pair typically requires \approx100~ns computation or \approx500 instructions, which is too large to fit in the instruction window (measured to be 100\approx200). When interleaved with computation, the performance of a CPU core degrades to only 5.5~M KV operations per second (Mops). An optimization is to batch memory accesses in a KV store by clustering the computation for several operations together before issuing the memory access all at once~\cite{li2016full, narula2014phase}. This improves the per-core throughput to 7.9~MOps in our CPU, which is still far less than the random 64B throughput of host DRAM.
+通过我们的测量，当代计算机的64字节随机读取延迟大约为1~ns。当CPU内核落入指令窗口时，CPU核心可以同时发出多个内存访问指令，受核心中加载存储单元数量的限制（在我们的CPU中测量为3至4个） \cite {gharachorloo1992hiding,han2010packetshader,zhang2015mega}。在我们的CPU中，我们测量每个核心每秒最大吞吐量为29.3~M随机64B访问。另一方面，访问64字节KV对的操作通常需要大约100~ns计算或大约500条指令，这太大而不适合指令窗口（测量为100至200）。当与计算交错时，CPU内核的性能降低到每秒5.5~M KV操作（Mops）。优化是通过在一次发出内存访问之前将多个操作的计算聚类在一起来批量KV存储中的内存访问\cite {li2016full,narula2014phase}。这将我们CPU中的每核心吞吐量提高到7.9~MOps，这仍远低于主机DRAM的随机64B吞吐量。
 
-Observing the limited capacity of CPU in KV processing, recent work~\cite{mitchell2013using,szepesi2014designing,dragojevic2014farm} leverage one-sided RDMA to offload KV processing to clients and effectively using the KVS server as a shared memory pool.
-Despite the high message rate (8\approx150~Mops~\cite{kalia2016design}) provided by RDMA NICs, it is challenging to find an efficient match between RDMA primitives and key-value operations.
-For a write (PUT or atomic) operation, multiple network round-trips and multiple memory accesses may be required to query the hash index, handle hash collisions and allocate variable-size memory.
-RDMA does not support transactions. Clients must synchronize with each other to ensure consistency using RDMA atomics or distributed atomic broadcast~\cite{szepesi2014designing}, both incurring communication overhead and synchronization latency~\cite{mitchell2013using, dragojevic2014farm}.
-Therefore, most RDMA-based KVS~\cite{mitchell2013using,dragojevic2014farm,kalia2014using} recommend using one-sided RDMA for GET operations only. For PUT operations, they fall back to the server CPU. The throughput of write-intensive workload is still bottlenecked by CPU cores.
+观察KV处理中CPU的有限容量，最近的工作是：利用片面RDMA将KV处理卸载到客户端，并有效地将KVS服务器用作共享内存池。
+尽管RDMA网卡提供了高消息率（8 至 150~Mops \cite {kalia2016design}），但要找到RDMA原语和键值操作之间的有效匹配是一项挑战。
+对于写入（PUT或原子）操作，可能需要多个网络往返和多个存储器访问来查询散列索引，处理散列冲突并分配可变大小的存储器。
+RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或分布式原子广播保持一致性 \cite{szepesi2014designing}，这两者都会产生通信开销和同步延迟 \cite {mitchell2013using,dragojevic2014farm}。
+因此，大多数基于RDMA的KVS \cite {mitchell2013using,dragojevic2014farm,kalia2014using}建议仅使用单面RDMA进行GET操作。对于PUT操作，它们会回退到服务器CPU。写入密集型工作负载的吞吐量仍然是CPU核心的瓶颈。
 
-\subsection{Programmable NIC with FPGA}
+\subsection{FPGA 可编程网卡}
 \label{kvdirect:sec:programmable-nic}
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.6\textwidth]{sys_architecture.PNG}
-\caption{Programmable NIC with FPGA.}
-\label{kvdirect:fig:kvdirect-arch}
-
-\end{figure}
-
-Ten years ago, processor frequency scaling slowed down and people turned to multi-core and concurrency~\cite{sutter2005free}.
-Nowadays, power ceiling implies that multi-core scaling has also met difficulties~\cite{esmaeilzadeh2013power}.
-People are now turning to domain-specific architectures (DSAs) for better performance.
+十年前，处理器频率扩展速度放慢，人们转向多核和并发\cite {sutter2005free}。
+如今，功率上限意味着多核扩展也遇到了困难\cite {esmaeilzadeh2013power}。
+人们现在转向领域定制架构（DSA）以获得更好的性能。
 
 %On the spectrum of hardware programmability and performance, general-purpose processors lie on the programmability end, while application-specific integrated circuits (ASICs) lie on the performance end.
 %Field-programmable gate array (FPGA) is an architecture between the two extremes, providing both programmability and performance~\cite{bacon2013fpga}.
@@ -234,11 +219,11 @@ People are now turning to domain-specific architectures (DSAs) for better perfor
 %Millions of reconfigurable gates and thousands of small block RAMs (BRAMs) provide massive parallelism to build thousands of ``cores'' running simultaneously, and more importantly, customized interconnections among the ``cores'' and BRAMs specializing communication and synchronization for a certain application.
 %Consequently, for applications with sufficient bit-level and task-level parallelism, FPGAs provide not only high throughput and power efficiency, but also low and predictable latency.
 
-Due to the increasing mismatch of network speed and CPU network processing capacity, programmable NICs with FPGA~\cite{vfp,greenberg2015sdn,li2016clicknp,caulfield2016cloud} now witness large-scale deployment in datacenters.
-As shown in Figure~\ref{kvdirect:fig:kvdirect-arch}, the heart of the programmable NIC we use is an FPGA, with an embedded NIC chip to connect to the network.
-Programmable NICs typically come with on-board DRAM as packet buffers and runtime memory for NIC firmware~\cite{li2016clicknp}, but the DRAM is typically not large enough to hold the entire key-value store.
+由于网络速度和CPU网络处理能力的不匹配日益增加，带有FPGA的可编程NIC \cite {vfp,greenberg2015sdn,li2016clicknp,caulfield2016cloud} 现在可以在数据中心进行大规模部署。
+如图\ref {kvdirect:fig:kvdirect-arch}所示，我们使用的可编程网卡的核心是FPGA，带有嵌入式网卡芯片以连接到网络。
+可编程NIC通常带有板载DRAM作为数据包缓冲区和用于NIC固件的运行时内存\cite {li2016clicknp}，但DRAM通常不足以容纳整个键值存储。
 
-\subsection{Challenges for Remote Direct Key-Value Access}
+\subsection{远程直接键值访问面临的挑战}
 \label{kvdirect:sec:challenge}
 
 \begin{figure}[t]
@@ -252,43 +237,42 @@ Programmable NICs typically come with on-board DRAM as packet buffers and runtim
 
 \end{figure}
 
-KV-Direct moves KV processing from the CPU to the programmable NIC in the server (Figure~\ref{kvdirect:fig:memaccess-c}).
-Same as RDMA, the KV-Direct NIC accesses host memory via PCIe. PCIe is a packet switched network with \approx500~ns round-trip latency and 7.87~GB/s theoretical bandwidth per Gen3 x8 endpoint.
-On the latency side, for our programmable NIC, the cached PCIe DMA read latency is 800~ns due to additional processing delay in FPGA.
-For random non-cached DMA read, there is an additional 250~ns average latency (Figure~\ref{kvdirect:fig:dma-lat}) due to DRAM access, DRAM refresh and PCIe response reordering in PCIe DMA engine.
-On the throughput side, each DMA read or write operation needs a PCIe transport-layer packet (TLP) with 26-byte header and padding for 64-bit addressing.
-For a PCIe Gen3 x8 NIC to access host memory in 64-byte granularity, the theoretical throughput is therefore 5.6~GB/s, or 87~Mops.
+KV-Direct将KV处理从CPU移动到服务器中的可编程NIC（图\ref {kvdirect:fig:memaccess -c}）。
+与RDMA相同，KV-Direct NIC通过PCIe访问主机内存。 PCIe是一种分组交换网络，具有大约500 ns的往返延迟和每Gen3 x8端点7.87~GB / s的理论带宽。
+在延迟方面，对于我们的可编程NIC，由于FPGA中的额外处理延迟，缓存的PCIe DMA读取延迟为800~ns。
+对于随机非缓存DMA读取，由于DRAM访问，DRAM刷新和PCIe DMA引擎中的PCIe响应重新排序，存在额外的250~ns平均延迟（图\ref {kvdirect:fig:dma-lat}）。
+在吞吐量方面，每个DMA读或写操作都需要一个带有26字节头的PCIe传输层数据包（TLP）和用于64位寻址的填充。
+对于以64字节粒度访问主机内存的PCIe Gen3 x8 NIC，理论吞吐量因此为5.6~GB / s或87~Mops。
 
-To saturate PCIe Gen3 x8 with 64-byte DMA requests, 92 concurrent DMA requests are needed considering our latency of 1050~ns.
-In practice, two factors further limit the concurrency of DMA requests.
-First, PCIe credit-based flow control constrains the number of in-flight requests for each DMA type. The PCIe root complex in our server advertises 88 TLP posted header credits for DMA write and 84 TLP non-posted header credits for DMA read.
-Second, DMA read requires assigning a unique PCIe tag to identify DMA responses which may come out of order.
-The DMA engine in our FPGA only support 64 PCIe tags, further limiting our DMA read concurrency to 64 requests, which renders a throughput of 60~Mops as shown in Figure~\ref{kvdirect:fig:dma-tput}.
-On the other hand, with 40~Gbps network and 64-byte KV pairs, the throughput ceiling is 78~Mops with client-side batching.
-In order to saturate the network with GET operations, the KVS on NIC must make full use of PCIe bandwidth and achieve close to one average memory access per GET.
-This boils down to three challenges:
+为了使用64字节DMA请求使PCIe Gen3 x8饱和，考虑到我们的1050~ns的延迟，需要92个并发DMA请求。
+实际上，有两个因素进一步限制了DMA请求的并发性。
+首先，基于PCIe信用的流量控制限制了每种DMA类型的飞行中请求的数量。我们服务器中的PCIe根联合体为DMA读取通告了88个TLP发布的头部信用，为DMA读取通告了84个TLP非发布的头部信用。
+其次，DMA读取需要分配唯一的PCIe标记来识别可能无序的DMA响应。
+我们FPGA中的DMA引擎仅支持64个PCIe标签，进一步将我们的DMA读取并发限制为64个请求，这使得吞吐量达到60~Mops，如图\ref {kvdirect:fig:dma-tput}所示。
+另一方面，对于40~Gbps网络和64字节KV对，客户端批处理的吞吐量上限为78~Mops。
+为了通过GET操作使网络饱和，NIC上的KVS必须充分利用PCIe带宽，并且每个GET实现接近一个平均内存访问。
+这归结为三个挑战：
 
-\textbf{Minimize DMA requests per KV operation.}
-Hash table and memory allocation are two major components in KVS that require random memory access.
-Previous works propose hash tables~\cite{dragojevic2014farm, breslow2016horton} with close to 1 memory access per GET operation even under high load factors.
-However, under higher than 50\% load factor, these tables need multiple memory accesses per PUT operation on average with large variance.
-This not only consumes PCIe throughput, but also leads to latency variations for write-intensive workloads.
+\textbf {最小化每KV操作的DMA请求。}
+散列表和内存分配是KVS中需要随机内存访问的两个主要组件。
+以前的工作建议哈希表\cite {dragojevic2014farm,breslow2016horton}，即使在高负载因子下，每个GET操作也有接近1个内存访问。
+但是，在高于50％的负载因子下，这些表平均每个PUT操作需要多次存储器访问，且方差很大。
+这不仅会消耗PCIe吞吐量，还会导致写入密集型工作负载的延迟变化。
 
-In addition to hash table lookup, dynamic memory allocation is required to store variable-length KVs that cannot be inlined in the hash table.
-Minimizing hash table lookups per KV operation and memory accesses per memory allocation is essential for matching PCIe and network throughput under write-intensive, small-KV workloads.
+除了哈希表查找之外，还需要动态内存分配来存储无法在哈希表中内联的可变长度KV。
+最小化每个KV操作的哈希表查找和每个内存分配的内存访问对于在写密集型小KV工作负载下匹配PCIe和网络吞吐量至关重要。
 
-\textbf{Hide PCIe latency while maintaining consistency.}
-An efficient KVS on NIC must pipeline KV operations and DMA requests to hide the PCIe latency.
-However, KV operations may have dependencies.
-A GET following PUT on a same key needs to return the updated value.
-%Two adjacent atomic add operations needs to wait for the first to finish before executing the second.
-This requires tracking KV operations being processed and stall the pipeline on data hazard, or better, design an out-of-order executor to resolve data dependency without explicitly stalling the pipeline.
+\textbf {隐藏PCIe延迟，同时保持一致性。}
+NIC上的高效KVS必须管理KV操作和DMA请求以隐藏PCIe延迟。
+但是，KV操作可能具有依赖性。
+在同一个键上的PUT之后的GET需要返回更新的值。
+两个相邻的原子添加操作需要在执行第二个之前等待第一个完成。
+这需要跟踪正在处理的KV操作并在数据危险时停止管道，或者更好地设计无序执行器以解决数据依赖性而不明确地停止管道。
 
 
-\textbf{Dispatch load between NIC DRAM and host memory.}
-%Currently the DRAM is underutilized both in terms of space and throughput.
-An obvious idea is to use the DRAM on NIC as a cache for host memory, but in our NIC, the DRAM throughput (12.8~GB/s) is on par with the achievable throughput (13.2~GB/s) of two PCIe Gen3 x8 endpoints.
-It is more desirable to distribute memory access between DRAM and host memory in order to utilize both of their bandwidths.
-However, the on-board DRAM is small (4~GiB) compared to the host memory (64~GiB), calling for a hybrid caching and load-dispatching approach.
+\textbf {在NIC DRAM和主机内存之间分配负载。}
+一个显而易见的想法是使用NIC上的DRAM作为主机内存的缓存，但在我们的NIC中，DRAM吞吐量（12.8~GB / s）与两个PCIe Gen3 x8端点的可实现吞吐量（13.2~GB / s）相当。 
+更期望在DRAM和主机存储器之间分配存储器访问以便利用它们的两个带宽。
+然而，与主机存储器（64~GiB）相比，板载DRAM很小（4~GiB），需要混合缓存和负载调度方法。
 
-In the following, we will present KV-Direct, a novel FPGA-based key-value store that satisfies all aforementioned goals and describe how we address the challenges.
+在下文中，我们将介绍KV-Direct，这是一种基于FPGA的新型键值存储，可满足上述所有目标，并描述我们如何应对这些挑战。

@@ -1,12 +1,12 @@
-\section{Design}
+\section{设计}
 \label{kvdirect:sec:architecture}
 
-\subsection{System Architecture}
+\subsection{系统架构}
 
-KV-Direct enables \textit{remote direct key-value access}.
-Clients send \textit{KV-Direct operations} (\S\ref{kvdirect:sec:kv-operations}) to KVS server while the \ournic{} processes the requests and sending back results, bypassing the CPU.
-The \ournic{} on KVS server is an FPGA reconfigured as a \textit{KV processor} (\S\ref{kvdirect:sec:kv-processor}).
-Figure~\ref{kvdirect:fig:kvdirect-arch} shows the architecture of KV-Direct.
+KV-Direct使\textit {远程直接键值访问}成为可能。
+客户端将\textit {KV-Direct 操作}（\S \ref {kvdirect:sec:kv-operations}）发送到KVS服务器，而可编程网卡处理请求并发送回结果，绕过CPU。
+KVS服务器上的可编程网卡是一个重新配置为\textit {KV处理器}的FPGA（\S \ref {kvdirect:sec:kv-processor}）。
+图\ref {kvdirect:fig:kvdirect-arch}显示了KV-Direct的架构。
 
 \subsection{KV-Direct Operations}
 \label{kvdirect:sec:kv-operations}
@@ -40,63 +40,63 @@ filter ($k, \lambda(v) \rightarrow$ bool) $\rightarrow [v]$ & Filter elements in
 
 \end{table}
 
-KV-Direct extends one-sided RDMA operations to key-value operations, as summarized in Table~\ref{kvdirect:tab:kv-operations}.
-In addition to standard KVS operations as shown in the top part of Table~\ref{kvdirect:tab:kv-operations}, KV-Direct supports two types of vector operations:
-Sending a scalar to the NIC on the server and the NIC applies the update to each element in the vector; or send a vector to the server and the NIC updates the original vector element-by-element.
-Furthermore, KV-Direct supports user-defined update functions as a generalization to atomic operations.
-The update function needs to be pre-registered and compiled to hardware logic before executing.
-KV operations with user-defined update functions are similar to \textit{active messages}~\cite{eicken1992active}, saving communication and synchronization cost.
+KV-Direct将单面RDMA操作扩展到键值操作，如表\ref {kvdirect:tab:kv-operations}中所述。
+除了表\ref {kvdirect:tab:kv-operations}顶部所示的标准KVS操作外，KV-Direct还支持两种类型的向量运算：
+将标量发送到服务器上的NIC，NIC将更新应用于向量中的每个元素;或者向服务器发送一个向量，并且NIC逐个元素地更新原始向量。
+此外，KV-Direct支持用户定义的更新功能，作为原子操作的概括。
+更新功能需要在执行前预先注册并编译为硬件逻辑。
+使用用户定义的更新功能的KV操作类似于\textit {动态消息}（active messages）\cite {eicken1992active}，从而节省了通信和同步成本。
 
-When a vector operation update, reduce or filter is operated on a key, its value is treated as an array of fixed-bit-width elements.
-Each function $\lambda$ operates on one element in the vector, a client-specified parameter~$\Delta$, and/or an initial value~$\Sigma$ for reduction.
-The KV-Direct development toolchain duplicates the $\lambda$ several times to leverage parallelism in FPGA and match computation throughput with PCIe throughput, then compiles it into reconfigurable hardware logic using an high-level synthesis (HLS) tool~\cite{aoc}.
-The HLS tool automatically extracts data dependencies in the duplicated function and generates a fully pipelined programmable logic.
-%Before executing the KVS client, the programmable NIC on KVS servers should be loaded with the hardware logic containing the unrolled $\lambda$.
+当对键执行向量操作更新（update），归约（reduce）或过滤（filter）时，其值被视为固定位宽元素的数组。
+每个函数 $\lambda$ 对向量中的一个元素，客户端指定的参数 $\Delta$ 和/或初始值 $\Sigma$ 进行归约操作。
+KV-Direct开发工具链多次复制$\lambda$以利用FPGA中的并行性并将计算吞吐量与PCIe吞吐量相匹配，然后使用高级综合（HLS）工具将其编译为可重新配置的硬件逻辑\cite {aoc} 。
+HLS工具自动提取复制函数中的数据依赖性，并生成完全流水线的可编程逻辑。
+在执行KVS客户端之前，KVS服务器上的可编程NIC应加载包含展开的$\lambda$的硬件逻辑。
 
-Update operations with user-defined functions are capable of general stream processing on a vector value.
-For example, a network processing application may interpret the vector as a stream of packets for network functions~\cite{li2016clicknp} or a bunch of states for packet transactions~\cite{sivaraman2016packet}.
-Single-object transaction processing completely in the programmable NIC is also possible, \eg, wrapping around S\_QUANTITY in TPC-C benchmark~\cite{council2010tpc}.
-Vector reduce operation supports neighbor weight accumulation in PageRank~\cite{page1999pagerank}.
-Non-zero values in a sparse vector can be fetched with vector filter operation.
+使用用户定义函数的更新操作能够对矢量值进行常规流处理。
+例如，网络处理应用程序可以将该向量解释为用于网络功能的分组流\cite{li2016clicknp}或用于分组事务的一堆状态\cite {sivaraman2016packet}。
+完全在可编程NIC中的单对象事务处理也是可能的，例如，在TPC-C基准中包围S\_QUANTITY \cite {council2010tpc}。
+向量归约操作支持PageRank \cite {page1999pagerank}中的邻居权重累积。
+可以使用向量过滤操作来获取稀疏向量中的非零值。
 
-\subsection{KV Processor}
+\subsection{KV 处理器}
 \label{kvdirect:sec:kv-processor}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.6\textwidth,page=1]{processor_architecture.PNG}
-\caption{KV processor architecture.}
+\caption{KV 处理器架构。}
 \label{kvdirect:fig:kvprocessor-arch}
 
 \end{figure}
 
-As shown in Figure~\ref{kvdirect:fig:kvprocessor-arch}, the KV processor receives packets from the on-board NIC, decodes vector operations and buffers KV operations in the reservation station (\S\ref{kvdirect:sec:ooo}).
-Next, the out-of-order engine (\S\ref{kvdirect:sec:ooo}) issues independent KV operations from reservation station into the operation decoder.
-Depending on the operation type, the KV processor looks up the hash table (\S\ref{kvdirect:sec:hashtable}) and executes the corresponding operations.
-To minimize the number of memory accesses, small KV pairs are stored \textit{inline} in the hash table, others are stored in dynamically allocated memory from the slab memory allocator (\S\ref{kvdirect:sec:slab}).
-Both the hash index and the slab-allocated memory are managed by a unified memory access engine (\S\ref{kvdirect:sec:dram-cache}), which accesses the host memory via PCIe DMA and caches a portion of host memory in on-board DRAM.
-After the KV operation completes, the result is sent back to the out-of-order execution engine (\S\ref{kvdirect:sec:ooo}) to find and execute matching KV operations in reservation station.
+如图\ref {kvdirect:fig:kvprocessor-arch}所示，KV处理器从板载NIC接收数据包，解码向量操作并缓冲保留站中的KV操作（\S \ref {kvdirect:sec:ooo}）。
+接下来，乱序执行引擎（\S \ref {kvdirect:sec:ooo}）从保留站向操作解码器发出独立的KV操作。
+根据操作类型，KV处理器查找哈希表（\S \ref {kvdirect:sec:hashtable}）并执行相应的操作。
+为了最小化内存访问次数，较小的KV对在哈希表中内联（inline）存储，其他的KV对存储在slab内存分配器（\S \ref {kvdirect:sec:slab}）的动态分配内存中。
+散列索引和slab分配的内存都由统一的内存访问引擎（\S \ref {kvdirect:sec:dram-cache}）管理，它通过PCIe DMA访问主机内存并缓存部分主机内存。板载DRAM。
+在KV操作完成之后，结果被发送回无序执行引擎（\S \ref {kvdirect:sec:ooo}）以在保留站中找到并执行匹配的KV操作。
 
-As discussed in \S\ref{kvdirect:sec:challenge}, the scarcity of PCIe operation throughput requires the KV processor to be frugal on DMA accesses.
-For GET operation, at least one memory read is required.
-For PUT or DELETE operation, one read and one write are minimal for hash tables.
-Log-based data structures can achieve one write per PUT, but it sacrifices GET performance.
-KV-Direct carefully designs the hash table to achieve close to ideal DMA accesses per lookup and insertion, as well as the memory allocator to achieve $<$~0.1 amortized DMA operations per dynamic memory allocation.
+正如\S \ref {kvdirect:sec:challenge}中所讨论的，PCIe操作吞吐量的稀缺性要求KV处理器在DMA访问上节俭。
+对于GET操作，至少需要读取一次内存。
+对于PUT或DELETE操作，对于哈希表，一次读取和一次写入最小。
+基于日志的数据结构可以实现每个PUT一次写入，但它牺牲了GET性能。
+KV-Direct仔细设计哈希表，以便在每次查找和插入时实现接近理想的DMA访问，以及内存分配器。每次动态内存分配平摊下来，只需不到0.1次DMA操作。
 
-\subsubsection{Hash Table}
+\subsubsection{哈希表}
 \label{kvdirect:sec:hashtable}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=1.0\textwidth,page=1]{hashline.PNG}
-\caption{Hash index structure. Each line is a hash bucket containing 10 hash slots, 3 bits of slab memory type per hash slot, one bitmap marking the beginning and end of inline KV pairs and a pointer to the next chained bucket on hash collision.}
+\caption{哈希索引结构。 每行是一个哈希桶，包含10个哈希槽，每个哈希槽3位板内存类型，一个位图标记内联KV对的开始和结束，以及指向哈希冲突下一个链接桶的指针。}
 \label{kvdirect:fig:hashtable}
 
 \end{figure}
 
-To store variable-sized KVs, the KV storage is partitioned into two parts. The first part is a hash index (Figure~\ref{kvdirect:fig:hashtable}), which consists a fixed number of \textit{hash buckets}. Each hash bucket contains several \textit{hash slots} and some metadata. The rest of the memory is dynamically allocated, and managed by a slab allocator (\S\ref{kvdirect:sec:slab}).
-A \textit{hash index ratio} configured at initialization time determines the percentage of the memory allocated for hash index.
-The choice of hash index ratio will be discussed in \S\ref{kvdirect:sec:hashtable-eval}.
+为了存储可变大小的KV，KV存储分为两部分。 第一部分是哈希索引（图\ref {kvdirect:fig:hashtable}），它包含固定数量的\textit {哈希桶}。 每个哈希桶包含几个\textit {哈希槽}和一些元数据。 内存的其余部分是动态分配的，由slab分配器（\S \ref {kvdirect:sec:slab}）管理。
+初始化时配置的\textit {哈希索引比率}确定为哈希索引分配的内存百分比。
+哈希索引比率的选择将在\S \ref {kvdirect:sec:hashtable-eval}中讨论。
 
 %\textbf{Hash Table.}
 %Each bucket includes 10 hash slots, 3b type code per slot, 50b metadata, plus 31b address and a valid bit of the next chained bucket, as shown in Figure~\ref{kvdirect:fig:hashtable}.
@@ -104,16 +104,16 @@ The choice of hash index ratio will be discussed in \S\ref{kvdirect:sec:hashtabl
 %For inline KVs, to mark the begin and end of each hash slot, as well as the separation between inline key and value, the information is encoded in a 50b metadata corresponding to 50 bytes of hash slots.
 %The inline keys and secondary hashes of offline keys in all hash slots are compared in parallel, and the first match is found.
 
-Each hash slot includes a pointer to the KV data in dynamically allocated memory and a secondary hash.
-Secondary hash is an optimization that enables parallel inline checking. The key is always checked to ensure correctness, at the cost of one additional memory access.
-Assuming a 64~GiB KV storage in host memory and 32-byte allocation granularity (a trade-off between internal fragmentation and allocation metadata overhead), the pointer requires 31 bits.
-A secondary hash of 9 bits gives a 1/512 false positive possibility.
-Cumulatively, the hash slot size is 5 bytes.
-To determine the hash bucket size, we need to trade-off between the number of hash slots per bucket and the DMA throughput.
-Figure~\ref{kvdirect:fig:dma-tput} shows that the DMA read throughput below 64B granularity is bound by PCIe latency and parallelism in the DMA engine.
-A bucket size less than 64B is suboptimal due to increased possibility of hash collision.
-On the other hand, increasing the bucket size above 64B would decrease hash lookup throughput.
-So we choose the bucket size to be 64 bytes.
+每个散列槽包括指向动态分配的存储器中的KV数据的指针和辅助散列。
+辅助哈希是一种启用并行内联检查的优化。始终检查密钥以确保正确性，但需要额外的一次内存访问。
+假设主机内存中的64~GiB KV存储和32字节分配粒度（内部碎片和分配元数据开销之间的权衡），指针需要31位。
+9位的二级散列给出1/512误报可能性。
+累积地，散列槽大小是5个字节。
+为了确定散列桶大小，我们需要在每个桶的散列槽数和DMA吞吐量之间进行权衡。
+图\ref {kvdirect:fig:dma-tput}表明DMA读取吞吐量低于64B粒度受DMA引擎中PCIe延迟和并行性的约束。
+由于哈希冲突的可能性增加，小于64B的桶大小是次优的。
+另一方面，将桶大小增加到64B以上会降低散列查找吞吐量。
+因此我们选择桶大小为64字节。
 
 \begin{figure}[t]
 \centering
@@ -123,22 +123,21 @@ So we choose the bucket size to be 64 bytes.
 
 \end{figure}
 
-\textit{KV size} is the combined size of key and value.
-KVs smaller than a threshold are stored \textit{inline} in the hash index to save the additional memory access to fetch KV data.
-An inline KV may span multiple hash slots, whose pointer and secondary hash fields are re-purposed for storing KV data.
-It might not be optimal to inline all KVs that can fit in a bucket.
-To minimize average access time, assuming that smaller and larger keys are equally likely to be accessed, it is more desirable to inline KVs smaller than an \textit{inline threshold}.
-To quantify the portion of used buckets in all buckets, we use \textit{memory utilization} instead of load factor, because it relates more to the number of KVs that can fit in a fixed amount of memory.
-As shown in Figure~\ref{kvdirect:fig:inline-offline}, for a certain inline threshold, the average memory access count increases with memory utilization, due to more hash collisions.
-Higher inline threshold shows a more steep growth curve of memory access count, so an optimal inline threshold can be found to minimize memory accesses under a given memory utilization.
-As with hash index ratio, the inline threshold can also be configured at initialization time.
+\textit {KV 大小}是指键和值的总大小。
+小于阈值的KV在哈希索引中内联（inline）存储，以保存对获取KV数据的额外存储器访问。
+内联KV可以跨越多个散列槽，其指针和二级散列字段被重新用于存储KV数据。
+内联所有可装入铲斗的KV可能不是最佳选择。
+为了最小化平均访问时间，假设可以同等地访问越来越小的密钥，则更希望内联小于\textit {内联阈值}的KV。
+为了量化所有桶中使用的桶的部分，我们使用\textit {内存利用率}而不是负载率（load factor），因为它更多地涉及可以适合固定内存量的KV的数量。
+如图\ref {kvdirect:fig:inline-offline}所示，对于某个内联阈值，由于更多的哈希冲突，平均内存访问计数随内存利用率的增加而增加。
+较高的内联阈值显示内存访问计数的更陡峭的增长曲线，因此可以找到最佳内联阈值以最小化在给定内存利用率下的内存访问。
+与哈希索引比率一样，也可以在初始化时配置内联阈值。
 
-When all slots in a bucket are filled up, there are several solutions to resolve hash collisions.
-Cuckoo hashing~\cite{pagh2004cuckoo} and hopscotch hashing~\cite{herlihy2008hopscotch} guarantee constant-time lookup by moving occupied slots during insertion.
-However, in write-intensive workload, the memory access time under high load factor would experience large fluctuations.
-Linear probing may suffer from primary clustering, therefore its performance is sensitive to the uniformity of hash function.
-We choose \textit{chaining} to resolve hash conflicts, which balances lookup and insertion, while being more robust to hash clustering.
-
+当存储桶中的所有插槽都已填满时，有几种解决方案可以解决散列冲突。
+Cuckoo哈希\cite {pagh2004cuckoo}和跳房子哈希（Hopscotch Hash）\cite {herlihy2008hopscotch}通过在插入过程中移动占用的插槽来保证恒定时间查找。
+但是，在写入密集型工作负载中，高负载率下的内存访问时间会经历大的波动。
+线性探测可能受到主群集的影响，因此其性能对散列函数的均匀性敏感。
+我们选择\textit {拉链法}来解决哈希冲突，这会平衡查找和插入，同时对哈希群集更加健壮。
 
 %In KV-Direct, we measure memory utilization instead of load factor, because chaining has dynamic size and that we care more about the overall storage efficiency counting all indexing, metadata and memory fragmentation overhead.
 %Clearly, small KVs cause lower memory utilization due to metadata overhead.
@@ -162,14 +161,13 @@ Inspired by garbage collection, we propose \textit{lazy slab merging} to merge f
 
 \subsubsection{Out-of-Order Execution Engine}
 \label{kvdirect:sec:ooo}
-%
-%\begin{figure}[t]
-%\centering
-%\includegraphics[width=.45\textwidth,page=1]{dynamic_scheduler.PNG}
-%\caption{Dynamic operation scheduler.}
-%\label{kvdirect:fig:ooo-mem-access}
-%
-%\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=.9\textwidth,page=1]{dynamic_scheduler.PNG}
+\caption{Dynamic operation scheduler.}
+\label{kvdirect:fig:ooo-mem-access}
+\end{figure}
 
 Dependency between two KV operations with the same key in the KV processor will lead to data hazard and pipeline stall.
 This problem is magnified in single-key atomics where all operations are dependent, thus limiting the atomics throughput.
@@ -196,7 +194,7 @@ This data forwarding and fast execution path enable single-key atomics to be pro
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.4\textwidth,page=1]{load_balancer.PNG}
+\includegraphics[width=0.8\textwidth,page=1]{load_balancer.PNG}
 \caption{DRAM load dispatcher.}
 \label{kvdirect:fig:cache}
 
@@ -210,7 +208,7 @@ The other approach is to use the NIC DRAM as a cache for host memory, the throug
 We adopt a hybrid solution to use the DRAM as a cache for a fixed portion of the KVS in host memory, as shown in Figure~\ref{kvdirect:fig:cache}.
 The cache-able portion is determined by the hash of memory address, in granularity of 64 bytes. The hash function is selected so that an address in hash index and dynamically allocated memory have an equal possibility of being cache-able.
 The portion of cache-able memory in the entire KVS memory is called \textit{load dispatch ratio} ($l$).
-%With a larger load dispatch ratio $l$, more load is dispatched to the on-board DRAM and the cache hit ratio $h(l)$ would increase.
+With a larger load dispatch ratio $l$, more load is dispatched to the on-board DRAM and the cache hit ratio $h(l)$ would increase.
 Assume the cache hit possibility is $h(l)$.
 To balance load on PCIe and on-board DRAM, the load dispatch ratio $l$ should be optimized so that:
 $$\frac{l}{tput_{DRAM}} = \frac{(1-l) + l \cdot (1-h(l))}{tput_{PCIe}}$$
