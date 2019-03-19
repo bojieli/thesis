@@ -1,24 +1,24 @@
-\section{Related Work}
+\section{相关工作}
 \label{kvdirect:sec:related}
 
-As an important infrastructure, the research and development of distributed key-value store systems have been driven by performance. A large body of distributed KVS are based on CPU. To reduce the computation cost, Masstree~\cite{mao2012cache}, MemC3~\cite{fan2013memc3} and libcuckoo~\cite{li2014algorithmic} optimize locking, caching, hashing and memory allocation algorithms, while \oursys{} comes with a new hash table and memory management mechanism specially designed for FPGA to minimize the PCIe traffic. MICA~\cite{lim2014mica} partitions the hash table to each core thus completely avoids synchronization. This approach, however, introduces core imbalance for skewed workloads.
+作为一种重要的基础设施，分布式键值存储系统的研究和开发受到性能的驱动。大量分布式KVS基于CPU。为了降低计算成本，Masstree~ \cite {mao2012cache}，MemC3~ \cite {fan2013memc3}和libcuckoo~ \cite {li2014algorithmic}优化锁定，缓存，散列和内存分配算法，而 \oursys{} 带有新的哈希值专为FPGA设计的表和内存管理机制，以最大限度地减少PCIe流量。 MICA~ \cite {lim2014mica}将哈希表分区到每个核心，从而完全避免同步。然而，这种方法为偏移的工作负载引入了核心不平衡。
 
-To get rid of the OS kernel overhead, ~\cite{rizzo2012netmap, intel2014data} directly poll network packets from NIC and \cite{jeong2014mtcp, marinos2014network} process them with the user space lightweight network stack.
-Key-value store systems~\cite{kapoor2012chronos, ousterhout2010case, ousterhout2015ramcloud, lim2014mica,li2016full} benefit from such optimizations for high performance.
-As a further step towards this direction, recent works \cite{infiniband2000infiniband, kalia2014using, kalia2016design, kalia2014using, kalia2016design} leverage the hardware-based network stack of RDMA NIC, using two-sided RDMA as an RPC mechanism between KVS client and server to further improve per-core throughput and reduce latency. Still, these systems are CPU bound (\S\ref{kvdirect:sec:state-of-the-art-kvs}).
+为了摆脱操作系统内核的开销， \cite {rizzo2012netmap,intel2014data}直接轮询来自NIC的网络数据包，并且\cite {jeong2014mtcp,marinos2014network}使用用户空间轻量级网络堆栈处理它们。
+键值存储系统 \cite {kapoor2012chronos,ousterhout2010case,ousterhout2015ramcloud,lim2014mica,li2016full}受益于这种高性能优化。
+作为朝着这个方向迈出的又一步，最近的作品\cite {infiniband2000infiniband,kalia2014using,kalia2016design,kalia2014using,kalia2016design}利用RDMA NIC的基于硬件的网络堆栈，使用双面RDMA作为KVS客户端和服务器之间的RPC机制进一步提高每核吞吐量并减少延迟。尽管如此，这些系统仍受CPU限制（\S \ref {kvdirect:sec:state-of-the-art-kvs}）。
 
-Another different approach is to leverage one-sided RDMA. Pilaf~\cite{mitchell2013using} and FaRM~\cite{dragojevic2014farm} adopt one-sided RDMA read for GET operation and FaRM achieves throughput that saturates the network. Nessie~\cite{szepesi2014designing}, DrTM~\cite{wei2015fast}, DrTM+R~\cite{chen2016fast} and FaSST~\cite{kalia2016fasst} leverage distributed transactions to implement both GET and PUT with one-sided RDMA. However, the performance of PUT operation suffer from unavoidable synchronization overhead for consistency guarantee, limited by RDMA primitives~\cite{kalia2016design}. Moreover, client-side CPU is involved in KV processing, limiting per-core throughput to \approx10~Mops on the client side.
-In contrast, \oursys{} extends the RDMA primitives to key-value operations while guarantees the consistency in server side, leaving the KVS client totally transparent while achieving high throughput and low latency even for PUT operation.
+另一种不同的方法是利用单侧RDMA。 Pilaf~ \cite {mitchell2013using}和FaRM~ \cite {dragojevic2014farm}采用单向RDMA读取进行GET操作，FaRM实现了使网络饱和的吞吐量。 Nessie~ \cite {szepesi2014designing}，DrTM~ \cite {wei2015fast}，DrTM + R~ \cite {chen2016fast}和FaSST~ \cite {kalia2016fasst}利用分布式事务来实现单向RDMA的GET和PUT。但是，PUT操作的性能受到一致性保证的不可避免的同步开销的影响，受到RDMA原语的限制 \cite {kalia2016design}。此外，客户端CPU涉及KV处理，将每个核心的吞吐量限制在客户端的大约10~Mops。
+相比之下，\oursys{} 将RDMA原语扩展到键值操作，同时保证服务器端的一致性，使KVS客户端完全透明，同时实现高吞吐量和低延迟，即使对于PUT操作也是如此。
 
-As a flexible and customizable hardware, FPGA is now widely deployed in datacenter-scale~\cite{putnam2014reconfigurable, caulfield2016cloud} and greatly improved for programmability~\cite{bacon2013fpga,li2016clicknp}. Several early works have explored building KVS on FPGA. But some of them are not practical by limiting the data storage in on-chip (about several MB memory)~\cite{liang16fpl} or on-board DRAM (typically 8GB memory)~\cite{istvan2013flexible,chalamalasetti2013fpga,istvan2015hash}.
-~\cite{blott2015scaling} focuses on improving system capacity rather than throughput, and adopts SSD as the secondary storage out of on-board DRAM.
-~\cite{liang16fpl, chalamalasetti2013fpga} limit their usage in fixed size key-value pairs, which can only work for the special purpose rather than a general key-value store.
-\cite{blott13hotcloud, lavasani2014fpga} uses host DRAM to store the hash table, and \cite{tokusashi2016multilevel} uses NIC DRAM as a cache of host DRAM, but they did not optimize for network and PCIe DMA bandwidth, resulting in poor performance.
-\oursys{} fully utilizes both NIC DRAM and host DRAM, making our FPGA-based key-value store system general and capable of large-scale deployment. Furthermore, our careful hardware and software co-design, together with optimizations for PCIe and networking push the performance to the physical limitation, advancing state-of-art solutions.
+作为一种灵活且可定制的硬件，FPGA现已广泛部署在数据中心规模 \cite {putnam2014reconfigurable,caulfield2016cloud}中，并且针对可编程性进行了大幅改进 \cite {bacon2013fpga,li2016clicknp}。一些早期的工作已探索在FPGA上构建KVS。但是其中一些是不实用的，限制片上数据存储（大约几MB内存） \cite {liang16fpl}或板载DRAM（通常是8GB内存） \cite {istvan2013flexible,chalamalasetti2013fpga,istvan2015hash}。
+ \cite {blott2015scaling}专注于提高系统容量而不是吞吐量，并采用SSD作为板载DRAM的二级存储。
+ \cite {liang16fpl,chalamalasetti2013fpga}限制它们在固定大小键值对中的使用，这只能用于特殊用途，而不是一般的键值存储。
+\cite {blott13hotcloud,lavasani2014fpga}使用主机DRAM存储哈希表，而\cite {tokusashi2016multilevel}使用NIC DRAM作为主机DRAM的缓存，但它们没有针对网络和PCIe DMA带宽进行优化，导致性能不佳。
+\oursys{} 充分利用了NIC DRAM和主机DRAM，使我们基于FPGA的键值存储系统通用，并且能够进行大规模部署。此外，我们精心的硬件和软件协同设计，以及对PCIe和网络的优化，将性能推向了物理限制，推进了最先进的解决方案。
 
-Secondary index is an important feature to retrieve data by keys other
-than the primary key in data storage system~\cite{escriva2012hyperdex, kejriwal2016slik}. SLIK~\cite{kejriwal2016slik} supports multiple secondary keys using a B+ tree algorithm in key-value store system. It would be interesting to explore how to support secondary index to help \oursys{} step towards a general data storage system. SwitchKV~\cite{li2016fast} leverages content-based routing to route requests to backend nodes based on cached keys, and NetCache~\cite{netcache-sosp17} takes a further step to cache KV in the switches. Such load balancing and caching will also benefit our system.
-Eris~\cite{eris} leverages network sequencers to achieve efficient distributed transactions, which may give a new life to the one-sided RDMA approach with client synchronization.
+二级索引是通过其他键检索数据的重要功能
+比数据存储系统中的主键 \cite {escriva2012hyperdex,kejriwal2016slik}。 SLIK~ \cite {kejriwal2016slik}在键值存储系统中使用B +树算法支持多个二级密钥。探索如何支持二级索引以帮助 \oursys{} 迈向通用数据存储系统将会很有趣。 SwitchKV~ \cite {li2016fast}利用基于内容的路由将请求路由到基于缓存密钥的后端节点，NetCache~ \cite {netcache-sosp17}进一步将KV缓存在交换机中。这种负载平衡和缓存也将使我们的系统受益。
+Eris~ \cite {eris}利用网络序列发生器来实现高效的分布式事务，这可以为客户端同步的单侧RDMA方法带来新的生命。
 
 
 %\textbf{TODO}

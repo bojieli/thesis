@@ -143,81 +143,81 @@ Cuckoo哈希\cite {pagh2004cuckoo}和跳房子哈希（Hopscotch Hash）\cite {h
 %Clearly, small KVs cause lower memory utilization due to metadata overhead.
 %The optimal hash index ratio is chosen at initialization time according to workload to balance average access time and memory utilization.
 
-\subsubsection{Slab Memory Allocator}
+\subsubsection{Slab 内存分配器}
 \label{kvdirect:sec:slab}
 
-Chained hash slots and non-inline KVs need dynamic memory allocation.
-We choose slab memory allocator~\cite{bonwick1994slab} to achieve $O(1)$ average memory access per allocation and deallocation. The main slab allocator logic runs on host CPU and communicates with the KV-processor through PCIe.
-Slab allocator rounds up allocation size to the nearest power of two, called \textit{slab size}.
-It maintains a \textit{free slab pool} for each possible slab size (32, 64, \ldots, 512 bytes), and a global \textit{allocation bitmap} to help to merge small free slabs back to larger slabs.
-Each free slab pool is an array of \textit{slab entries} consisting of an address field and a slab type field indicating the size of the slab entry.
-The free slab pool can be cached on the NIC. The cache syncs with the host memory in batches of slab entries. Amortized by batching, less than 0.07 DMA operation is needed per allocation or deallocation.
-When a small slab pool is almost empty, larger slabs need to be split.
-Because the slab type is already included in a slab entry, in \textit{slab splitting}, slab entries are simply copied from the larger pool to the smaller pool, without the need for computation.
-Including slab type in the slab entry also saves communication cost because one slab entry may contain multiple slots.
+链式散列槽和非内联KV需要动态内存分配。
+我们选择slab内存分配器\cite {bonwick1994slab}来实现每个分配和释放的$O（1）$平均内存访问。主平板分配器逻辑在主机CPU上运行，并通过PCIe与KV处理器通信。
+Slab分配器将分配大小四舍五入到最接近的2的幂，称为\textit {slab 大小}。
+它为每个可能的slab大小（32,64，\ldots，512字节）和全局 \textit {分配位图}维护\textit {空闲 slab 池}，以帮助将小的空闲slab合并回更大的slab。
+每个空闲slab池是一个\textit {slab 条目}数组，由一个地址字段和一个slab类型字段组成，表示slab条目的大小。
+可以在NIC上缓存可用的slab池。缓存与批量的slab条目中的主机内存同步。通过批处理分摊，每次分配或解除分配需要少于0.07的DMA操作。
+当一个小板坯池几乎是空的时，需要拆分较大的板坯。
+因为slab类型已经包含在slab条目中，所以在\textit {slab 分割}中，slab条目只是从较大的池复制到较小的池，而不需要计算。
+在slab条目中包括slab类型也可以节省通信成本，因为一个slab条目可能包含多个槽。
 
-On deallocation, the slab allocator needs to check whether the freed slab can be merged with its neighbor, requiring at least one read and write to the allocation bitmap.
-Inspired by garbage collection, we propose \textit{lazy slab merging} to merge free slabs in batch when a slab pool is almost empty and no larger slab pools have enough slabs to split.
+在重新分配时，slab分配器需要检查释放的slab是否可以与其邻居合并，需要至少一次读取和写入分配位图。
+受垃圾收集的启发，我们建议\textit {懒惰 slab 合并}在一个slab池几乎为空时并且没有更大的slab池有足够的slab来拆分时批量合并空闲slab。
 
-\subsubsection{Out-of-Order Execution Engine}
+\subsubsection{乱序执行引擎}
 \label{kvdirect:sec:ooo}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=.9\textwidth,page=1]{dynamic_scheduler.PNG}
-\caption{Dynamic operation scheduler.}
+\caption{乱序执行引擎。}
 \label{kvdirect:fig:ooo-mem-access}
 \end{figure}
 
-Dependency between two KV operations with the same key in the KV processor will lead to data hazard and pipeline stall.
-This problem is magnified in single-key atomics where all operations are dependent, thus limiting the atomics throughput.
-We borrow the concept of dynamic scheduling from computer architecture and implement a \textit{reservation station} to track all in-flight KV operations and their \textit{execution context}.
-To saturate PCIe, DRAM and the processing pipeline, up to 256 in-flight KV operations are needed.
-However, comparing 256 16-byte keys in parallel would take 40\% logic resource of our FPGA.
-Instead, we store the KV operations in a small hash table in on-chip BRAM, indexed by the hash of the key.
-To simplify hash collision resolution, we regard KV operations with the same hash as dependent, so there may be false positives, but it will never miss a dependency.
-Operations with the same hash are organized in a chain and examined sequentially.
-Hash collision would degrade the efficiency of chain examination, so the reservation station contains 1024 hash slots to make hash collision possibility below 25\%.
+在KV处理器中使用相同密钥的两个KV操作之间的依赖性将导致数据危险和管道停滞。
+这个问题在单键原子中被放大，其中所有操作都是依赖的，因此限制了原子的吞吐量。
+我们从计算机体系结构借用动态调度的概念，并实现\textit {保留站}（reservation station）来跟踪所有正在进行的KV操作及其\textit {执行上下文}。
+为了使PCIe，DRAM和处理流水线饱和，需要多达256个正在执行的KV操作。
+但是，并行比较256个16字节密钥将占用FPGA的40％逻辑资源。
+相反，我们将KV操作存储在片上BRAM中的小哈希表中，由密钥的哈希索引。
+为了简化哈希冲突解决方案，我们认为KV操作具有相同的哈希值，因此可能存在误报，但它永远不会错过依赖关系。
+具有相同散列的操作在链中组织并顺序检查。
+散列冲突会降低链检查的效率，因此保留站包含1024个散列槽，使哈希冲突可能性低于25％。
 
-The reservation station not only holds pending operations, but also caches their latest values for \textit{data forwarding}.
-When a KV operation is completed by the main processing pipeline, its result is returned to the client, and the latest value is forwarded to the reservation station.
-Pending operations in the same hash slot are checked one by one, and operations with matching key are executed immediately and removed from the reservation station.
-For atomic operations, the computation is performed in a dedicated execution engine.
-For write operations, the cached value is updated.
-The execution result is returned to the client directly.
-After scanning through the chain of dependent operations, if the cached value is updated, a PUT operation is issued to the main processing pipeline for cache write back.
-This data forwarding and fast execution path enable single-key atomics to be processed one operation per clock cycle (180~Mops), eliminate head-of-line blocking under workload with popular keys, and ensure consistency because no two operations on the same key can be in the main processing pipeline simultaneously.
+保留站不仅保留挂起的操作，还缓存\textit {数据转发}（data forwarding）的最新值。
+当主处理流水线完成KV操作时，其结果返回给客户端，最新值被转发到保留站。
+逐个检查相同散列槽中的待定操作，并立即执行具有匹配密钥的操作并从保留站移除。
+对于原子操作，计算在专用执行引擎中执行。
+对于写入操作，将更新缓存的值。
+执行结果直接返回给客户端。
+在扫描从属操作链之后，如果更新了高速缓存的值，则向主处理管道发出PUT操作以进行高速缓存写回。
+这种数据转发和快速执行路径使单键原子能够在每个时钟周期（180~Mops）内处理一次操作，消除了常用密钥在工作负载下的线头阻塞，并确保一致性，因为在同一个密钥上没有两个操作可以在主处理管道中同时进行。
 
 
-\subsubsection{DRAM Load Dispatcher}
+\subsubsection{DRAM 负载分配器}
 \label{kvdirect:sec:dram-cache}
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.8\textwidth,page=1]{load_balancer.PNG}
-\caption{DRAM load dispatcher.}
+\caption{DRAM 负载分配器。}
 \label{kvdirect:fig:cache}
 
 \end{figure}
 
-To further save the burden on PCIe, we dispatch memory accesses between PCIe and the NIC on-board DRAM.
-Our NIC DRAM has 4~GiB size and 12.8~GB/s throughput, which is an order of magnitude smaller than the KVS storage on host DRAM (64~GiB) and slightly slower than the PCIe link (14~GB/s).
-One approach is to put a fixed portion of the KVS in NIC DRAM. However, the NIC DRAM is too small to carry a significant portion of memory accesses.
-The other approach is to use the NIC DRAM as a cache for host memory, the throughput would degrade due to the limited throughput of our NIC DRAM.
+为了进一步减轻PCIe的负担，我们在PCIe和NIC板载DRAM之间调度内存访问。
+我们的NIC DRAM具有4~GiB大小和12.8~GB / s的吞吐量，比主机DRAM（64~GiB）上的KVS存储小一个数量级，并且比PCIe链路（14~GB / s）稍慢。
+一种方法是将固定部分的KVS放入NIC DRAM中。但是，NIC DRAM太小而无法承载大部分内存访问。
+另一种方法是使用NIC DRAM作为主机内存的缓存，由于我们的NIC DRAM的吞吐量有限，吞吐量会降低。
 
-We adopt a hybrid solution to use the DRAM as a cache for a fixed portion of the KVS in host memory, as shown in Figure~\ref{kvdirect:fig:cache}.
-The cache-able portion is determined by the hash of memory address, in granularity of 64 bytes. The hash function is selected so that an address in hash index and dynamically allocated memory have an equal possibility of being cache-able.
-The portion of cache-able memory in the entire KVS memory is called \textit{load dispatch ratio} ($l$).
-With a larger load dispatch ratio $l$, more load is dispatched to the on-board DRAM and the cache hit ratio $h(l)$ would increase.
-Assume the cache hit possibility is $h(l)$.
-To balance load on PCIe and on-board DRAM, the load dispatch ratio $l$ should be optimized so that:
+我们采用混合解决方案将DRAM用作主机内存中固定部分KVS的缓存，如图\ref {kvdirect:fig:cache}所示。
+可缓存部分由存储器地址的散列确定，其粒度为64字节。选择散列函数，使得散列索引和动态分配的存储器中的地址具有可高速缓存的相同可能性。
+整个KVS内存中可缓存内存的部分称为\textit {负载分配比例}（$ l $）。
+使用更大的负载调度比$ l $，将更多负载分配给板载DRAM，并且缓存命中率$ h(l)$将增加。
+假设缓存命中率可能是$ h(l)$。
+为了平衡PCIe和板载DRAM上的负载，应优化负载调度比$ l $，使得：
 $$\frac{l}{tput_{DRAM}} = \frac{(1-l) + l \cdot (1-h(l))}{tput_{PCIe}}$$
 
-Specifically, under uniform workload, let $k$ be the ratio of on-board DRAM size and host KV storage size, cache hit possibility $h(l) = \frac{\textnormal{cache size}}{\textnormal{cache-able memory size}} = \frac{k}{l}$ when $k \leq l$.
-Caching under uniform workload is not efficient.
-Under long-tail workload with Zipf distribution, assume $n$ is the total number of KVs, approximately $h(l) = \frac{\log (\textnormal{cache size})}{\log (\textnormal{cache-able corpus size})} = \frac{\log (kn)}{\log (ln)}$ when $k \leq l$.
-Under long-tail workload, the cache hit possibility as high as 0.7 with 1M cache in 1G corpus.
-An optimal $l$ can be solved numerically, as shown in \S\ref{kvdirect:sec:different-nic}.
+特别的，在均匀（uniform）负载下，令 $k$ 是板上 DRAM 大小和主机 KV 存储大小之比，则缓存命中率 $h(l) = \frac{\textnormal{cache size}}{\textnormal{cache-able memory size}} = \frac{k}{l}$，当 $k \leq l$ 时。
+一致负载下的缓存并不高效。
+在长尾负载（Zipf 分布）下，设 $n$ 是 KV 的总数，则大致上 $h(l) = \frac{\log (\textnormal{缓存大小})}{\log (\textnormal{可缓存部分大小})} = \frac{\log (kn)}{\log (ln)}$，当 $k \leq l$ 时。
+在长尾工作负载下，1G语料库中1M缓存的缓存命中可能性高达0.7。
+最优的 $l$ 可以得出数值解，将在 \S\ref{kvdirect:sec:different-nic} 中讨论。
 
 \egg{
 \subsubsection{Congestion Avoidance}

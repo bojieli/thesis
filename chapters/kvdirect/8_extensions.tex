@@ -1,12 +1,13 @@
 \section{Extensions}
 \label{kvdirect:sec:extensions}
 
-\subsection{CPU-based Scatter-Gather DMA}
+\subsection{基于 CPU 的分散 - 聚集 DMA}
 
-PCIe has 29\% TLP header and padding overhead for 64B DMA operations (\S\ref{kvdirect:sec:challenge}) and the DMA engine may not have enough parallelism to saturate the PCIe bandwidth-delay product with small TLPs (\S\ref{kvdirect:sec:implementation}).
-Larger DMA operations with up to 256-byte TLP payload is supported by the PCIe root complex in our system. In this case, the TLP head and padding overhead is only 9\%, and the DMA engine has enough parallelism (64) to saturate the PCIe link with 27 in-flight DMA reads.
-To batch the DMA operations on PCIe link, we can leverage the CPU to perform scatter-gather (Figure~\ref{kvdirect:fig:sg-arch}).
-First, the NIC DMAs addresses to a request queue in host memory. The host CPU polls the request queue, performs random memory access, put the data in response queue and writes MMIO doorbell to the NIC. The NIC then fetches the data from response queue via DMA.
+
+对于64B DMA操作，PCIe具有29％的TLP报头和填充开销（\ S \ ref {kvdirect：sec：challenge}），并且DMA引擎可能没有足够的并行性来使用小TLP（\ S）使PCIe带宽延迟产品饱和\ REF{kvdirect：秒：实施}）。
+我们系统中的PCIe根联合体支持更大的DMA操作，最高256字节的TLP有效负载。 在这种情况下，TLP头和填充开销仅为9％，并且DMA引擎具有足够的并行性（64）以通过27个正在进行的DMA读取来使PCIe链路饱和。
+要批量处理PCIe链路上的DMA操作，我们可以利用CPU来执行分散 - 聚集（scatter gather）（图〜\ ref {kvdirect：fig：sg-arch}）。
+首先，NIC DMA将地址发送到主机内存中的请求队列。 主机CPU轮询请求队列，执行随机内存访问，将数据放入响应队列并将MMIO门铃写入NIC。 然后，NIC通过DMA从响应队列中提取数据。
 
 \begin{figure}[t]
 \centering
@@ -19,43 +20,43 @@ First, the NIC DMAs addresses to a request queue in host memory. The host CPU po
 
 \end{figure}
 
-Figure~\ref{kvdirect:fig:scatter-gather} shows that CPU-based scatter-gather DMA has up to 79\% throughput improvement compared to the CPU-bypassing approach.
-In addition to the CPU overhead, the primary drawback of CPU-based scatter-gather is the additional latency.
-To save MMIOs from the CPU to the NIC, we batch 256 DMA operations per doorbell, which requires 10~$\mu$s to complete.
-The overall latency for the NIC to access host memory using CPU-based scatter-gather is \approx20~$\mu$s, almost 20x higher than direct DMA.
+图 \ref {kvdirect:fig:scatter-gather} 表明，与CPU旁路方法相比，基于CPU的分散 - 聚集DMA的吞吐量提高了79％。
+除了CPU开销之外，基于CPU的分散 - 聚集的主要缺点是额外的延迟。
+为了将MMIO从CPU保存到NIC，我们每个门铃批量256个DMA操作，这需要 10 $\mu$s 才能完成。
+使用基于CPU的分散 - 聚集NIC访问主机内存的总延迟是大约20美元，比直接DMA高出近20倍。
 
-\subsection{Multiple NICs per Server}
+\subsection{单机多网卡}
 \label{kvdirect:sec:multi-nic}
 
 \begin{figure}[t]
 \begin{minipage}[t]{0.5\textwidth}
 \centering
 \includegraphics[width=1\textwidth,page=1]{scatter_gather.PNG}
-\caption{Scatter-gather architecture.}
+\caption{分散 - 聚集（scatter-gather）架构。}
 \label{kvdirect:fig:sg-arch}
 \end{minipage}
 \begin{minipage}[t]{0.5\textwidth}
 \centering
 \includegraphics[width=1\textwidth,page=1]{multi_nic.pdf}
-\caption{Performance of multiple NICs per server.}
+\caption{单机多网卡的性能可扩放性。}
 \label{kvdirect:fig:multiple-nics}
 \end{minipage}
 
 \end{figure}
 
-%The primary use case for KV-Direct is to enable remote direct key-value access without CPU overhead on the server. 
-In some cases, it may be desirable to build a dedicated key-value store with maximal throughput per server.
-Through simulation, \cite{li2016full} showed the possibility of achieving a billion KV op/s in a single server with four (currently unavailable) 60-core CPUs.
-As shown in Table~\ref{kvdirect:tab:kvs-compare}, with 10 KV-Direct NICs on a server, the one billion KV op/s performance is readily achievable with a commodity server.
-The server consumes 357 watts power (measured on the wall) to achieve 1.22~Gop/s GET or 0.61~Gop/s PUT.
+KV-Direct的主要用例是启用远程直接键值访问，而无需服务器上的CPU开销。
+在某些情况下，可能需要构建一个具有每服务器最大吞吐量的专用键值存储。
+通过模拟，\cite {li2016full}显示了在具有四个（当前不可用的）60核CPU的单个服务器中实现十亿KV运行的可能性。
+如表 \ref{kvdirect:tab:kvs-compare}所示，在服务器上有10个KV-Direct NIC，使用商用服务器可以轻松实现10亿KV op / s性能。
+服务器消耗357瓦的功率（在墙壁上测量）以达到1.22~Gop / s GET或0.61~Gop / s PUT。
 
-In order to saturate the 80 PCIe Gen3 lanes of two Xeon E5 CPUs, we replace the motherboard of the benchmarked server (Sec.~\ref{kvdirect:sec:eval}) with a SuperMicro X9DRX+-F motherboard with 10 PCIe Gen3 x8 slots.
-We use PCIe x16 to x8 converters to connect 10 programmable NICs on each of the slots, and only one PCIe Gen3 x8 link is enabled on each NIC, so the throughput per NIC is lower than Figure~\ref{kvdirect:fig:ycsb-tput}.
-Each NIC owns an exclusive memory region in host memory and serves a disjoint partition of keys.
-Multiple NICs suffer the same load imbalance problem as a multi-core KVS implementation.
-Fortunately, for a small number of partitions (\textit{e.g.} 10), the load imbalance is not significant~\cite{lim2014mica,li2016full}. Under YCSB long-tail workload, the highest-loaded NIC has 1.5x load of the average, and the added load from extremely popular keys is served by the out-of-order execution engine (Sec.~\ref{kvdirect:sec:ooo}).
-%In comparison, to achieve matching performance with 240 CPU cores, the load of the hottest core will be 10x of the average.
-Figure~\ref{kvdirect:fig:multiple-nics} shows that KV-Direct throughput scales almost linearly with the number of NICs on a server.
+为了使两个Xeon E5 CPU的80个PCIe Gen3通道饱和，我们用带有10个PCIe Gen3 x8插槽的 SuperMicro X9DRX+-F 主板替换了基准测试服务器的主板（\S\ref {kvdirect:sec:eval}） 。
+我们使用PCIe x16到x8转换器连接每个插槽上的10个可编程网卡，每个网卡上只启用一个PCIe Gen3 x8链路，因此每个网卡的吞吐量低于图 \ref {kvdirect:fig:ycsb-tput}。
+每个NIC在主机内存中拥有一个独占内存区域，并提供不相交的密钥分区。
+多个NIC遇到与多核KVS实现相同的负载不平衡问题。
+幸运的是，对于少量分区（\textit {例如10个}），负载不平衡并不重要 \cite {lim2014mica,li2016full}。在YCSB长尾工作负载下，负载最高的NIC的平均负载为1.5倍，非常流行的密钥所增加的负载由无序执行引擎提供（\S \ref {kvdirect:sec:ooo}）。
+相比之下，为了实现与240个CPU内核的匹配性能，最热芯的负载将是平均值的10倍。
+图\ref {kvdirect:fig:multiple-nics}显示KV-Direct吞吐量几乎与服务器上的NIC数量呈线性关系。
 
 \subsection{访问 SSD}
 
@@ -67,14 +68,13 @@ Figure~\ref{kvdirect:fig:multiple-nics} shows that KV-Direct throughput scales a
 \textbf{TODO，网卡大量并发连接……}
 
 
-\section{Discussion}
+\section{讨论}
 \label{kvdirect:sec:discussion}
 
-\subsection{NIC hardware with different capacity.}
+\subsection{不同容量的网卡硬件}
 \label{kvdirect:sec:different-nic}
 
-The goal of KV-Direct is to leverage existing hardware in data centers to offload an important workload (KV access), instead of designing a special hardware to achieve maximal KVS performance. We use programmable NICs, which usually contain limited amount of DRAM for buffering and connection-state tracking. Large DRAMs are expensive in both die size and power consumption.
-%Our Hynix DDR3 SDRAM takes 35 $mm^2$ die size per 4 Gb, and will occupy 4480 $mm^2$ for 64 GB, much larger than the 1600 $mm^2$ die size of our Stratix V FPGA. In terms of power consumption, 64 GB of on-board DRAM will consume 56 watts (assuming 0.878 watt/GB in~\cite{blott2015scaling}), much larger than TDP of our entire FPGA board (30 watts).
+KV-Direct的目标是利用数据中心的现有硬件来卸载重要的工作负载（KV访问），而不是设计特殊的硬件来实现最大的KVS性能。 我们使用可编程NIC，它通常包含有限数量的DRAM用于缓冲和连接状态跟踪。 大型DRAM在芯片尺寸和功耗方面都很昂贵。
 
 \begin{table}[t]
 \centering
@@ -95,7 +95,7 @@ The goal of KV-Direct is to leverage existing hardware in data centers to offloa
 \hline
 \end{tabular}
 }
-\caption{Optimal load dispatch ratio for long-tail workload under different NIC DRAM/PCIe throughput ratio (vertical) and NIC/host memory size ratio (horizontal).}
+\caption{不同NIC DRAM / PCIe吞吐率（垂直）和NIC /主机内存大小比（水平）下长尾工作负载的最佳负载分配比。}
 \label{kvdirect:tab:optimal-load-dispatch}
 
 \end{table}
@@ -119,30 +119,30 @@ The goal of KV-Direct is to leverage existing hardware in data centers to offloa
 \hline
 \end{tabular}
 }
-\caption{Relative throughput of load dispatch compared to simple partitioning. Column titles are same as Table~\ref{kvdirect:tab:optimal-load-dispatch}.}
+\caption{与简单分区相比，负载分派的相对吞吐量。 列标题与表格相同~\ref{kvdirect:tab:optimal-load-dispatch}。}
 \label{kvdirect:tab:optimal-load-dispatch-throughput}
 
 \end{table}
 
 
-Even if future NICs have faster or larger on-board memory, under long-tail workload, our load dispatch design (Sec.~\ref{kvdirect:sec:dram-cache}) still shows performance gain over the simple design of partitioning the keys uniformly according to NIC and host memory capacity.
-Table~\ref{kvdirect:tab:optimal-load-dispatch} shows the optimal load dispatch ratio for long-tail workload with a corpus of 1 billion keys, under different ratio of NIC DRAM and PCIe throughput and different ratio of NIC and host memory size.
-If the NIC has faster DRAM, more load will be dispatched to the NIC. A load dispatch ratio of 1 means the NIC memory behaves exactly like a cache of host memory.
-If the NIC has larger DRAM, a slightly less portion of load will be dispatched to the NIC.
-As shown in Table~\ref{kvdirect:tab:optimal-load-dispatch-throughput}, even when the size of NIC DRAM is a tiny fraction of host memory, the throughput gain is significant.
+即使未来的NIC具有更快或更大的板载内存，在长尾工作负载下，我们的负载分配设计（\S \ref {kvdirect:sec:dram-cache}）仍然显示出比简单的分区设计更高的性能。密钥统一根据NIC和主机内存容量。
+表 \ref {kvdirect:tab:optimal-load-dispatch} 显示了具有10亿个密钥的长尾工作负载的最佳负载分配比率，不同的NIC DRAM和PCIe吞吐率以及不同的NIC和主机比率内存大小。
+如果NIC具有更快的DRAM，则将更多负载分派给NIC。负载分配比率为1表示NIC内存的行为与主机内存的高速缓存完全相同。
+如果NIC具有更大的DRAM，则将稍微少量的负载分派给NIC。
+如表 \ref {kvdirect:tab:optimal-load-dispatch-throughput} 所示，即使NIC DRAM的大小只是主机内存的一小部分，吞吐量增益也很大。
 
-The out-of-order execution engine (Sec.~\ref{kvdirect:sec:ooo}) can be applied to all kinds of applications in need of latency hiding, and we hope future RDMA NICs to support that for atomics.
+乱序执行引擎（\S \ref {kvdirect:sec:ooo}）可以应用于需要隐藏延迟的各种应用程序，我们希望未来的RDMA NIC能够支持原子的。
 
-In 40~Gbps networks, network bandwidth bounds non-batched KV throughput, so we use client-side batching (Sec.\ref{kvdirect:sec:implementation}). With higher network bandwidth, batch size can be reduced, thus reducing latency. In a 200~Gbps network, a KV-Direct NIC could achieve 180~Mop/s without batching.
+在40~Gbps网络中，网络带宽限制了非批量KV吞吐量，因此我们使用客户端批处理（\S \ref {kvdirect:sec:implementation}）。通过更高的网络带宽，可以减少批量大小，从而减少延迟。在200~Gbps网络中，KV-Direct网卡无需批量即可达到180~Mop / s。
 
-KV-Direct leverages widely-deployed programmable NICs with FPGAs~\cite{putnam2014reconfigurable,caulfield2016cloud}. FlexNIC~\cite{kaufmann2015flexnic,kaufmann2016krishnamurthy} is another promising architecture for programmable NICs with Reconfigurable Match-action Tables (RMT)~\cite{bosshart2013forwarding}.
-NetCache~\cite{netcache-sosp17} implements a KV cache in RMT-based programmable switches, showing potential for building KV-Direct in an RMT-based NIC.
+KV-Direct利用广泛部署的可编程NIC和FPGA实现 \cite{putnam2014reconfigurable,caulfield2016cloud}。 FlexNIC \cite {kaufmann2015flexnic,kaufmann2016krishnamurthy} 是另一种具有可重构匹配行动表（RMT） \cite {bosshart2013forwarding} 的可编程NIC的有前途的架构。
+NetCache \cite {netcache-sosp17} 在基于RMT的可编程交换机中实现KV缓存，显示了在基于RMT的NIC中构建KV-Direct的潜力。
 
-\subsection{Implications for real-world applications.}
+\subsection{对现实世界应用的影响}
 
-Back-of-the-envelope calculations show potential performance gains when KV-Direct is applied in end-to-end applications. In PageRank~\cite{page1999pagerank}, because each edge traversal can be implemented with one KV operation, KV-Direct supports 1.22G TEPS on a server with 10 programmable NICs. In comparison, GRAM~\cite{wu2015g} supports 250M TEPS per server, bound by interleaved computation and random memory access.
+当KV-Direct应用于端到端应用程序时，后台计算显示了潜在的性能提升。 在PageRank \cite {page1999pagerank}中，由于每次边缘遍历都可以通过一次KV操作实现，因此KV-Direct在具有10个可编程NIC的服务器上支持1.22G TEPS。 相比之下，GRAM \cite {wu2015g}支持每台服务器250M TEPS，受交错计算和随机内存访问的约束。
 
-KV-Direct supports user-defined functions and vector operations (Table~\ref{kvdirect:tab:kv-operations}) that can further optimize PageRank by offloading client computation to hardware. Similar arguments hold for parameter server~\cite{li2014scaling}. We expect future work to leverage hardware-accelerated key-value stores to improve distributed application performance.
+KV-Direct支持用户定义的函数和向量操作（表 \ref {kvdirect:tab:kv-operations}），可以通过将客户端计算卸载到硬件来进一步优化PageRank。 类似的参数适用于参数server \cite {li2014scaling}。 我们希望未来的工作可以利用硬件加速的键值存储来提高分布式应用程序的性能。
 
 \subsection{键值映射以外的其他数据结构}
 

@@ -1,14 +1,12 @@
 \section{Implementation}
 \label{kvdirect:sec:implementation}
 
-Our hardware platform is built on an Intel Stratix V FPGA based programmable NIC (\S\ref{kvdirect:sec:programmable-nic}).
-The programmable NIC is attached to the server through two PCIe Gen3 x8 links in a bifurcated x16 physical connector, and contains 4 GiB of on-board DRAM with a single DDR3-1600 channel.
+我们的硬件平台基于基于英特尔Stratix V FPGA的可编程NIC（\S \ref {kvdirect:sec:programmable-nic}）。
+可编程NIC通过分叉x16物理连接器中的两个PCIe Gen3 x8链路连接到服务器，并包含4 GiB板载DRAM和一个DDR3-1600通道。
 
-%Predominately, FPGAs are programmed with low-level hardware description languages.
-For development efficiency, we use Intel FPGA SDK for OpenCL~\cite{aoc} to synthesize hardware logic from OpenCL.
-Our KV processor is implemented in 11K lines of OpenCL code and all kernels are fully pipelined, \ie, the throughput is one operation per clock cycle.
-With 180~MHz clock frequency, our design can process KV operations at 180~M op/s if not bottlenecked by network, DRAM or PCIe.
-
+为了提高开发效率，我们使用英特尔FPGA SDK for OpenCL~ \cite {aoc}来合成OpenCL的硬件逻辑。
+我们的KV处理器采用1.1万行OpenCL代码实现，所有内核都完全流水线化，即吞吐量是每个时钟周期一次操作。
+凭借180~MHz的时钟频率，我们的设计可以在180~M op / s下处理KV操作，如果不是网络，DRAM或PCIe的瓶颈。
 %
 %\begin{table}[t!]
 %	\centering
@@ -37,45 +35,39 @@ With 180~MHz clock frequency, our design can process KV operations at 180~M op/s
 %	}
 %\end{table}
 
-
-Below highlights several implementation details.
+下面讨论几个实现中的细节。
 
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=.8\textwidth,page=1]{figure/cropped_slab.pdf}
-\caption{Slab memory allocator.}
+\caption{Slab 内存分配器。}
 \label{kvdirect:fig:slab}
 
 \end{figure}
 
+\textbf {Slab 内存分配器。}
 
-\textbf{Slab Memory Allocator.}
-As shown in Figure~\ref{kvdirect:fig:slab}, for each slab size, the slab cache on the NIC is synchronized with host DRAM using two double-ended stacks.
-For the NIC-side double-ended stack (left side in Figure~\ref{kvdirect:fig:slab}), the left end is popped and pushed by the allocator and deallocator, and the right end is synchronized with the left end of the corresponding host-side stack via DMA.
-The NIC monitors the size of NIC stack and synchronizes to or from the host stack according to high and low watermarks.
-Host daemon periodically checks the size of host-side double-ended stack. If it grows above a high watermark, slab merging is triggered; when it drops below a low watermark, slab splitting is triggered.
-Because each end of a stack is either accessed by the NIC or the host, and the data is accessed prior to moving pointers, race conditions would not occur.
+如图\ref {kvdirect:fig:slab}所示，对于每个slab大小，NIC上的slab缓存使用两个双端堆栈与主机DRAM同步。
+对于NIC端双端堆栈（图\ref {kvdirect:fig:slab}中的左侧），左端由分配器和解除分配器弹出并推送，右端与左端同步通过DMA对应的​​主机端堆栈。
+NIC监视NIC堆栈的大小，并根据高水位线和低水位线与主机堆栈同步。
+主机守护进程定期检查主机端双端堆栈的大小。如果它高于高水印，则触发平板合并;当它低于低水印时，会触发平板分裂。
+因为堆栈的每一端都是由NIC或主机访问的，并且在移动指针之前访问数据，所以不会发生竞争条件。
+
+在我们的实现中，每个slab条目是5个字节，DMA粒度是64个字节，因此每个slab操作的摊销DMA开销是$ 5/64 $。此外，当后续分配重新使用新释放的slab槽时，使用网卡上的堆栈而不是DMA。
 
 
-%In our implementation, each slab entry is 5 bytes and the DMA granularity is 64 bytes, so the amortized DMA overhead per slab operation is $5/64$. Furthermore, when newly freed slab slots are reused by subsequent allocations, the on-NIC stack is used instead of DMA.
+\textbf{DRAM 负载均衡器。}
 
-
-%\textbf{Dynamic Operation Scheduler.}
-%Upon simultaneous completion of an operation and arrival of a new operation, the reservation station prioritizes completion processing, because the completed operation has waited longer and prioritizing it benefits tail latency.
-%During checking and execution of a hash slot, new completions may come.
-%For simplicity, we finish scanning the chain of pending operations before moving to another key.
-
-\textbf{DRAM Load Dispatcher.}
-One technical challenge is the storage of metadata in DRAM cache, which requires additional 4 address bits and one dirty flag per 64-byte cache line.
-Cache valid bit is not needed because all KVS storage is accessed exclusively by the NIC.
-To store the 5 metadata bits per cache line, extending the cache line to 65 bytes would reduce DRAM performance due to unaligned access; saving the metadata elsewhere will double memory accesses.
-Instead, we leverage spare bits in ECC DRAM for metadata storage.
-ECC DRAM typically has 8 ECC bits per 64 bits of data.
-For Hamming code to correct one bit of error in 64 bits of data, only 7 additional bits are required.
-The 8th ECC bit is a parity bit for detecting double-bit errors.
-As we access DRAM in 64-byte granularity and alignment, there are 8 parity bits per 64B data.
-We increase the parity checking granularity from 64 data bits to 256 data bits, so double-bit errors can still be detected. This allows us to have 6 extra bits which can save our address bits and dirty flag.
+一个技术挑战是在DRAM高速缓存中存储元数据，这需要额外的4个地址位和每64字节高速缓存行一个脏标志。
+不需要缓存有效位，因为所有KVS存储都由NIC专门访问。
+为了存储每个高速缓存行的5个元数据位，将高速缓存行扩展到65个字节会由于未对齐访问而降低DRAM性能;将元数据保存在别处会使内存访问倍增。
+相反，我们利用ECC DRAM中的备用位来进行元数据存储。
+ECC DRAM通常每64位数据具有8个ECC位。
+对于汉明码来纠正64位数据中的一位错误，只需要7个附加位。
+第8个ECC位是用于检测双位错误的奇偶校验位。
+当我们以64字节粒度和对齐方式访问DRAM时，每64B数据有8个奇偶校验位。
+我们将奇偶校验检查粒度从64个数据位增加到256个数据位，因此仍然可以检测到双位错误。这允许我们有6个额外的位，可以保存我们的地址位和脏标志。
 
 %\textbf{KV Operation Decoder.}
 %The KV operation decoder saves receive timestamp and UDP flow tuple as execution context in reservation station.
@@ -84,16 +76,13 @@ We increase the parity checking granularity from 64 data bits to 256 data bits, 
 %To avoid head-of-line blocking, KV operations are processed out-of-order, so the client may receive KV completions in a different order from requests.
 %The client could match the completions with requests by the key, because completions with a same key are guaranteed to be in request order.
 
-\textbf{Vector Operation Decoder.}
-%Throughout the KV processor design, we see batching as an universal principle in fetching multiple hash slots in one bucket, synchronizing free slab queues with host memory, lazy splitting and merging of slab slots, and data forwarding of dependent KV operations.
-%Batching improves performance by amortizing control plane overhead to multiple data plane payloads.
-Compared with PCIe, network is a more scarce resource with lower bandwidth (5~GB/s) and higher latency (2~$\mu$s).
-%The control plane overhead of network is also larger. 
-An RDMA write packet over Ethernet has 88 bytes of header and padding overhead, while a PCIe TLP packet has only 26 bytes of overhead.
-This is why previous FPGA-based key-value stores~\cite{blott13hotcloud,blott2015scaling} have not saturated the PCIe bandwidth, although their hash table designs are less efficient than KV-Direct.
-This calls for \textit{client-side batching} in two aspects: batching multiple KV operations in one packet and supporting vector operations for a more compact representation. Towards this end, we implement a decoder in the KV-engine to unpack multiple KV operations from a single RDMA packet.
-%For computation efficiency, we could not use a general-purpose compression algorithm.
-Observing that many KVs have a same size or repetitive values, the KV format includes two flag bits to allow copying key and value size, or the value of the previous KV in the packet.
-%For atomic and vector operations, additional fields include the opcode of the $\lambda$ function and the parameter to the active message.
-Fortunately, many significant workloads (\textit{e.g.} graph traversal, parameter server) can issue KV operations in batches.
-Looking forward, batching would be unnecessary if higher-bandwidth network is available.
+\textbf{向量操作译码器。}
+在整个KV处理器设计中，我们将批处理视为在一个存储桶中获取多个散列槽，使自由slab队列与主机内存同步，懒惰拆分和slab槽合并以及依赖KV操作的数据转发的通用原则。
+批处理通过将控制平面开销分摊到多个数据平面有效负载来提高性能。
+与PCIe相比，网络是一种更加稀缺的资源，具有更低的带宽（5~GB / s）和更高的延迟（2~$\mu$s）。
+以太网上的RDMA写数据包有88字节的报头和填充开销，而PCIe TLP数据包只有26字节的开销。
+这就是以前基于FPGA的键值存储 \cite{blott13hotcloud，blott2015scaling} 没有使PCIe带宽饱和的原因，尽管它们的哈希表设计效率低于KV-Direct。
+这需要在两个方面进行\textit {客户端批处理}：在一个数据包中批量处理多个KV操作，并支持向量操作以实现更紧凑的表示。为此，我们在KV引擎中实现了一个解码器，从单个RDMA数据包中解压缩多个KV操作。
+观察到许多KV具有相同的大小或重复值，KV格式包括两个标志位以允许复制密钥和值大小，或者包中的先前KV的值。
+幸运的是，许多重要的工作负载（\textit {例如图遍历，参数服务器}）可以批量发布KV操作。
+展望未来，如果可以使用更高带宽的网络，则无需批量处理。
