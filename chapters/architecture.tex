@@ -1,0 +1,3 @@
+\chapter{系统架构}
+
+\textbf{需要讨论 FPGA centric server 的软硬件架构。基本思想：把 hypervisor 和 OS kernel 中需要高性能的数据平面卸载到可编程网卡。FPGA 对外部机器和对内的虚拟机：把主机内的硬件资源虚拟化（一虚多，ClickNP网络虚拟化为例），实现 CPU 直接访问远程资源（KV-Direct内存数据结构为例）、硬件之间直接通信。对 CPU：调度和分发任务（socket加速）。引出后面的 FPGA 编程、网络功能加速、通信原语加速、键值存储加速。}
