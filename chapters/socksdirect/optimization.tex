@@ -1,4 +1,4 @@
-\subsection{Ring Buffer with RDMA and SHM}
+\subsection{带RDMA和SHM的环形缓冲区}
 \label{socksdirect:subsec:lockless-queue}
 
 \iffalse
@@ -6,14 +6,14 @@
 	\centering
 	\includegraphics[width=0.4\textwidth]{images/fixme.pdf}
 	
-	\caption{Performance comparison of queues.}
+	\caption{队列的性能比较。}
 	\label{socksdirect:fig:queue-performance}
 \end{figure}
 \fi
 
 \begin{figure}[t]
 	\centering
-	\subfloat[Traditional.]{
+	\subfloat[传统环形缓冲区。]{
 		\includegraphics[width=0.3\textwidth]{images/ringbuffer_traditional}
 		\label{socksdirect:fig:ringbuffer-traditional}
 	}
@@ -23,47 +23,35 @@
 		\label{socksdirect:fig:ringbuffer-new}
 	}
 	
-	\caption{Ring buffer data structures. Shaded part is packet metadata, and black part is payload.}
+	\caption{环缓冲数据结构。 阴影部分是包元数据，黑色部分是有效载荷。}
 \end{figure}
 
-Traditionally, the network stack send and receive packets from NICs using a ring buffer.
-As Figure~\ref{socksdirect:fig:ringbuffer-traditional} shows, it leads to buffer management overhead and internal fragmentation.
-Traditional NICs support a limited number of ring buffers, so multiple connections may multiplex through one ring buffer, and this design enables moving payload to per-connection buffers without copy.
-Fortunately, RDMA write verbs open up new design possibility.
-Our innovation is to have \emph{one ring buffer per socket connection} and store packets back-to-back, as Figure~\ref{socksdirect:fig:ringbuffer-new} shows.
-The sender determines the ring buffer and offset (i.e. \emph{tail} pointer), then use RDMA write verb to write the packet to the tail pointer in remote-side memory.
-During transmission, the receiver CPU does not need to do anything.
-When the receiver application calls \texttt{recv}, data is dequeued from the \emph{head} pointer.
-The process is similar for SHM because both SHM and RDMA support write primitives.
+传统上，网络堆栈使用环形缓冲区从NIC发送和接收数据包。
+如图 \ref {socksdirect:fig:ringbuffer-traditional}所示，它会导致缓冲区管理开销和内部碎片。
+传统的NIC支持有限数量的环形缓冲区，因此多个连接可以通过一个环形缓冲区进行复用，这种设计可以将有效负载移动到每个连接缓冲区而无需复制。
+幸运的是，RDMA编写动词开辟了新的设计可能性。
+我们的创新是拥有\emph {每个套接字连接一个环形缓冲区}并将数据包背靠背存储，如图 \ref {socksdirect:fig:ringbuffer-new}所示。
+发送方确定环形缓冲区和偏移量（即\emph {tail}指针），然后使用RDMA写动词将数据包写入远程端内存中的尾指针。
+在传输过程中，接收器CPU不需要做任何事情。
+当接收器应用程序调用\texttt {recv}时，数据从\emph {head}指针中出列。
+SHM的过程类似，因为SHM和RDMA都支持写原语。
 
-%%We first revisit requirements of the queue between a pair of communicating threads in different applications or hosts. A sender enqueues messages sequentially. At the same time, a receiver peeks and dequeues messages at any position. The message may be a control command or data of a FD, so the message size is variable.
-%%Our aim is high throughput and low latency when messages in the queue are dequeued in the same order as enqueued, and preserve liveness when dequeuing in arbitrary order.
-%SHM and RDMA are state-of-the-art methods for intra-host and inter-host communication respectively.
-%%As Figure~\ref{socksdirect:fig:queue-performance} shows, 
-%Sharing \emph{head} and \emph{tail} pointers between sender and receiver introduces inter-core cache migration overheads in shared memory and unacceptable latency for RDMA.
-%For high throughput and low latency, our principle is that each shared memory region is either writable by the sender or receiver, but never both.
-%So we keep \textit{head} and \textit{tail} pointers locally in sender and receiver respectively.
-%Because the receiver needs to modify \emph{isdel} and \emph{nextptr} fields, we create a \emph{shadow ring buffer} in receiver's private memory and update the corresponding offset in place of shared memory.
+要判断环形缓冲区是否已满，发送方将保持\textit {queue credits}计数，指示环形缓冲区中的空闲字节数。
+当发件人将数据包入队时，它会消耗信用。 当接收器使消息出列时，它会在本地递增计数器，并在计数器超过环形缓冲区大小的一半时在发送者的内存中写入\textit {credit return flag}。 发送者在检测到标志时重新获得队列信用。
+请注意，此机制与拥塞控制无关; 后者由NIC硬件处理 \cite {zhu2015congestion}。
 
-%Most ring buffer designs share \textit{head} and \textit{tail} pointers between sender and receiver, which introduces an additional cache migration or RDMA operation. To eliminate such overhead, we keep \textit{head} and \textit{tail} pointers locally in sender and receiver respectively.
-To tell whether the ring buffer is full, the sender maintains a \textit{queue credits} count, indicating the number of free bytes in ring buffer.
-%Many applications use the limited send buffer as a back-pressure signal to control how much data to generate.
-%To achieve fair queue utilization among FDs, the sender also maintains \emph{per-FD credits}.
-When sender enqueues a packet, it consumes credits. When receiver dequeues a message, it increments a counter locally, and writes a \textit{credit return flag} in sender's memory once the counter exceeds half the size of ring buffer. The sender regains queue credits upon detecting the flag.
-%Notice that this mechanism is irrelevant to congestion control; the latter is handled by the NIC hardware~\cite{zhu2015congestion}.
-
-\parab{Two copies of ring buffers on send and receive sides.}
-The above mechanism still incurs buffer management on the send side because the sender needs to construct RDMA message in a buffer.
-Second, it does not support container live migration because the remaining data in RDMA queue is hard to migrate.
-Third, we aim to batch small messages to improve throughput.
-To this end, we maintain a copy of ring buffers on both send and receive sides.
-The sender side writes its local ring buffer, and invokes RDMA to synchronize the sender to the receiver.
-We use an RDMA RC QP for each ring buffer, and maintain a counter of in-flight RDMA messages.
-If the counter does not exceed threshold, an RDMA message is sent for every socket \texttt{send} operation.
-Otherwise, the message is not sent, and \emph{send\_next} marks the first unsent message.
-Upon completion of an RDMA write, we send a message containing all unsent changes (\emph{send\_next} to \emph{tail} in Figure~\ref{socksdirect:fig:ringbuffer-new}).
-This adaptive batching mechanism minimizes latency on idle links and maximizes throughput on busy links.
-For SHM, we have only one copy of ring buffer shared by two processes, and synchronization is done by cache coherence hardware.
+\textbf {发送和接收方的两个环形缓冲区副本。}
+上述机制仍然会在发送端引起缓冲区管理，因为发送方需要在缓冲区中构造RDMA消息。
+其次，它不支持容器实时迁移，因为RDMA队列中的剩余数据很难迁移。
+第三，我们的目标是批量处理小消息以提高吞吐量。
+为此，我们在发送方和接收方都保留了环形缓冲区的副本。
+发送方写入其本地环形缓冲区，并调用RDMA以使发送方与接收方同步。
+我们为每个环形缓冲区使用RDMA RC QP，并维护一个机上RDMA消息的计数器。
+如果计数器未超过阈值，则为每个socket \texttt {send}操作发送RDMA消息。
+否则，不发送消息，\emph {send\_next}标记第一个未发送的消息。
+完成RDMA写入后，我们会在图 \ref {socksdirect:fig:ringbuffer-new}中发送包含所有未发送更改的消息（\emph {send \_next}到\emph {tail}）。
+这种自适应批处理机制可最大限度地减少空闲链路上的延迟，并最大化繁忙链路上的吞
+对于SHM，我们只有一个由两个进程共享的环形缓冲区副本，并且同步由高速缓存一致性硬件完成。
 
 %Before sending, sender clears header of the next message to prevent the receiver from considering junk data in the ring buffer to be a message. Next, sender writes payload, then writes header, finally advances \textit{tail}. Receiver polls \textit{isvalid} at \textit{head} pointer, then copies the message, finally advances \textit{head}.
 %For RDMA, the sender maintains a local copy of ring buffer, and we use one-sided RDMA write to synchronize updates from sender to receiver.
@@ -74,102 +62,99 @@ For SHM, we have only one copy of ring buffer shared by two processes, and synch
 %When \libipc{} polls CQ and finds an empty slot in send queue, it sends all queued but unsent data in queue as an RDMA message, because the messages are stored back-to-back in the queue.
 
 
-\parab{Consistency between payload and metadata.}
-%One may believe that out-of-order execution in CPU may mandate the use of memory fence instructions. 
-%For shared-memory queue, 
-For SHM, X86 processors from Intel and AMD provide total store ordering~\cite{sewell2010x86,intel-manual}, which implies that two writes are observed by other cores in the same order as they were written. An 8-byte \texttt{MOV} instruction is atomic, so writing a header is atomic. Because sender writes header after payload, the receiver would read a consistent message. Therefore, memory fence instruction is unnecessary.
+\textbf {有效载荷和元数据之间的一致性。}
+对于SHM，英特尔和AMD的X86处理器提供了整体商店订购 \cite {sewell2010x86，intel-manual}，这意味着其他内核按照与编写时相同的顺序观察到两次写入。一个8字节的\texttt {MOV}指令是原子的，所以写一个标题是原子的。由于发送方在有效负载之后写入标头，因此接收方将读取一致的消息因此，不需要存储器栅栏指令。
 
-Because RDMA does not ensure write ordering within a message~\cite{infiniband2000infiniband}, we do need to make sure a message is completely arrived. Although message write ordering is observed in RDMA NICs that use go-back-0 or go-back-N loss recovery~\cite{dragojevic2014farm}, it is not true for more advanced NICs with selective retransmission~\cite{mprdma,mittal2018revisiting}. In \libipc{}, the sender uses \textit{RDMA write with immediate} verb to generate completions on receiver. The receiver polls RDMA \emph{completion queue} rather than the ring buffer. RDMA ensures cache consistency on receiver, and the completion message is guaranteed to be delivered after writing the data to \libipc{} ring buffer~\cite{infiniband2000infiniband}.
+因为RDMA不能确保消息中的写入顺序 \cite {infiniband2000infiniband}，我们确实需要确保消息完全到达。虽然在使用go-back-0或go-back-N loss recovery~ \cite {dragojevic2014farm}的RDMA网卡中观察到消息写入顺序，但对于具有选择性重传的更高级NIC，情况并非如此 \cite {mprdma，mittal2018revisiting} 。在\libipc {}中，发送方使用\textit {RDMA write with immediate}动词在接收方生成完成。接收器轮询RDMA \emph {完成队列}而不是环形缓冲区。 RDMA确保接收器上的高速缓存一致性，并且在将数据写入\libipc {}环形缓冲区 \cite {infiniband2000infiniband}之后保证完成消息。
 
 
-\parab{Amortize polling overhead.}
-Polling ring buffers wastes CPU cycles of the receiver when a socket is not used frequently. We amortize polling overhead using two techniques.
-First, for RDMA queues, we leverage the RDMA NIC to multiplex event notifications into a single queue.
-Each thread uses a \emph{shared completion queue} for all RDMA QPs, so it only needs to poll one queue rather than all per-socket queues.
+\textbf {平摊轮询开销。}
+当不经常使用套接字时，轮询环缓冲区会浪费接收器的CPU周期。我们使用两种技术分摊轮询开销。
+首先，对于RDMA队列，我们​​利用RDMA NIC将事件通知复用到单个队列中。
+每个线程对所有RDMA QP使用\emph {共享完成队列}，因此它只需要轮询一个队列而不是所有每个套接字队列。
 
-Second, each queue can switch between \textit{polling} and \textit{interrupt} modes. The queue to the monitor is always in polling mode. Receiver of each queue maintains a counter of consecutive empty polls. When it exceeds a threshold, the receiver sends a message to sender notifying that the queue is entering interrupt mode, and stops polling after a short period. When sender writes to a queue in interrupt mode, it also notifies the monitor and the monitor will signal the receiver to resume polling.
-
-
+其次，每个队列可以在\textit {polling}和\textit {interrupt}模式之间切换。监视器的队列始终处于轮询模式。每个队列的接收者维护一个连续空轮询的计数器。当它超过阈值时，接收器向发送器发送消息，通知队列正在进入中断模式，并在短时间后停止轮询。当发送方以中断模式写入队列时，它还会通知监视器，监视器将通知接收方恢复轮询。
 
 
 %\RED{Need a performance comparison figure of ring buffer architectures. (traditional ring buffer, new ring buffer, intra, inter, x axis: msg size, y axis: throughput)}
 
-\subsection{Zero Copy}
+\subsection{零拷贝}
 \label{socksdirect:subsec:zerocopy}
 
 \begin{figure}[t]
 	\centering
-	\subfloat[Intra-server SHM. 1) Get physical page and set copy-on-write; 2) send page address via SHM; 3) map received page; 4) (optional) remap when sender write / memcpy / recv.]{
+	\subfloat[服务器内SHM。 1）获取物理页面并设置写入时复制; 2）通过SHM发送页面地址; 3）映射收到的页面; 4）（可选）在发送者写入/ memcpy / recv时重新映射。]{
 		\includegraphics[width=0.44\textwidth]{images/zerocopy_intra}
 		\label{socksdirect:fig:zerocopy-intra}
 	}
 	\hspace{0.02\textwidth}
-	\subfloat[Inter-server RDMA. 1) Get physical page and set copy-on-write; 2) get free page from pool; 3) send data via RDMA; 4) send page address via RDMA; 5) map received page; 6) return unmapped page to pool.]{
+	\subfloat[服务器间RDMA。 1）获取物理页面并设置写入时复制; 2）从池中获取免费页面; 3）通过RDMA发送数据; 4）通过RDMA发送页面地址; 5）地图收到的页面; 6）将未映射的页面返回到池。]{
 		\includegraphics[width=0.42\textwidth]{images/zerocopy_inter}
 		\label{socksdirect:fig:zerocopy-inter}
 	}
 	
-	\caption{Procedure to send a page with zero copy.}
+	\caption{发送零拷贝页面的过程。}
 \end{figure}
 
 
-As Sec.~\ref{socksdirect:subsec:per-byte-overhead} discussed, the main challenge for zero copy is to maintain the semantics of socket API.
-Fortunately, virtual memory provides a layer of indirection, and many works leverage this \emph{page remapping} technique.
-%Rather than copying, we can remap the physical pages from sender's virtual addresses to receiver's.
-Linux zero copy socket~\cite{linux-zero-copy} only support send side, by setting the data pages as copy-on-write.
-However, many applications overwrite the send buffer frequently, so the copy-on-write mechanism simply delays the copy from \texttt{send} time to first overwrite time. 
-To achieve zero copy receive, 20 years ago, BSD~\cite{thadani1995efficient} and Solaris~\cite{chu1996zero} remap the virtual page of application buffer to the physical page of system buffer. However, as Table~\ref{socksdirect:tab:operation-performance} shows, on modern CPUs, mapping one page has even higher cost than copying it, because of kernel crossing and TLB flush costs.
-Recently, many high performance TCP/IP stacks~\cite{han2012megapipe,yasukata2016stackmap} and socket-to-RDMA libraries~\cite{rsockets,socketsdirect} provide both standard socket API and an alternative zero-copy API, but none of them achieves zero copy for the standard API.
-Further, no existing works support zero copy for intra-host sockets.
+正如Sec .~ \ref {socksdirect:subsec:per-byte-overhead}所讨论的，零拷贝的主要挑战是维护套接字API的语义。
+幸运的是，虚拟内存提供了一个间接层，许多作品利用了这种\emph {page remapping}技术。
+我们可以将物理页面从发件人的虚拟地址重新映射到接收者，而不是复制。
+Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数据页设置为写时复制。
+但是，许多应用程序经常覆盖发送缓冲区，因此写时复制机制只是将复制从\texttt {send}时间延迟到第一次覆盖时间。
+为了实现零拷贝接收，20年前，BSD~ \cite {thadani1995efficient}和Solaris~ \cite {chu1996zero}将应用缓冲区的虚拟页面重新映射到系统缓冲区的物理页面。但是，正如Table~ \ref {socksdirect:tab:operation-performance}所示，在现代CPU上，由于内核交叉和TLB刷新成本，映射一个页面的成本甚至比复制它更高。
+最近，许多高性能TCP / IP堆栈 \cite {han2012megapipe，yasukata2016stackmap}和socket-to-RDMA库 \cite {rsockets，socketsdirect}提供标准套接字API和备用零拷贝API，但它们都没有实现标准API的零拷贝。
+此外，没有现有的工作支持主机内套接字的零拷贝。
 
 
 %A sender may write the send buffer after non-blocking \texttt{send}, and the receiver does not know the receive buffer before \texttt{recv}.
 % so we can remap virtual address of a buffer to another physical page if the data occupies entire 4~KiB pages.
 
-To enable zero-copy, we need to modify the NIC driver to expose several kernel functions related to page remapping. 
-%Due to the remapping overhead (Table~\ref{socksdirect:tab:operation-performance}), we only use zero-copy for \texttt{send} or \texttt{recv} with at least 8~KiB payload size. Smaller messages are copied instead.
-To amortize page remapping cost, we only use zero copy for \texttt{send} or \texttt{recv} with at least 16~KiB payload size.
-Smaller messages are copied instead.
 
-\parab{Page alignment.}
-Page remapping only works when the send and receive addresses are page aligned and the transfer contains entire pages.
-We intercept \texttt{malloc} and \texttt{realloc} functions and allocate 4~KiB aligned addresses for allocations with multiple-of-4K sizes, so most buffers will align to page boundary, while not wasting memory for small allocations.
-If the size of sent message is not a multiple of 4~KiB, the last chunk of data is copied on \texttt{send} and \texttt{recv}.
+要启用零拷贝，我们需要修改NIC驱动程序以公开与页面重新映射相关的几个内核函数。
+为了分摊页面重新映射成本，我们仅对\texttt {send}或\texttt {recv}使用零拷贝，且有效载荷至少为16~KiB。
+而是复制较小的消息。
 
-%\parab{Amortize page remapping cost.}
+\textbf {内存对齐。}
+页面重新映射仅在发送和接收地址页面对齐且传输包含整个页面时才有效。
+我们拦截\texttt {malloc}和\texttt {realloc}函数，并为具有多个4K大小的分配分配4~KiB对齐的地址，因此大多数缓冲区将与页面边界对齐，而不会浪费内存用于小分配。
+如果发送消息的大小不是4~KiB的倍数，则最后一块数据将复制到\texttt {send}和\texttt {recv}。
 
+\textbf{讨论非对齐情况:接收之后直接发送，没有读写数据}
 
-\parab{Minimize copy-on-write.}
-%After \texttt{send}, because the application may read the buffer or send the buffer to other receivers, it needs to write-protect the buffer.
-%\texttt{recv} also needs to write-protect received buffers.
-When sender overwrites the buffer after \texttt{send}, existing designs use copy-on-write. %Copy is required because the sender may read the non-written part of the page.
-%Because applications almost always reuse the buffer for subsequent send operations, copy-on-write is invoked in most cases, making zero-copy essentially useless on sender.
-Our observation is that most applications do not write send buffers byte-by-byte. Instead, they overwrite entire pages of the send buffer via \texttt{recv} or \texttt{memcpy}, so it is unnecessary to copy original data of the page.
-%For \texttt{recv}, the old read-only mapping can be safely discarded.
-For \texttt{memcpy}, we invoke the kernel to remap new pages and disables copy-on-write, then do the actual copy.
-For \texttt{recv}, the old page mappings are replaced by the received pages.
+%\textbf{Amortize page remapping cost.}
 
 
-\parab{Page allocation overhead.}
-Page remapping requires the kernel to allocate and free pages for each zero copy \texttt{send} and \texttt{recv}. 
-Page allocation in kernel uses a global lock, which is inefficient. \libipc{} manages a pool of free pages in each process locally.
-\libipc{} also tracks the origin of received zero-copy pages.
-When a page is unmapped, if it is from another process, \libipc{} return the pages to the owner through a message.
+\textbf{减少写时复制。}
+当发送者在\texttt {send}之后覆盖缓冲区时，现有设计使用copy-on-write。
+复制是必需的，因为发件人可能会读取页面的未写入部分。
+由于应用程序几乎总是将缓冲区重用于后续发送操作，因此在大多数情况下会调用copy-on-write，这使得零拷贝在发送方上基本无用。
+我们的观察是大多数应用程序不会逐字节写入发送缓冲区。 相反，它们会通过\texttt {recv}或\texttt {memcpy}覆盖发送缓冲区的整个页面，因此无需复制页面的原始数据。
+％对于\texttt {recv}，可以安全地丢弃旧的只读映射。
+对于\texttt {memcpy}，我们调用内核重新映射新页面并禁用copy-on-write，然后执行实际复制。
+对于\texttt {recv}，旧页面映射将被接收的页面替换。
 
-\parab{Send page addresses securely via SHM.}
-For intra-host socket, we send the physical page addresses in a message in user-space queues, as step 2 in Figure~\ref{socksdirect:fig:zerocopy-intra}.
-We must prevent unsolicited remapping of arbitrary pages.
-To this end, \libipc{} invokes a modified NIC driver to 
-get obfuscated physical page addresses of the send buffer and send the address to receiver via shared memory queue.
-On the receiving side, \libipc{} invokes the kernel to remap the obfuscated physical pages to the application-provided receive buffer virtual address.
 
-\parab{Zero Copy under RDMA.}
-\libipc{} initializes a pinned page pool on receiver and send the physical addresses of the pages to the sender.
-The sender manages the pool.
-On sender, \libipc{} %pins the send buffer if it has not been pinned, then 
-allocates pages from the remote receiver page pool to determine the remote address of RDMA write, as step 2 in Figure~\ref{socksdirect:fig:zerocopy-inter}.
-On receiver, when \texttt{recv} is called, \libipc invokes the NIC driver to map pages in the pool to application buffer virtual address.
-After the remapped pages are freed (e.g. overwritten by another \texttt{recv}), \libipc{} returns them to the pool manager in sender (step 6).
+\textbf {页面分配开销。}
+页面重新映射需要内核为每个零拷贝\texttt {send}和\texttt {recv}分配和释放页面。
+内核中的页面分配使用全局锁定，这是低效的。 \libipc {}在本地管理每个进程中的可用页面池。
+\libipc {}还跟踪收到的零拷贝页面的来源。
+当页面未映射时，如果它来自另一个进程，\libipc {}会通过消息将页面返回给所有者。
+
+\textbf {通过SHM安全发送页面地址。}
+对于主机内部套接字，我们在用户空间队列中的消息中发送物理页面地址，如图 \ref {socksdirect:fig:zerocopy-intra}中的步骤2所示。
+我们必须防止未经请求重新映射任意页面。
+为此，\libipc {}调用修改后的NIC驱动程序
+获取发送缓冲区的模糊物理页面地址，并通过共享内存队列将地址发送给接收方。
+在接收端，\libipc {}调用内核将模糊的物理页面重新映射到应用程序提供的接收缓冲区虚拟地址。
+
+\textbf {RDMA下的零拷贝。}
+\libipc {}初始化接收器上的固定页面池，并将页面的物理地址发送给发送者。
+发件人管理池。
+在发送方上，\libipc {}将发送缓冲区固定，从远程接收器页面池中分配页面以确定RDMA写入的远程地址，如图 \ref {socksdirect:fig:zerocopy-inter}中的步骤2所示。
+在接收器上，当调用\texttt {recv}时，\libipc 调用NIC驱动程序将池中的页面映射到应用程序缓冲区虚拟地址。
+在重新映射的页面被释放后（例如被另一个\texttt {recv}覆盖），\libipc {}将它们返回给发送方中的池管理器（步骤6）。
+
 %If the OS runs out of memory, \libipc{} unpins pages to reclaim memory.
 %For security, kernel validates that page numbers are in the huge-page receive buffer.
 
@@ -184,37 +169,34 @@ After the remapped pages are freed (e.g. overwritten by another \texttt{recv}), 
 %%In corner cases where the received header length is not 54 bytes, \libipc{} reassembles the packet.
 %Upon \texttt{recv}, the payload buffer is remapped to application.
 
-\subsection{Event Notification}
+\subsection{事件通知}
 \label{socksdirect:subsec:process-mux}
 
-\parab{Challenge 1: multiplex events between kernel and \libipc{}.}
-The application polls events from both sockets and other \textit{kernel FDs} handled by Linux kernel.
-A naive way to poll kernel events is to invoke the syscall (e.g. \textit{epoll\_wait}) every time, which incurs high overhead because event polling is a frequent operation on virtually every send and receive.
-%LOS~\cite{huang2017high} periodically invokes non-blocking \texttt{epoll\_wait} syscall with kernel FDs, which leads to a trade-off between delay and CPU overhead. Differently,
-Differently, \libipc{} creates a per-process \textit{epoll thread} which invokes \textit{epoll\_wait} syscall to poll kernel events. Whenever epoll thread receives a kernel event, application threads will report the event together with user-space socket events.
+\textbf {挑战1:在kernel和\libipc {}之间复用事件。}
+应用程序轮询来自Linux内核处理的套接字和其他\textit {内核FD}的事件。
+轮询内核事件的一种简单方法是每次都调用系统调用（例如\textit {epoll \_wait}），这会产生很高的开销，因为事件轮询几乎是每次发送和接收的频繁操作。
+LOS~ \cite {huang2017high}定期用内核FD调用非阻塞\texttt {epoll \_wait}系统调用，这导致延迟和CPU开销之间的权衡。不同的是，
+不同的是，\libipc {}创建了一个per-process \textit {epoll thread}，它调用\textit {epoll \_wait} syscall来轮询内核事件。每当epoll线程收到内核事件时，应用程序线程将报告该事件以及用户空间套接字事件。
 
-\parab{Challenge 2: interrupt busy processes.}
-%To minimize context switch, \sys{} runs in user mode and uses cooperative multitasking to multiplex processes on CPU cores. 
-%Coordination and delegation based on message passing requires processes to respond to messages promptly.
-The socket take-over mechanism (Sec.~\ref{socksdirect:subsubsec:fork_rdwr}) requires a process to respond monitor requests promtly. However, processes may execute application code without calling \libipc{} for a long time. To address this issue, we design a \textit{signal} mechanism analogous to interrupts in OS. Event initiators first poll the receive queue for a period of time for ACK. If no reply, it sends a Linux \textit{signal} to the receptor and wake up the process.
+\textbf {挑战2:中断繁忙的进程。}
+套接字接管机制（Sec .~ \ref {socksdirect:subsubsec:fork_rdwr}）需要一个进程来响应监视器请求。但是，进程可以执行应用程序代码而无需长时间调用\libipc {}。为了解决这个问题，我们设计了一个类似于OS中断的\textit {signal}机制。事件启动器首先轮询接收队列一段时间以进行ACK。如果没有回复，它会向接收器发送Linux \textit {signal}并唤醒进程。
 
-The signal handler, registered by \libipc{}, first determines whether the process is executing application or \libipc{} code. \libipc{} sets and clears a flag at entry and exit of the library. If signal handler finds that the process is in \libipc, it does nothing and \libipc{} will process the event before returning control to the application. Otherwise, the signal handler immediately processes messages from the emergency queue to the monitor, before returning control to the application. 
-%Because \libipc{} is designed to be fast and non-blocking, message passing initiators will soon receive the response.
+由\libipc {}注册的信号处理程序首先确定进程是执行application还是\libipc {}代码。 \libipc {}在库的入口和出口处设置和清除标志。如果信号处理程序发现进程在\libipc 中，它什么也不做，\libipc {}将在将控制权返回给应用程序之前处理该事件。否则，在将控制权返回给应用程序之前，信号处理程序会立即处理从紧急队列到监视器的消息。
+因为\libipc {}被设计为快速且无阻塞，所以消息传递启动器很快就会收到响应。
 
-\parab{Challenge 3: enable multiple threads time-share a core.}
-%When an application calls non-blocking socket operations, \libipc{} polls the ring buffers and returns immediately.
-For blocking operations (e.g., blocking recv, connect and epoll\_wait), \libipc{} first polls the ring buffers once. If the operation is not completed, rather than polling infinitely, \libipc{} calls \textit{sched\_yield} to yield to other processes on the same core. %As stated in Sec.~\ref{socksdirect:subsec:bottleneck}, context switch in cooperative multitasking only takes 0.4~$\mu$s. However, an application may wait a long time for an external event, making frequent wake-ups wasteful. In this regard, we count consecutive wake-ups which does not process any message, and puts the process to sleep when this reaches a threshold. 
-If \libipc{} continues to yield for a certain number of rounds, it will put itself into sleep. Before sleeping, it sends a message to the monitor and all peers, so they can wake it up later through a message.
+\textbf {挑战3:让多个线程分时核心。}
+对于阻塞操作（例如，阻塞recv，connect和epoll\_wait），\libipc {}首先轮询环形缓冲区一次。如果操作没有完成，而不是无限轮询，\libipc {}调用\textit {sched \_yield}以产生同一核心上的其他进程。如章节 \ref {socksdirect:subsec:bottleneck}中所述，协同多任务处理中的上下文切换仅需要0.4~$\mu$s。但是，应用程序可能需要等待很长时间才能进行外部事件，从而导致频繁的唤醒浪费。在这方面，我们计算连续唤醒，它不处理任何消息，并在达到阈值时将进程置于休眠状态。
+如果\libipc {}继续产生一定数量的轮次，它将使自己进入睡眠状态。在睡眠之前，它会向监视器和所有对等方发送消息，以便稍后通过消息将其唤醒。
 
-%\parab{Handling events from kernel.}
+%\textbf{Handling events from kernel.}
 %An application often needs to poll kernel FDs (\textit{e.g.} files and semaphores) together with socket FDs.
 %\libipc{} creates a per-process \textit{epoll thread} to poll kernel FDs for all application threads. When it receives a kernel event, it broadcasts the event to application threads via shared memory queues.%\texttt{Epoll\_wait} in \libipc{} will return such kernel events in addition to socket events. Note that Linux allows an event to be received by multiple threads sharing the FD.
 
-%\parab{Exit.}
+%\textbf{Exit.}
 %When a process exits, the \texttt{atexit} handler of \libipc{} notifies the monitor and all peers to close connections and mark the queues as dead. However, a process may crash or get killed. In this case, monitor detects process death via \texttt{SIGHUP} of the bootstrap socket (Sec.~\ref{socksdirect:subsubsec:fork_fork}) and notify its peers. When a process switches to \texttt{daemon} mode or \texttt{execve} another program, it first follows the process exit procedure, then calls the system call. After that, \libipc{} is re-initialized.
 
 
-\subsection{Connection Management}
+\subsection{连接管理}
 \label{socksdirect:subsec:connection-management}
 
 %Before designing the connection management protocol, we keep the following requirements in mind:
@@ -241,88 +223,77 @@ If \libipc{} continues to yield for a certain number of rounds, it will put itse
 \end{figure}
 
 
-\subsubsection{FD Remapping Table}
+\subsubsection{FD 重映射表}
 \label{socksdirect:subsubsec:fd-remapping-table}
-\quad
 
 
-%\parab{Initialization.}
-%During initialization, \libipc{} connects to the monitor in local host via \emph{bootstrap socket} (a Unix domain socket or kernel TCP socket on localhost or overlay network) and establishes a shared memory queue between them.
-%After that, communication between the application and monitor goes through the shared memory queue.
 
-%\parab{Socket creation.}
-%An application first creates a socket identified by an integer \emph{file descriptor} (FD).
-Socket FDs and other FDs (e.g. disk files) share a namespace and Linux always allocates the lowest available FD.
-To preserve this semantics without allocating dummy FDs in the kernel, \libipc{} intercepts all FD-related Linux APIs and maintains an \emph{FD remapping table} to map each application FD to a user-space socket object or a kernel FD.
-When an FD is closed, \libipc{} put it to an \emph{FD recycle pool}.
-Upon FD allocation, \libipc{} first tries to obtain an FD from the pool.
-If the pool is empty, it allocates a new FD by incrementing an \emph{FD allocation counter}.
-The FD recycle pool and allocation counter are shared among all threads in a process.% and allow wait-free access with atomic operations.
+套接字FD和其他FD（例如磁盘文件）共享命名空间，Linux总是分配最低可用FD。
+为了保留这种语义而不在内核中分配虚拟FD，\libipc {}拦截所有与FD相关的Linux API并维护\emph {FD重映射表}以将每个应用FD映射到用户空间套接字对象或内核FD。
+当FD关闭时，\libipc {}将其放入\emph {FD回收池}。
+在FD分配时，\libipc {}首先尝试从池中获取FD。
+如果池为空，则通过递增\emph {FD分配计数器}来分配新的FD。
+FD回收池和分配计数器在进程中的所有线程之间共享。
 
-\subsubsection{Connection Establishment.}
-\quad
-
-Figure~\ref{socksdirect:fig:conn-setup} shows the connection establishment procedure.
-
-\parab{Bind.}
-After socket creation, the application calls \texttt{bind} to allocate address and port.
-Because addresses and ports are global resources with permission protection, the allocation is coordinated by the monitor.
-As shown in Figure~\ref{socksdirect:fig:conn-setup}, \libipc{} sends the request to monitor.
-To hide the latency of contacting monitor, \libipc{} returns to application immediately if the bind request would not fail, e.g., when port is not specified for client-side sockets.
-
-\parab{Listen.}
-When a server application is ready to accept connections from clients, it calls \texttt{listen} and notifies the monitor.
-The monitor maintains a list of listening processes on each address and port to dispatch new connections.
+\subsubsection{连接建立}
 
 
-\parab{Connect.}
-A client application calls \texttt{connect} and sends a SYN command to monitor via SHM queue.
-%The monitor forwards the SYN to the target server application.
-%If it is in the same host, forward the SYN to it directly.
-%\parab{Dispatch new connections to listeners.}
-Now the monitor needs to dispatch the new connection to a listening application.
-In Linux, new connection requests are queued in a \emph{backlog} in the kernel.
-Every time the server application calls \texttt{accept}, it accesses the kernel to dequeue from the backlog, which requires synchronization and adds latency.
-In contrast, we maintain a per-listener backlog for every thread that listens on the socket.
-The monitor distributes SYN to a listener thread in round-robin manner.
+图 \ref {socksdirect:fig:conn-setup}显示了连接建立过程。
 
-Dispatching connection to listeners may lead to starvation when a listener does not accept new connections.
-We devise a \emph{work stealing} approach.
-When a listener invokes \texttt{accept} while the backlog is empty, it requests the monitor to steal from others' backlog.
-%To avoid polling empty backlogs, each listener notifies the monitor when its backlog becomes empty.
-To avoid contention between a listener and monitor, the monitor sends a request to the listener to steal from the backlog.
+\textbf{绑定。}
+创建套接字后，应用程序调用\texttt {bind}来分配地址和端口。
+由于地址和端口是具有权限保护的全局资源，因此分配由监视器协调。
+如图 \ref {socksdirect:fig:conn-setup}所示，\libipc {}将请求发送到监视器。
+为了隐藏联系监视器的延迟，如果绑定请求不会失败，\libipc {}会立即返回应用程序，例如，当没有为客户端套接字指定端口时。
 
-\parab{Establish a peer-to-peer queue.}
-The first time a client and a server application communicates, the server monitor helps them establish a direct connection.
-For intra-host, the monitor allocates a SHM queue and sends the SHM key to both client and server applications.
-For inter-host, the client and server monitors establish a new RDMA QP, and send the local and remote keys to the corresponding applications.
-To reduce latency, the peer-to-peer queue is established by monitor(s) when the SYN command is distributed into a listener's backlog.
-However, if the SYN is stolen by another listener, a new queue needs to be established between client and the new listener, as shown in the Wait-Server state of Figure~\ref{socksdirect:fig:conn-setup}.
-
-\parab{Finalize connection setup.}
-After the server sets up peer-to-peer queue, as the left side of Figure~\ref{socksdirect:fig:conn-setup} shows, the server application sends an ACK to client. The ACK contains the client FD in SYN request and its allocated server FD.
-Similar to TCP handshake, the server application can send data to the queue after sending the ACK.
-When the client receives the ACK, as shown on the right side of Figure~\ref{socksdirect:fig:conn-setup}, it sets up the FD mapping and can start sending data.
+\textbf{监听。}
+当服务器应用程序准备好接受来自客户端的连接时，它会调用\texttt {listen}并通知监视器。
+监视器维护每个地址和端口上的侦听进程列表，以分派新连接。
 
 
-\subsubsection{Compatibility with Regular TCP/IP Peers}
-\quad
+\textbf{连接。}
+客户端应用程序调用\texttt {connect}并发送SYN命令以通过SHM队列进行监视。
+现在，监视器需要将新连接分派给侦听应用程序。
+在Linux中，新的连接请求在内核的\emph {backlog}中排队。
+每次服务器应用程序调用\texttt {accept}时，它都会访问内核以从积压中出列，这需要同步并增加延迟。
+相反，我们为每个侦听套接字的线程维护一个每个监听器的积压。
+监视器以循环方式将SYN分发给侦听器线程。
 
-To be compatible with peers that do not support \sys{} and RDMA, we need to detect \sys{} capability and fall back to TCP/IP.
-However, Linux does not support adding special options to TCP SYN and ACK packets.
-Using another port (e.g. LibVMA~\cite{libvma}) is also unreliable due to middleboxes and network reordering.
-To this end, we first use kernel raw socket to directly send SYN and ACK packets with a special option, then fall back to kernel TCP/IP socket if the special option is not present.
+当侦听器不接受新连接时，调度与侦听器的连接可能会导致饥饿。
+我们设计了一种\emph {work stealing}方法。
+当监听器在积压为空时调用\texttt {accept}时，它会请求监视器窃取其他人的积压。
+为了避免侦听器和监视器之间的争用，监视器向侦听器发送请求以从积压中窃取。
 
-On client side, the monitor sends a TCP SYN packet with a special option over the network.
-If the peer is \sys{} capable, its monitor would receive the special SYN and know the client is \sys{} capable.
-The server then responds SYN+ACK with special option, including credentials to setup an RDMA connection, so that the two monitors can communicate through RDMA afterwards.
-If either the client or the server monitor finds out that the peer is a regular TCP/IP host, it creates an established TCP connection in kernel using TCP connection repair~\cite{tcp-connection-repair}.
-Then the monitor sends the kernel FD to the application via Unix domain socket, and \libipc{} can use the kernel FD for future socket operations.
+\textbf {建立点对点队列。}
+客户端和服务器应用程序第一次通信时，服务器监视器可帮助它们建立直接连接。
+对于主机内部，监视器分配SHM队列并将SHM密钥发送到客户端和服务器应用程序。
+对于主机间，客户端和服务器监视器建立新的RDMA QP，并将本地和远程密钥发送到相应的应用程序。
+为了减少延迟，当SYN命令分发到监听器的待办事项时，监视器会建立对等队列。
+但是，如果SYN被另一个侦听器窃取，则需要在客户端和新侦听器之间建立新队列，如图 \ref {socksdirect:fig:conn-setup}中的Wait-Server状态所示。
+
+\textbf {连接建立的最后步骤。}
+服务器设置对等队列后，如图 \ref {socksdirect:fig:conn-setup}左侧所示，服务器应用程序向客户端发送ACK。 ACK包含SYN请求中的客户端FD及其分配的服务器FD。
+与TCP握手类似，服务器应用程序可以在发送ACK后将数据发送到队列。
+当客户端收到ACK时，如图 \ref {socksdirect:fig:conn-setup}右侧所示，它设置FD映射并可以开始发送数据。
 
 
-A tricky thing is that received packets are delivered to both the raw socket and kernel networking stack, and the kernel will respond with RST because such connection does not exist.
-To avoid this behavior, the monitor installs \emph{iptables} rules to filter such outbound RST packets.
+\subsubsection{与常规 TCP/IP 对端的兼容性}
 
+
+为了与不支持\sys {}和RDMA的对等端兼容，我们需要检测\sys {}功能并回退到TCP / IP。
+但是，Linux不支持向TCP SYN和ACK数据包添加特殊选项。
+由于中间盒和网络重新排序，使用另一个端口（例如LibVMA~ \cite {libvma}）也是不可靠的。
+为此，我们首先使用内核原始套接字直接发送带有特殊选项的SYN和ACK数据包，如果不存在特殊选项，则回退到内核TCP / IP套接字。
+
+在客户端，监视器通过网络发送带有特殊选项的TCP SYN数据包。
+如果对等体具有\sys {}能力，则其监视器将接收特殊SYN并且知道客户端具有\sys {}能力。
+然后，服务器使用特殊选项响应SYN + ACK，包括设置RDMA连接的凭据，以便两个监视器之后可以通过RDMA进行通信。
+如果客户端或服务器监视器发现对等方是常规TCP / IP主机，它将使用TCP连接修复 \cite {tcp-connection-repair}在内核中创建已建立的TCP连接。
+然后监视器通过Unix域套接字将内核FD发送到应用程序，\libipc {}可以使用内核FD进行未来的套接字操作。
+
+
+一个棘手的问题是接收的数据包被传递到原始套接字和内核网络堆栈，并且内核将使用RST响应，因为这样的连接不存在。
+为避免此行为，监视器会安装\emph {iptables}规则来过滤此类出站RST数据包。
 
 %\begin{figure}[t!]
 %	\centering
@@ -333,28 +304,28 @@ To avoid this behavior, the monitor installs \emph{iptables} rules to filter suc
 %\end{figure}
 
 
-\subsubsection{Connection Teardown}
-\quad
+\subsubsection{连接关闭}
 
-\libipc{} deletes an FD from remapping table when the application calls \texttt{close}.
-However, the socket data may be still useful because the FD may be shared to other processes, and there may be unsent data in the buffer.
-We track a reference count for each socket, which is incremented on fork and decremented on close.
-To push out unsent data, we require a handshake between peers, similar to TCP close.
-Because socket is bidirectional, \texttt{close} is equivalent to \texttt{shutdown} on both send and receive directions.
-When application shuts down one direction of a connection, it sends a \emph{shutdown message} to the peer.
-The peer responds with a shutdown message.
-A socket is deleted when \libipc{} receives shutdown messages in both directions.
 
+
+当应用程序调用\texttt {close}时，\libipc {}会从重映射表中删除FD。
+然而，套接字数据可能仍然有用，因为FD可以与其他进程共享，并且缓冲区中可能存在未发送的数据。
+我们跟踪每个套接字的引用计数，它在fork上递增，在close时递减。
+为了推出未发送的数据，我们需要在对等体之间进行握手，类似于TCP close。
+因为套接字是双向的，所以\texttt {close}在发送和接收方向上相当于\texttt {shutdown}。
+当应用程序关闭连接的一个方向时，它会向对等方发送\emph {shutdown message}。
+对等体以关闭消息响应。
+当\libipc {}在两个方向上收到关闭消息时，将删除套接字。
 
 
 \iffalse
 
-\parab{\texttt{Bind} and \texttt{listen}.}
+\textbf{\texttt{Bind} and \texttt{listen}.}
 A \emph{server} process \texttt{bind}s a socket and needs to detect IP and port conflict. In this case, \texttt{bind} is non-partitionable and goes to the monitor. The monitor also listens on the IP and port in a user-space TCP/IP stack (\textit{e.g.} mTCP~\cite{jeong2014mtcp}, LibVMA~\cite{libvma} or Seastar~\cite{seastar}) to receive connections from other hosts.
 
 A \emph{client} process typically \texttt{bind}s without specifying IP and port, so we need to allocate a unique IP and port for it. For scalability, we partition the loopback IP address space (127.0.0.0/8) and each process allocates IP and port in its range.
 
-\parab{\texttt{Connect} and \texttt{accept}.}
+\textbf{\texttt{Connect} and \texttt{accept}.}
 When a client process connects to a server process on the same host, it sends a \textit{connect request} to the monitor via shared memory queue. When the server process is on another host, it creates a \textit{bootstrap TCP socket} with a special option via the user-space TCP/IP stack. If the server host supports the option, it is a \sys host and its monitor establishes an RDMA connection to the client to speedup later communications. Otherwise, the client process keeps using the bootstrap TCP socket for compatibility.
 
 On a server host, the monitor distributes connect requests to server processes in a round-robin order, and a \textit{backlog} is maintained in each process. If the client is TCP only, the monitor proxies messages between the server process and the user-space TCP/IP stack. If the client is intra-server or RDMA capable, and it is the first time for the client and server processes to communicate, the monitor creates an inter-process queue for the process pair and sends the credentials to both processes via bootstrap sockets. After a server process \texttt{accept}s a connection in the backlog, it sends a message to the client via inter-process queue to create an FD mapping, then the socket is ready for data transmission. As Figure~\ref{socksdirect:fig:conn-setup} shows, connection creation takes three inter-process delays.
@@ -363,7 +334,7 @@ Distributing connection to listeners may lead to starvation when a listener does
 
 %\subsubsection{Connection Close}
 
-\parab{\texttt{Close} and \texttt{shutdown}.}
+\textbf{\texttt{Close} and \texttt{shutdown}.}
 Connection close is a peer-to-peer operation because only the peer process needs to be notified. If FD is deleted immediately after \texttt{close}, a new connection may reuse the FD while the peer process might not yet have received the close event thus sends data to the wrong connection. To avoid this, we require a handshake between peers.
 Because socket is bidirectional, \texttt{close} is equivalent to \texttt{shutdown} on both send and receive directions.
 When application shuts down one direction of a connection, it sends a \textit{shutdown message} to the peer. The peer responds with a shutdown message. A process deletes an FD when it receives shutdown messages in both directions.

@@ -1,10 +1,10 @@
-\section{Conclusion}
+\section{小结}
 \label{socksdirect:sec:conclusion}
 
-\sys{} is a Linux compatible and high performance user-space socket system.
-We design a per-host monitor daemon for trusted control plane;
-a peer-to-peer synchronization-free data plane to fully support fork and multi-thread socket sharing;
-and a ring buffer that utilizes shared memory and RDMA efficiently.
-\sys{} achieves performance close to hardware limits and improves end-to-end performance of real-world applications.
+\sys {}是Linux兼容的高性能用户空间套接字系统。
+我们为可信控制平面设计了一个每主机监控守护进程;
+一个点对点无同步数据平面，完全支持fork和多线程套接字共享;
+和一个有效利用共享内存和RDMA的环形缓冲区。
+\sys {}实现了接近硬件限制的性能，并提高了实际应用程序的端到端性能。
 
 %\sys is a high performance user-space socket architecture that is compatible with existing applications and preserves isolation among processes, while being scalable to multiple cores and many concurrent connections. We carefully remove all major overheads in Linux socket.%\sys can significant reduce communication overhead, especially in a service oriented distributed system environment. 
