@@ -200,7 +200,15 @@ Rack Level Computing
 
 
 
-\section{可重构硬件在数据中心的部署与挑战}
+\section{可编程网卡在数据中心的部署}
+
+\subsection{可编程网卡的架构}
+
+两种架构：FPGA / SoC（NP）
+
+Mellanox 等公司的产品（NP）
+
+\subsection{FPGA 可编程网卡在微软 Azure 云的部署}
 
 
 一、数据中心系统原语的性能瓶颈
@@ -350,5 +358,13 @@ FPGA（SmartNIC）对每个虚拟机虚拟出一块网卡，虚拟机通过 SR-I
 
 
 
+\subsection{可编程网卡在亚马逊、阿里、腾讯、华为等云服务的部署}
 
+亚马逊：Nitro project，FPGA 和 ASIC 的选择，最终到ASIC（mid 2018，C5 VM + bare metal cloud）
 
+阿里：ASIC SoC（神龙 MOC），《阿里云开发智能网卡的动机》，2018；《阿里云弹性裸金属服务器-神龙架构（X-Dragon）揭秘》，2018
+
+腾讯：FPGA，bare metal cloud，APNet 2018，Towards Converged SmartNIC Architecture
+for Bare Metal \& Public Clouds
+
+华为：ASIC SoC，《华为发布智能加速引擎部件，全面加速企业应用》，2018；C3ne 官方主页
