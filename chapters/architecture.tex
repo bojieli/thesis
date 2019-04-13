@@ -6,15 +6,15 @@
 
 \section{网络、存储节点的硬件加速}
 
-位置：存储、网关等节点。CPU bypass（控制面数据面分离，数据面 offload，控制面仍在 CPU 上）
+位置：存储、网关等节点。CPU bypass（控制面数据面分离，数据面 offload，控制面仍在 CPU 上）s
 
 \subsection{网络数据包处理}
 
 直接处理网络数据包，数据面无需经过 CPU（ClickNP NF offload）。
 
-\subsection{访问内存数据结构和存储设备}
+\subsection{访问内存和闪存中的数据结构}
 
-直接访问远程硬件资源，而无需经过远程机器的 CPU （KV-Direct内存数据结构的服务器端，还可以访问 SSD）。
+直接访问远程硬件资源，而无需经过远程机器的 CPU （KV-Direct内存数据结构的服务器端，还可以访问闪存（SSD）记录日志后直接返回 ACK，缩短处理延迟）。
 
 \section{计算节点的硬件加速}
 
