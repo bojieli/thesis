@@ -4,42 +4,65 @@
 
 画一个数据中心架构图，包括存储、网关等节点，计算节点（包括 hypervisor 和客户虚拟机）。
 
-\section{网络、存储节点的硬件加速}
+\section{计算节点}
 
-位置：存储、网关等节点。CPU bypass（控制面数据面分离，数据面 offload，控制面仍在 CPU 上）s
+位置：计算节点（客户虚拟机所在的服务器）。
 
-\subsection{网络数据包处理}
+\subsection{虚拟化}
 
-直接处理网络数据包，数据面无需经过 CPU（ClickNP NF offload）。
+虚拟机监控器（hypervisor）：硬件的一虚多、多虚一。
 
-\subsection{访问内存和闪存中的数据结构}
-
-直接访问远程硬件资源，而无需经过远程机器的 CPU （KV-Direct内存数据结构的服务器端，还可以访问闪存（SSD）记录日志后直接返回 ACK，缩短处理延迟）。
-
-\section{计算节点的硬件加速}
-
-位置：计算节点（客户虚拟机所在的服务器）。虚拟机监控器（hypervisor）：硬件的一虚多、多虚一；操作系统：高层抽象。
-
-\subsection{一虚多}
+\subsubsection{一虚多}
 
 可编程网卡把主机内的硬件资源虚拟化成多个逻辑资源，实现外部机器和本地虚拟机的多路复用（ClickNP 硬件网卡虚拟化为多个租户的 VPC，SocksDirect 容器网络，即 vSwitch data-plane offload）。
 
-\subsection{多虚一}
+\subsubsection{多虚一}
 
 可编程网卡把数据中心内物理上分散的资源虚拟化成一个逻辑资源（ClickNP VPC 和 SocksDirect 容器网络，KV-Direct 分布式存储的客户端，还可以做 storage 和 memory 的 disaggregation）。
 
 \subsection{高层抽象}
 
-OS kernel 给应用程序提供的抽象可以重构为（控制面）协调和管理（仍在内核或用户态 daemon） + （数据面）用户态 library 负责高层抽象 + （数据面）可编程网卡负责多路复用、调度唤醒和可靠传输等低层语义，需要思考数据面上软硬件的接口（SocksDirect）。
+操作系统和共享运行库：高层抽象。
 
-\section{可编程网卡的硬件编程}
+\subsubsection{操作系统原语}
 
-可编程网卡承担这么多功能，需要高度灵活性。
+OS kernel 给应用程序提供的高层抽象可以重构为（控制面）协调和管理（仍在内核或用户态 daemon） + （数据面）用户态 library 负责高层抽象 + （数据面）可编程网卡负责多路复用、调度唤醒和可靠传输等低层语义，需要思考数据面上软硬件的接口（SocksDirect）。
 
-\subsection{FPGA 高级语言编程}
+\subsubsection{数据结构操作原语}
 
-需要适合流式处理的模块化 FPGA 高级语言编程（ClickNP 编程框架）。
+Key-value 为例。
 
-\subsection{硬件中的并发事务处理}
+\section{网络、存储节点}
 
-与软件不同。简化：事务的依赖性可以事先判断。KV-Direct 有依赖请求的并发执行框架。
+位置：存储、网关等节点。CPU bypass（控制面数据面分离，数据面 offload，控制面仍在 CPU 上）
+
+\subsection{网络功能卸载}
+
+直接处理网络数据包并直接返回，数据面无需经过 CPU（ClickNP NF offload）。
+
+\subsection{网卡直接访问内存数据结构}
+
+直接访问远程硬件资源，而无需经过远程机器的 CPU （KV-Direct内存数据结构的服务器端，还可以访问闪存（SSD）记录日志后直接返回 ACK，缩短处理延迟）。
+
+
+\section{可编程网卡}
+
+\subsection{硬件架构}
+
+可编程网卡需要高度灵活性。为什么要 FPGA + CPU + ASIC SoC。回应第二章。
+
+\textbf{图1: 网卡 SoC 结构图}
+
+\subsection{高级语言编程框架}
+
+FPGA 高级语言编程：ClickNP，适合流式处理的模块化 FPGA 高级语言编程
+
+\subsection{基础服务中间件}
+
+有状态处理（stateful processing）、数据结构、可扩放 RDMA
+
+本文使用高级语言编程框架实现基础服务中间件，中间件未来可以硬件化。
+
+\subsection{上层应用}
+
+内存键值存储、持久化键值存储、网络功能
