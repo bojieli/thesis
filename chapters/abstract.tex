@@ -1,6 +1,16 @@
 % !TeX root = ../main.tex
 
 \begin{abstract}
+随着云计算的兴起和通用处理器性能提升的放缓，基于FPGA的可编程网卡在数据中心被广泛部署。本论文旨在探索基于可编程网卡的高性能数据中心系统。
+
+首先，我们提出用可编程网卡加速云计算中的虚拟网络功能。为了简化FPGA编程，提出了首个适用于高速网络数据包处理、基于高级语言的模块化FPGA编程框架ClickNP。基于ClickNP设计和实现了多个网络功能，相比基于CPU的传统实现，吞吐量提高了10倍，延迟降低到1/10，为云计算中的每个计算节点节约了1/5的CPU核。
+
+其次，我们提出用可编程网卡加速远程数据结构访问。键值存储是最常用的基本数据结构之一。设计实现了一个高性能内存键值存储系统KV-Direct，在服务器端绕过CPU，用可编程网卡通过PCIe直接访问主机内存。通过一系列性能优化，实现了10倍于CPU的能耗效率和微秒级的延迟，是首个单机性能达到10亿次每秒的通用键值存储系统。
+
+最后，我们提出用可编程网卡和用户态运行库相结合的方法为应用程序提供系统原语，从而绕过操作系统内核。套接字是最常用的通信原语。设计实现了一个用户态套接字系统SocksDirect，与现有应用程序完全兼容，并能实现接近硬件极限的吞吐量和延迟。解决了长期以来通用协议栈性能较低、专用协议栈兼容性较差的矛盾。
+
+\textbf{TODO: 摘要增加字数，800 - 1000 字}
+
   摘要是论文内容的总结概括，应简要说明论文的研究目的、基本研究内容、 研究方法或
   过程、结果和结论，突出论文的创新之处。摘要中不宜使用公式、图表，不引用文献。
   博士论文中文摘要一般800～1000个汉字，硕士论文中文摘要一般600个汉字。英文摘要的
@@ -9,10 +19,13 @@
   关键词另起一行并隔写在摘要下方，一般3～8个词，中文关键词间空一字或用分号“；”隔
   开。英文摘要的关键词与中文摘要的关键词应完全一致，中间用逗号“,”或分号“;”隔开。
 
-  \keywords{中国科学技术大学；学位论文；\LaTeX{} 模板；学士；硕士；博士}
+  \keywords{数据中心；可编程网卡；现场可编程门阵列；网络功能虚拟化；键值存储；网络协议栈}
 \end{abstract}
 
 \begin{enabstract}
+	
+\textbf{TODO: 摘要翻译成英文}
+
   This is a sample document of USTC thesis \LaTeX{} template for bachelor,
   master and doctor. The template is created by zepinglee and seisman, which
   orignate from the template created by ywg. The template meets the
@@ -22,6 +35,5 @@
   some features provided by the template. For more information, please refer to
   the template document ustcthesis.pdf.
 
-  \enkeywords{University of Science and Technology of China (USTC); Thesis;
-  \LaTeX{} Template; Bachelor; Master; PhD}
+  \enkeywords{Data Center; Programmable NIC; FPGA; Network Function Virtualization; Key-Value Store; Networking Stack}
 \end{enabstract}
