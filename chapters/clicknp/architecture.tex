@@ -8,10 +8,8 @@
 \begin{figure}
 \centering
 \includegraphics[width=.8\textwidth]{clicknp-arch.pdf}
-
 \caption{ClickNP 架构。}
 \label{clicknp:fig:clicknp}
-
 \end{figure}
 
 图 \ref{clicknp:fig:clicknp} 显示了 \name 的体系结构。
@@ -20,11 +18,11 @@
 \name FPGA程序合成为 Catapult \textit {role}。
 但是，由于\name 依赖于商品HLS工具链来生成FPGA HDL，并且不同的工具可以为shell管理的资源生成自己的（和不同的）接口，我们需要一个名为\textit {HLS-的垫片层特定运行时}，用于执行HLS特定接口与shell接口之间的转换。
 
-\name host 进程通过 \name library与 \name role 进行通信，这进一步依赖于 Catapult PCIe 驱动程序中的服务与FPGA硬件进行交互。
-\name library 实现了两个重要的功能：
-（1）它暴露了一个PCIe通道API，以实现 \name host进程和角色之间的高速和低延迟通信;
+\name{} host 进程通过 \name{} library与 \name{} role 进行通信，这进一步依赖于 Catapult PCIe 驱动程序中的服务与FPGA硬件进行交互。
+\name{} library 实现了两个重要的功能：
+（1）它暴露了一个PCIe通道API，以实现 \name{} host进程和角色之间的高速和低延迟通信;
 （2）它调用几个HLS特定库将初始参数传递给角色中的模块，并控制这些模块的启动/停止/复位。
-\name host进程有一个管理器线程和零个或多个工作线程。
+\name{} host进程有一个管理器线程和零个或多个工作线程。
 管理器线程将FPGA映像加载到硬件中，启动工作线程，根据配置初始化FPGA和CPU中的\name elements，并通过在运行时向元素发送\textit {signals}来控制它们的行为。
 如果将每个工作线程分配给CPU，则每个工作线程可以处理一个或多个模块。
 
@@ -32,13 +30,20 @@
 
 \subsubsection{抽象}
 
-\name 提供模块化架构，基本处理模块称为\textit{元件}。
-\name 元件具有以下属性：
+\name 提供模块化架构，基本处理模块称为\textit{元件}（element）。
+如图 \ref{clicknp:fig:element_arch} 所示，\name 元件具有以下属性：
 \begin{itemize}
 \item 本地状态。 每个元素都可以定义一组只能在元素内部访问的局部变量。
 \item 输入和输出端口。 元素可以具有任意数量的输入或输出端口。
 \item 处理程序功能。 元素有三个处理函数：（1）初始化处理程序，在元素启动时调用一次，（2）处理处理程序，连续调用以检查输入端口和处理可用数据，以及（3）信号处理程序 ，它从主机程序中的管理器线程接收和处理命令（\textit {信号}）。
 \end{itemize}
+
+\begin{figure}
+\centering
+\includegraphics[width=.6\textwidth]{element_arch.pdf}
+\caption{ClickNP 元件的构成。}
+\label{clicknp:fig:element_arch}
+\end{figure}
 
 元素的输出端口可以通过\textit {channel}连接到另一个元素的输入端口，如图\ref {clicknp:fig:element}（a）所示。
 在 \name 中，通道基本上是一个FIFO缓冲区，写入一端并从另一端读取。

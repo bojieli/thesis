@@ -1,3 +1,4 @@
+%!TEX root=main.tex
 \section{背景}
 \label{kvdirect:sec:background}
 
@@ -44,38 +45,14 @@ When pushed to the limit, in high performance KVS systems the throughput bottlen
 
 KVS needs to spend CPU cycles for key comparison and hash slot computation. Moreover, KVS hash table is orders of magnitude larger than the CPU cache, therefore the memory access latency is dominated by cache miss latency for practical access patterns.
 
-\begin{figure}[t]
-\centering
-\subfloat[Single core.\label{kvdirect:fig:cpu-mem-single}]
-{\includegraphics[width=.25\textwidth,page=1]{cpu_random_mem_single_core.pdf}}
-\subfloat[Multiple cores.\label{kvdirect:fig:cpu-mem-multi}]
-{\includegraphics[width=.25\textwidth,page=1]{cpu_random_mem_multi_core.pdf}}
-\caption{CPU random memory access performance.}
-\label{kvdirect:fig:cpu-mem}
-\end{figure}
+
 
 The latency for CPU to access DRAM on the same NUMA node, \ie cache miss latency, is 80\approx90 nanoseconds on our platform (measured with~\cite{intelmemaccess}, hardware details in sec. \ref{kvdirect:sec:implementation}).
 For 64-byte access granularity, the random read latency including data copy is \approx110~ns.
 This latency can be partially hidden by the out-of-order execution engine in modern CPUs, which can issue a few memory accesses in parallel.
 However, the parallelism is limited by two factors: the number of load-store units (LSUs) per core~\emph{k} (measured to be 3\approx4 on our CPU) and the instruction window size~\emph{W} (measured to be 100\approx200 instructions on our CPU)~\cite{gharachorloo1992hiding, han2010packetshader, zhang2015mega}. When there are enough memory operations in the instruction window, \emph{k} of them can be issued simultaneously. 
 
-\begin{table}[htbp]
-\footnotesize
-\centering
-\label{kvdirect:tab:tput-unroll}
-\begin{tabular}{|c|c|c|c|c|c|c|}
-\hline
-\multirow{2}{*}{Size (B)} & \multirow{2}{*}{CalcOnly} & \multirow{2}{*}{MemOnly} & \multicolumn{4}{c|}{Calc + Mem (Batch Factor)} \\\cline{4-7} 
-  &  & & 1 & 2 & 3 & 4 \\\hline
-32 & 24.1 & 44.0 & 7.5 & 11.1 & 13.1 & 14.1 \\\hline
-64 & 11.1 & 29.3 & 5.5 & 6.7 & 7.6 & 7.9 \\\hline
-128 & 5.4 & 18.3 & 3.5 & 4.1 & 4.3 & 4.1 \\\hline
-256 & 2.7 & 13.2 & 2.1 & 2.2 & 2.2 & 2.1 \\\hline
-512 & 1.3 & 8.2 & 1.2 & 1.1 & 1.2 & 1.1 \\\hline
-\end{tabular}
-\caption{Throughput (M op/s) under different workload and payload sizes of memory access.}
-\label{kvdirect:tab:kv-cpu-throughput}
-\end{table}
+
 
 Figure~\ref{kvdirect:fig:cpu-mem} shows random memory access performances of a multicore CPU. It shows that a modern CPU core can provide fairly high random memory access throughput (27M~op/s or 1.7~GB/s for 64B granularity). Moreover, memory throughput scales linearly with number of CPU cores, indicating that the DDR main memory is not a bottleneck.
 
@@ -197,6 +174,34 @@ KV处理的特点是，最先进的高性能KVS系统基本上分为三类：
 当推到极限时，在高性能KVS系统中，吞吐量瓶颈可归因于KV操作中的计算和随机存储器访问中的延迟。
 基于CPU的KVS需要花费CPU周期来进行密钥比较和散列槽计算。
 此外，KVS散列表比CPU高速缓存大几个数量级，因此存储器访问等待时间由实际访问模式的高速缓存未命中等待时间决定。
+
+\begin{figure}[t]
+	\centering
+	\subfloat[单核。\label{kvdirect:fig:cpu-mem-single}]
+	{\includegraphics[width=.5\textwidth,page=1]{cpu_random_mem_single_core.pdf}}
+	\subfloat[多核。\label{kvdirect:fig:cpu-mem-multi}]
+	{\includegraphics[width=.5\textwidth,page=1]{cpu_random_mem_multi_core.pdf}}
+	\caption{CPU 随机内存访问性能。}
+	\label{kvdirect:fig:cpu-mem}
+\end{figure}
+
+\begin{table}[htbp]
+	\small
+	\centering
+	\label{kvdirect:tab:tput-unroll}
+	\begin{tabular}{|c|c|c|c|c|c|c|}
+		\hline
+		\multirow{2}{*}{大小（字节）} & \multirow{2}{*}{仅计算} & \multirow{2}{*}{仅访存} & \multicolumn{4}{c|}{同时计算和访存（批处理大小）} \\\cline{4-7} 
+		&  & & 1 & 2 & 3 & 4 \\\hline
+		32 & 24.1 & 44.0 & 7.5 & 11.1 & 13.1 & 14.1 \\\hline
+		64 & 11.1 & 29.3 & 5.5 & 6.7 & 7.6 & 7.9 \\\hline
+		128 & 5.4 & 18.3 & 3.5 & 4.1 & 4.3 & 4.1 \\\hline
+		256 & 2.7 & 13.2 & 2.1 & 2.2 & 2.2 & 2.1 \\\hline
+		512 & 1.3 & 8.2 & 1.2 & 1.1 & 1.2 & 1.1 \\\hline
+	\end{tabular}
+	\caption{不同工作负载和内存访问粒度下的吞吐量（百万次操作每秒）。}
+	\label{kvdirect:tab:kv-cpu-throughput}
+\end{table}
 
 通过我们的测量，当代计算机的64字节随机读取延迟大约为1~ns。当CPU内核落入指令窗口时，CPU核心可以同时发出多个内存访问指令，受核心中加载存储单元数量的限制（在我们的CPU中测量为3至4个） \cite {gharachorloo1992hiding,han2010packetshader,zhang2015mega}。在我们的CPU中，我们测量每个核心每秒最大吞吐量为29.3~M随机64B访问。另一方面，访问64字节KV对的操作通常需要大约100~ns计算或大约500条指令，这太大而不适合指令窗口（测量为100至200）。当与计算交错时，CPU内核的性能降低到每秒5.5~M KV操作（Mops）。优化是通过在一次发出内存访问之前将多个操作的计算聚类在一起来批量KV存储中的内存访问\cite {li2016full,narula2014phase}。这将我们CPU中的每核心吞吐量提高到7.9~MOps，这仍远低于主机DRAM的随机64B吞吐量。
 

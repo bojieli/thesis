@@ -2,6 +2,20 @@
 \section{引言}
 \label{socksdirect:sec:intro}
 
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{images/sys_arch.pdf}
+	\caption{本章主题：操作系统通信原语加速，用红色标出。}
+	\label{socksdirect:fig:sys-arch}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.6\textwidth]{images/sw_hw_codesign.pdf}
+	\caption{本章在可编程网卡软硬件架构中的位置。}
+	\label{socksdirect:fig:sw-hw-codesign}
+\end{figure}
+
 %Most cloud applications use the socket API for inter-process communication among components or containers inside a same server and across data center network, in addition to serving Internet users. For example, communication intensive applications (\textit{e.g.} Nginx and memcached) spend 50\%$\sim$90\% of CPU time in the OS kernel, mostly processing socket operations.
 %The overhead of Linux socket attributes to kernel crossing in system calls, context switch, process scheduling, synchronization, memory copy, cache miss and TCP transport.
 %Applications in high performance computing have a long tradition of using shared memory for intra-server communication and RDMA for inter-server, thus avoiding the overheads above.

@@ -1,6 +1,15 @@
 \section{实现}
 \label{kvdirect:sec:implementation}
 
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{figure/kvdirect_photo.jpg}
+	\caption{以 357 瓦功耗实现 12.2 亿次 KV 操作每秒的 10 卡 KV-Direct 系统。}
+	\label{kvdirect:fig:photo}
+\end{figure}
+
 我们的硬件平台基于基于英特尔Stratix V FPGA的可编程NIC（\S \ref {kvdirect:sec:programmable-nic}）。
 可编程NIC通过分叉x16物理连接器中的两个PCIe Gen3 x8链路连接到服务器，并包含4 GiB板载DRAM和一个DDR3-1600通道。
 
