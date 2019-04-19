@@ -3,6 +3,9 @@
 \label{clicknp:sec:impl}
 
 \subsection{\name 工具链和硬件实现}
+
+\textbf{图：编译生成的 OpenCL 代码示例，（1）只包含顺序和选择结构，不包含分支结构，（2）非阻塞（每个流水级有最坏时钟周期数的保证）。可以避免 handler 阻塞 signal。}
+
 我们构建了一个\name 编译器，它作为\name 工具链的前端（\S \ref {clicknp:subsec:toolchain}）。
 对于宿主程序，我们使用Visual C++作为后端。我们进一步集成了Altera OpenCL SDK（v15.1）\cite {aoc}和Xilinx Vivado HLS（v2015.4）\cite {vivado}作为FPGA程序的后端。
 \name 编译器包含4,925行C ++代码，它们解析配置文件和元素声明，在\S \ref {clicknp:sec:optimization}中执行优化，并生成特定于每个商业HLS工具的代码。
@@ -10,6 +13,8 @@
 使用Xilinx Vivado HLS时，我们将每个元素编译成IP内核，并使用AXI流来实现元素之间的连接。
 元素也可以编译为CPU二进制文件，管理器线程将为每个主机元素创建一个工作线程。
 主机和FPGA元素之间的每个连接都映射到PCIe I / O通道的\textit {插槽}（\S \ref {clicknp:subsec:pcie}）。
+
+\textbf{图：ClickNP element，channel，signal 菊花链，command hub 的示例}
 
 我们的硬件平台基于Altera Stratix V FPGA和Catapult shell \cite {putnam2014reconfigurable}。
 Catapult shell还包含一个OpenCL特定的运行时，因此\name role可以通过此运行时层与shell通信。
@@ -43,9 +48,9 @@ FPGA板具有PCIe Gen2 x8接口，4GB板载DDR内存和两个40G以太网端口�
 最后两列总结了每个元素的资源利用率。 利用率归一化为FPGA芯片的容量。
 我们可以看到大多数元素只使用少量的逻辑元素。
 这是合理的，因为大多数数据包操作都很简单。
-HashTCAM和RateLimiter具有适度的LE使用，因为这些元素具有更大的仲裁逻辑。
+HashTCAM和RateLimiter具有适度的逻辑资源使用，因为这些元素具有更大的仲裁逻辑。
 但是，BRAM的使用很大程度上依赖于元素的配置。 例如，BRAM使用率随流表中支持的条目数呈线性增长。
-总的来说，我们的FPGA芯片有足够的容量来支持包含少量元素的有意义的NF（\S \ref{clicknp:sec:application}）。
+总的来说，我们的FPGA芯片有足够的容量来支持包含少量元素的有意义的网络功能（\S \ref{clicknp:sec:application}）。
 
 
 

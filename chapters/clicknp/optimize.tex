@@ -109,7 +109,7 @@ using registers to increase the parallelism.
 我们无法同时处理具有 \textit {memory dependency}的操作，因为每个内存访问都有一个周期延迟，并且程序的语义正确性很大程度上取决于操作的顺序。
 如图 \ref {clicknp:fig:dependency}（b），\textbf {S1}和 \textbf {S2}相互依赖：\textbf {S2}必须延迟到\textbf {S1}结束 ，只有在\textbf {S2}完成后，\textbf {S1}才能对新的输入数据进行操作。
 因此，该函数将需要两个周期来处理一个数据。
-对于某些处理算法，内存依赖性可能相当复杂，但是由于 \name 的模块化体系结构，大多数元素只执行简单的任务，而\textit {读写操作}之间的内存依赖关系是我们遇到的最常见的情况，如图 \ ref{clicknp:fig:dependency}（b）所示。
+对于某些处理算法，内存依赖性可能相当复杂，但是由于 \name 的模块化体系结构，大多数元素只执行简单的任务，而\textit {读写操作}之间的内存依赖关系是我们遇到的最常见的情况，如图 \ref{clicknp:fig:dependency}（b）所示。
 
 消除此内存依赖性的一种方法是仅将数据存储在寄存器中。
 由于寄存器足够快，可以在一个周期内执行读取，计算和回写，根本就没有\textit {读写}依赖。
@@ -184,6 +184,9 @@ S2: A[idx].cnt ++;
 我们注意到上述技术可能无法解决所有内存依赖性。
 在许多情况下，它需要程序员重新考虑他们的代码，甚至改变算法，以确保他们的实现可以在FPGA中完全流水线化。
 
+
+\textbf{新内容：元件之间共享内存，存储类型标识符 global / static / register。}
+
 \egg{
 \begin{figure}
 \lstset{style=numbers}
@@ -255,6 +258,8 @@ struct hash_entry
 ClickNP编译器提供\textbf {unroll}指令来展开循环。
 虽然许多HLS工具支持循环展开已知次数的迭代，但ClickNP扩展此功能以展开循环，其循环次数未知但在程序员指定的上限之下。
 
+\textbf{提供 pragma 让程序员指定最高循环次数}
+
 其次，如果我们确定元素具有重量级和轻量级操作，我们会尝试将单个元素中的每种类型的操作分开。
 例如，要实现一个缓存，如图 \ref {clicknp:fig:unbalance}（b）所示，我们将慢“`else”分支移动到另一个元素中。
 这样，快速路径和慢速路径将异步运行。
@@ -265,6 +270,8 @@ ClickNP编译器提供\textbf {unroll}指令来展开循环。
 \textbf{讨论 async}。
 
 \textbf{更新 ClickNP 语法，端口名称}。
+
+
 
 \begin{figure}
 \lstset{style=numbers}
