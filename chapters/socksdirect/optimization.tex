@@ -97,14 +97,15 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 \end{figure}
 
 
-正如Sec .~ \ref {socksdirect:subsec:per-byte-overhead}所讨论的，零拷贝的主要挑战是维护套接字API的语义。
+正如第 \ref {socksdirect:subsec:per-byte-overhead} 节所讨论的，零拷贝的主要挑战是维护套接字API的语义。
 幸运的是，虚拟内存提供了一个间接层，许多作品利用了这种\emph {page remapping}技术。
 我们可以将物理页面从发件人的虚拟地址重新映射到接收者，而不是复制。
 Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数据页设置为写时复制。
 但是，许多应用程序经常覆盖发送缓冲区，因此写时复制机制只是将复制从\texttt {send}时间延迟到第一次覆盖时间。
 为了实现零拷贝接收，20年前，BSD~ \cite {thadani1995efficient}和Solaris~ \cite {chu1996zero}将应用缓冲区的虚拟页面重新映射到系统缓冲区的物理页面。但是，正如Table~ \ref {socksdirect:tab:operation-performance}所示，在现代CPU上，由于内核交叉和TLB刷新成本，映射一个页面的成本甚至比复制它更高。
-最近，许多高性能TCP / IP堆栈 \cite {han2012megapipe，yasukata2016stackmap}和socket-to-RDMA库 \cite {rsockets，socketsdirect}提供标准套接字API和备用零拷贝API，但它们都没有实现标准API的零拷贝。
+最近，许多高性能TCP / IP堆栈 \cite {han2012megapipe,yasukata2016stackmap}和socket-to-RDMA库 \cite {rsockets,socketsdirect}提供标准套接字API和备用零拷贝API，但它们都没有实现标准API的零拷贝。
 此外，没有现有的工作支持主机内套接字的零拷贝。
+
 
 
 %A sender may write the send buffer after non-blocking \texttt{send}, and the receiver does not know the receive buffer before \texttt{recv}.
@@ -120,7 +121,7 @@ Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数
 我们拦截\texttt {malloc}和\texttt {realloc}函数，并为具有多个4K大小的分配分配4~KiB对齐的地址，因此大多数缓冲区将与页面边界对齐，而不会浪费内存用于小分配。
 如果发送消息的大小不是4~KiB的倍数，则最后一块数据将复制到\texttt {send}和\texttt {recv}。
 
-\textbf{讨论非对齐情况:接收之后直接发送，没有读写数据}
+\textbf{讨论非对齐情况:接收之后直接发送，没有读写数据。recv 缓冲区如果不对齐，就默认不做映射，首次访问才 page fault 映射上来；recv 之后直接 send，应用程序不 touch payload 就根本不需要映射到虚拟地址空间。}
 
 %\textbf{Amortize page remapping cost.}
 

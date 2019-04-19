@@ -1,6 +1,14 @@
 \section{连接数可扩放的 RDMA 网卡实现}
 \label{socksdirect:sec:discussion}
 
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.9\textwidth]{images/scalable_rdma.pdf}	
+	\caption{基于可编程网卡的连接数可扩放 RDMA。}
+	\label{socksdirect:fig:scalable-rdma}
+\end{figure}
+
 %\textbf{Communicating with TCP/IP peers.}
 %We use a user-space networking stack to communicate with regular TCP/IP peers, but the compatibility may be limited~\cite{yasukata2016stackmap}.
 %To solve this problem, after receiving the TCP SYN+ACK, the monitor can create an established kernel TCP connection using TCP connection repair~\cite{tcp-connection-repair}.
