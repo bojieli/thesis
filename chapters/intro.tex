@@ -39,33 +39,22 @@
 
 \subsection{优化软件}
 
-为了支持虚拟网络，云服务商部署了软件实现的虚拟交换机，如微软的 VFP \cite{firestone2017vfp} 和谷歌的 Andromeda \cite{andromeda}。
-为了支持网络功能，云服务商还部署了软件实现的虚拟网络功能。例如，Ananta \cite {ananta} 是一个部署在微软数据中心的软件负载均衡器，用于提供云规模的负载均衡服务。
+虚拟网络通常用虚拟交换机软件实现，如 Open vSwitch \cite{pfaff2015design}。
+为了提高虚拟网络的性能，并满足可编程性要求，云服务商重新设计了软件虚拟交换机，如微软的 VFP \cite{firestone2017vfp} 和谷歌的 Andromeda \cite{andromeda}。
+通过利用 DPDK \cite{dpdk} 等高速网络处理包技术，并使用轮询模式运行 CPU 核，我们可以绕过 OS 网络协议栈来显著降低数据包处理成本。
+%SoftNIC \cite{han2015softnic} 提出用软件实现网卡中固化的功能以提高灵活性。
+但是，即使是不做任何处理的简单网络数据包转发，每个 CPU 核每秒也只能处理 10 M 至 20 M 个数据包 \cite{martins2014clickos,netbricks}，对于 60 M 个数据包每秒的 40 Gbps 线速，仍然需要 3 至 6 个 CPU 核。
 
+为了支持灵活的网络功能，云服务商还部署了软件实现的虚拟网络功能。例如，Ananta \cite {ananta} 是一个部署在微软数据中心的软件负载均衡器，用于提供云规模的负载均衡服务。
+为了在一台服务器上支持多种网络功能，RouteBricks \cite {routebricks}、xOMB \cite{anderson2012xomb} 和 COMB \cite{comb} 采用 Click 模块化路由器 \cite{kohler2000click} 的编程模型，把每个网络功能实现成一个 C++ 的类，让每个数据包在一个 CPU 核上依次被各个网络功能处理，即所谓 ``运行到结束（run-to-completion）'' 模型。
+这些工作表明，在实际网络功能下，基于多核 x86 CPU 的每台服务器转发数据包的速度可达 10 Gbps，并且可以通过多核和搭建更多网络节点的集群来扩展容量。
+为了实现网络功能之间的隔离，NetVM \cite{hwang2015netvm}、ClickOS \cite{martins2014clickos}、HyperSwitch \cite{ram2013hyper}、mSwitch \cite{eisenbud2016maglev} 等工作把每个网络功能放在一个（轻量级）虚拟机里，并让虚拟交换机把数据包依次分发给这些虚拟机处理，即所谓 ``流水线'' 模型。
+流水线模型中，数据包在多核之间反复传递，开销较高。
+NetBricks \cite{netbricks} 回到了 ``运行到结束'' 模型，但用高级语言实现网络功能，并在编译器和运行框架的层面上保证网络功能之间的隔离性。
+NFP \cite{sun2017nfp} 利用多个并行的网络功能流水线提高数据包处理的性能。
 
-基于软件的数据包转发 \cite {routebricks,Egi:2008:THP:1544012.1544032}。
-他们表明，多核x86 CPU可以以每服务器10Gbps的速度转发数据包，并且可以通过集群更多服务器来扩展容量。
-最近，许多系统被设计用于实现各种类型的网络功能 \cite {comb,Greenhalgh:2009:FPR:1517480.1517484,martins2014clickos}。
-同样，所有这些系统都利用CPU中的多核并行性来实现每台机器接近10Gbps的吞吐量，并在需要更高容量时向外扩展以使用更多机器。
-
-
-
-我们仍然根据我们仅使用主机内核运行我们的SDN堆栈的原始策略来评估所有选项，特别是像DPDK \cite{dpdk} 这样的技术表明我们可以通过绕过OS网络堆栈来显着降低数据包处理成本 并在轮询模式下运行核心。 考虑到我们无法使ASIC满足我们的可编程性要求，这个选项击败了ASIC，但是如第3节所述，将内核烧录到VM托管成本的成本和性能开销足够高，即使是效率低下的多核SoC也是如此 更好的方法。
-
-虽然软件实现的虚拟交换机和网络功能可以使用更多数量的 CPU 核来支持更高的性能，但这样做会增加相当大的资产和运营成本 \cite {ananta,duet}。
-与其竞争对手一样，Azure作为IaaS产品直接向客户销售虚拟机，并竞争这些虚拟机的价格。我们在IaaS中的盈利能力是客户为虚拟机支付的价格与托管虚拟机的成本之间的差异。由于我们已经为每台服务器固定了成本，因此降低VM成本的最佳方法是将更多VM打包到每台主机服务器上。因此，大多数云通常在给定的2插槽（经济和性能标准）刀片上合理地部署最大数量的CPU核心。在撰写本文时，物理核心（2个超线程）的售价为0.1美元/小时左右，或者最大潜在收入约为900美元/年，在服务器的生命周期内售价为4500美元（服务器通常持续3到5年）在我们的数据中心）。即使考虑到某些部分核心在任何时候都未售出，并且云通常为客户提供购买容量的折扣，与专用硬件相比，甚至使用一个物理核心进行主机网络也是相当昂贵的。我们的业务从根本上依赖于为每个主机销售尽可能多的内核到客户虚拟机，因此我们将竭尽全力减少主机开销。因此，应避免使用主机CPU内核运行高速SDN数据路径。
-
-
-为了加速网络功能，ClickOS \cite{martins2014clickos} 和 NetBricks \cite{netbricks} 提出了基于 CPU 的网络功能处理框架。
-排一条线的，run to completion 的
-
-
-
-存储……
-Key-value store……
-
-
-作为一种重要的基础设施，分布式键值存储系统的研究和开发受到性能的驱动。大量分布式KVS基于CPU。为了降低计算成本，Masstree~ \cite {mao2012cache}，MemC3~ \cite {fan2013memc3}和libcuckoo~ \cite {li2014algorithmic}优化锁定，缓存，散列和内存分配算法。MICA~ \cite {lim2014mica}将哈希表分区到每个核心，从而完全避免同步。然而，这种方法为偏移的工作负载引入了核心不平衡。
+为了数据的可靠性、容量的可扩放性和分布式计算中的数据共享，云上的数据一般是存储在分布式存储系统中。
+作为一种重要的基础设施，分布式键值存储系统的研究和开发受到性能的驱动。大量分布式KVS基于CPU。为了降低计算成本，Masstree~ \cite {mao2012cache}，MemC3~ \cite {fan2013memc3}和libcuckoo~ \cite {li2014algorithmic}优化锁定，缓存，散列和内存分配算法。MICA~ \cite {lim2014mica}将哈希表分区到每个核心，从而完全避免同步。然而，这种方法为偏移的工作负载（skewed workload）引入了 CPU 核之间的不平衡。
 
 
 内核网络堆栈优化：第一项工作是优化内核TCP / IP堆栈。 FastSocket~ \cite {lin2016scalable}，Affinity-Accept~ \cite {pesterev2012improving}，FlexSC~ \cite {soares2010flexsc}和零拷贝套接字 \cite {thadani1995efficient,chu1996zero,linux-zero-copy}实现良好的兼容性和隔离性。
@@ -86,17 +75,9 @@ SandStorm~ \cite {marinos2014network}，mTCP~ \cite {jeong2014mtcp}，Seastar~ \
 FaSST~ \cite {kalia2016fasst}和eRPC~ \cite {kalia2018datacenter}提供RPC API而不是套接字。
 LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS~ \cite {huang2017high}符合标准套接字API。
 用户空间TCP / IP堆栈提供了比Linux更好的性能，但它仍然不接近RDMA和SHM。
-一个重要原因是现有的工作都不支持在线程和进程之间共享套接字，导致fork和容器实时迁移中的兼容性问题，以及多线程锁定开销。
-首先，当进程分叉时，只有父进程和子进程中的一个可以使用现有套接字。
-但是，许多Web服务 \cite {apache,nginx,php-fpm,python-gunicorn,vsftpd}和键值存储 \cite {memcached}都有一个主进程来接受连接并（可选）读取请求头，然后它可以分叉一个子进程来处理请求，其中子进程需要访问套接字。
-同时，父进程仍需要通过现有套接字接受新连接。
-这使得此类Web服务无法正常工作。
-更棘手的情况是父进程和子进程可以通过现有套接字同时写入日志服务器。
-其次，容器实时迁移与fork有关。
-它类似于分叉容器（到新主机），子容器应该仍然能够访问套接字。
-第三，多线程在应用程序中很常见。
-应用程序在套接字操作中承担竞争条件的风险，或者每次操作必须采用套接字FD锁定。
-后一种方法保证了正确性，但即使没有争用，锁定也会损害性能。
+一个重要原因是现有的工作都不支持在线程和进程之间共享套接字，导致多线程锁定开销。
+不支持套接字共享还导致进程分叉（fork）和容器热迁移（container live migration）中的兼容性问题。
+这将在第 \ref{chapter:socksdirect} 中进一步讨论。
 
 
 
@@ -164,16 +145,22 @@ HyperLoop nsdi
 因此，不是所有软件都适合用硬件来加速，需要权衡成本和收益。
 
 
-
-可编程网卡是最早被公有云大规模部署的定制化硬件之一。
-以微软 Azure 云为代表的云服务商在数据中心的每台服务器上部署了一块可编程网卡，用以加速计算节点上的虚拟网络 \cite{smartnic}。
+虽然软件实现的虚拟交换机和网络功能可以使用更多数量的 CPU 核和更大的网络节点集群来支持更高的性能，但这样做会增加相当大的资产和运营成本 \cite {ananta,duet}。
+云服务商在 IaaS 业务中的盈利能力是客户为虚拟机支付的价格与托管虚拟机的成本之间的差异。
+由于每台服务器的资产和运营成本在上架部署时就已基本确定，因此降低托管虚拟机成本的最佳方法是在每台计算节点服务器上打包更多的客户虚拟机。
+目前，物理 CPU 核（2 个超线程）的售价为 0.1 美元/小时左右，亦即最大潜在收入约为 900 美元/年。
+在数据中心，服务器通常服役 3 到 5 年，因此一个物理 CPU 核在服务器生命周期内的售价最高可达 4500 美元 \cite{smartnic}。
+即使考虑到总有一部分 CPU 核没有被售出，并且云经常为大客户提供折扣，与专用硬件相比，即使专门分配一个物理 CPU 核用于虚拟网络也是相当昂贵的。
+为了尽可能减少计算节点上用于虚拟网络的 CPU 核，以微软 Azure 云为代表的云服务商在数据中心的每台服务器上部署了一块可编程网卡，用以加速计算节点上的虚拟网络 \cite{smartnic}。
 为了在提供高性能的同时保持一定的可编程性和灵活性，业界提出了专用芯片（ASIC）、网络处理器（Network Processor）、多核通用处理器片上系统（SoC）、现场可编程门阵列（FPGA）等可编程网卡架构。
 
-学术界也提出了多种基于专用芯片的可编程网卡架构……
+学术界也提出了多种基于专用芯片的网卡架构，如 FlexNIC \cite{kaufmann2016high}。
 基于专用芯片的柜顶交换机和可编程网卡灵活性较差，而基于通用处理器的可编程网卡和 GPU 有一定的性能局限性。
 FPGA 在性能和灵活性间达到了折中，因此微软采用了基于 FPGA 的可编程网卡 \cite{putnam2014reconfigurable}。
 
-AWS …… 国内 ……
+AWS Nitro …… 国内 ……
+
+
 
 FPGA是一项成熟的技术，最近已经部署用于加速数据中心服务，包括网络功能 \cite {putnam2014reconfigurable,smartnic,rubow2010chimpp,lavasani2012compiling}。
 众所周知，FPGA的可编程性很低，有丰富的前人工作提供了高级编程抽象 \cite {bluespec,auerbach2010lime,bacon2013fpga,singh2011implementing,bachrach2012chisel,wester2015transformation}。
