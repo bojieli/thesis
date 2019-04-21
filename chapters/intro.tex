@@ -8,7 +8,7 @@
 
 近十年来，大数据与人工智能的兴起改变了数据中心的应用负载特性。一方面，大数据处理、机器学习等负载对算力要求很高。然而，由于摩尔定律的放缓和 Dennard 缩放定律的终结，近十年来，通用处理器的频率提升和多核核数增加都受到功耗墙的限制。因此，通用处理器性能提升 ``免费的午餐'' 已经结束，体系结构的创新迎来了春天，GPU、FPGA、TPU 等定制化硬件在数据中心内大量部署。另一方面，大数据处理、机器学习等负载需要多个节点紧密协同处理，对节点间的通信带宽和延迟要求较高。因此，近十年来，数据中心网络从 1 Gbps 发展到 40 Gbps，并有向 100 Gbps 演进的趋势。定制化硬件之间的专用互连也成为趋势。因此，如英伟达 CEO 黄仁勋所说，未来的数据中心会像超级计算机一样 \cite{nvidia-datacenter}。
 
-与此同时，数据中心的运营模式也在经历一场云化的变革。数据中心的算力逐渐集中到少数几家云厂商，每家拥有数以百万计的服务器。由于云数据中心的规模大，云服务商有足够的规模来平摊服务器、板卡甚至芯片的设计和流片成本，通过软件优化也可以提高性能指标、降低成本，获得可观的经济效益。由于上述应用负载特性的转变和数据中心的云化，工程师获得了从硬件、系统软件到应用的全栈优化机会。
+与此同时，数据中心的运营模式也在经历一场云化的变革。数据中心的算力逐渐集中到少数几家云厂商，每家拥有数以百万计的服务器。由于云数据中心的规模大，云服务商一方面有足够的规模来平摊服务器、板卡甚至芯片的设计和流片成本，另一方面通过软件优化也可以提高性能指标、降低成本，获得可观的经济效益。由于上述应用负载特性的转变和数据中心的云化，工程师获得了从硬件、系统软件到应用的全栈优化机会。
 
 在云数据中心中，不同的租户共享一个巨大的计算、存储和网络资源池。为了实现资源共享和性能隔离，数据中心需要实现计算、存储和网络的虚拟化。如图 \ref{intro:fig:virt-architecture} 所示，在基础设施作为服务（IaaS）的云服务模式下，计算节点上需要提供虚拟网络、虚拟云存储、虚拟本地存储等服务，实际的网络和云存储资源则位于独立的网络节点和存储节点上。计算节点上的虚拟网络和存储服务把数据中心内物理上分散的网络和存储资源虚拟化成逻辑上统一的资源（``多虚一''）。网络和存储节点则不仅需要把物理资源共享给多个计算节点上不同租户的虚拟机使用（``一虚多''），还需要提供数据处理功能和高层抽象。网络节点需要提供防火墙、负载均衡、加密隧道网关、网络地址转换（NAT）等网络功能；存储节点需要进行数据结构处理以提供对象存储、文件系统存储等高层抽象，还需要进行复制（replication）以实现容灾。
 
@@ -35,52 +35,193 @@
 
 \section{国内外研究现状}
 
+为了降低 ``数据中心税'' 的开销，学术界和工业界提出了很多方案，大致可以分为优化软件、利用新型商用硬件和设计新硬件三类。
+
+\subsection{优化软件}
+
+
+虚拟网络：基于软件的数据包转发 \cite {routebricks,Egi:2008:THP:1544012.1544032}。
+他们表明，多核x86 CPU可以以每服务器10Gbps的速度转发数据包，并且可以通过集群更多服务器来扩展容量。
+最近，许多系统被设计用于实现各种类型的NF \cite {comb,Greenhalgh:2009:FPR:1517480.1517484,martins2014clickos}。
+同样，所有这些系统都利用CPU中的多核并行性来实现每台机器接近10Gbps的吞吐量，并在需要更高容量时向外扩展以使用更多机器。
+
+Andromeda \cite{andromeda}
+
+我们仍然根据我们仅使用主机内核运行我们的SDN堆栈的原始策略来评估所有选项，特别是像DPDK \cite{dpdk} 这样的技术表明我们可以通过绕过OS网络堆栈来显着降低数据包处理成本 并在轮询模式下运行核心。 考虑到我们无法使ASIC满足我们的可编程性要求，这个选项击败了ASIC，但是如第3节所述，将内核烧录到VM托管成本的成本和性能开销足够高，即使是效率低下的多核SoC也是如此 更好的方法。
+
+与其竞争对手一样，Azure作为IaaS产品直接向客户销售虚拟机，并竞争这些虚拟机的价格。我们在IaaS中的盈利能力是客户为虚拟机支付的价格与托管虚拟机的成本之间的差异。由于我们已经为每台服务器固定了成本，因此降低VM成本的最佳方法是将更多VM打包到每台主机服务器上。因此，大多数云通常在给定的2插槽（经济和性能标准）刀片上合理地部署最大数量的CPU核心。在撰写本文时，物理核心（2个超线程）的售价为0.1美元/小时左右，或者最大潜在收入约为900美元/年，在服务器的生命周期内售价为4500美元（服务器通常持续3到5年）在我们的数据中心）。即使考虑到某些部分核心在任何时候都未售出，并且云通常为客户提供购买容量的折扣，与专用硬件相比，甚至使用一个物理核心进行主机网络也是相当昂贵的。我们的业务从根本上依赖于为每个主机销售尽可能多的内核到客户虚拟机，因此我们将竭尽全力减少主机开销。因此，应避免使用主机CPU内核运行高速SDN数据路径。
+
+
+为了加速网络功能，ClickOS \cite{martins2014clickos} 和 NetBricks \cite{netbricks} 提出了基于 CPU 的网络功能处理框架。
+排一条线的，run to completion 的
+
+Ananta \cite {ananta}是一个部署在Microsoft数据中心的软件负载均衡器，用于提供云规模的负载均衡服务。
+虽然软件NF可以扩展以提供更多容量，但这样做会在CAPEX和OPEX中增加相当大的成本 \cite {ananta,duet}。
+
+
+存储……
+Key-value store……
+
+
+作为一种重要的基础设施，分布式键值存储系统的研究和开发受到性能的驱动。大量分布式KVS基于CPU。为了降低计算成本，Masstree~ \cite {mao2012cache}，MemC3~ \cite {fan2013memc3}和libcuckoo~ \cite {li2014algorithmic}优化锁定，缓存，散列和内存分配算法。MICA~ \cite {lim2014mica}将哈希表分区到每个核心，从而完全避免同步。然而，这种方法为偏移的工作负载引入了核心不平衡。
+
+
+内核网络堆栈优化：第一项工作是优化内核TCP / IP堆栈。 FastSocket~ \cite {lin2016scalable}，Affinity-Accept~ \cite {pesterev2012improving}，FlexSC~ \cite {soares2010flexsc}和零拷贝套接字 \cite {thadani1995efficient,chu1996zero,linux-zero-copy}实现良好的兼容性和隔离性。
+
+MegaPipe~ \cite {han2012megapipe}和StackMap~ \cite {yasukata2016stackmap}提出了新的API来实现零拷贝和改进I / O多路复用，代价是需要修改应用程序。
+但是，大量的内核开销仍然存在。
+支持零拷贝的挑战是套接字语义，如章节 \ref {socksdirect:subsec:per-byte-overhead}中所述。
+
+用户空间TCP / IP堆栈：第二项工作完全绕过内核TCP / IP堆栈并在用户空间中实现TCP / IP。
+在这个类别中，IX~ \cite {belay2017ix}和Arrakis~\cite {peter2016arrakis}是新的操作系统架构，它使用虚拟化来确保安全性和隔离性。 IX利用LwIP~ \cite {dunkels2001design}在用户空间中实现TCP / IP，同时使用内核转发每个数据包以实现性能隔离和QoS。相比之下，Arrakis将QoS卸载到NIC，因此绕过数据平面的内核。
+他们使用NIC在同一主机中的应用程序之间转发数据包。
+如表 \ref {socksdirect:tab:operation-performance}所示，从CPU到NIC的发夹延迟远远高于核心间缓存迁移延迟。
+吞吐量也受到内存映射I / O（MMIO）门铃延迟和PCIe带宽的限制 \cite {neugebauer2018understanding,li2017kv}。
+
+除了这些新的OS体系结构外，许多用户空间套接字在Linux上使用高性能数据包I / O框架，例如Netmap~ \cite {rizzo2012netmap}，Intel DPDK~ \cite {dpdk}和PF\_RING \cite {pf-ring}，以便直接访问用户空间中的NIC队列。
+SandStorm~ \cite {marinos2014network}，mTCP~ \cite {jeong2014mtcp}，Seastar~ \cite {seastar}和F-Stack~ \cite {fstack}提出了新的API，因此需要修改应用程序。
+大多数API更改旨在支持零拷贝，标准API仍然会复制数据。
+FaSST~ \cite {kalia2016fasst}和eRPC~ \cite {kalia2018datacenter}提供RPC API而不是套接字。
+LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS~ \cite {huang2017high}符合标准套接字API。
+用户空间TCP / IP堆栈提供了比Linux更好的性能，但它仍然不接近RDMA和SHM。
+一个重要原因是现有的工作都不支持在线程和进程之间共享套接字，导致fork和容器实时迁移中的兼容性问题，以及多线程锁定开销。
+首先，当进程分叉时，只有父进程和子进程中的一个可以使用现有套接字。
+但是，许多Web服务 \cite {apache,nginx,php-fpm,python-gunicorn,vsftpd}和键值存储 \cite {memcached}都有一个主进程来接受连接并（可选）读取请求头，然后它可以分叉一个子进程来处理请求，其中子进程需要访问套接字。
+同时，父进程仍需要通过现有套接字接受新连接。
+这使得此类Web服务无法正常工作。
+更棘手的情况是父进程和子进程可以通过现有套接字同时写入日志服务器。
+其次，容器实时迁移与fork有关。
+它类似于分叉容器（到新主机），子容器应该仍然能够访问套接字。
+第三，多线程在应用程序中很常见。
+应用程序在套接字操作中承担竞争条件的风险，或者每次操作必须采用套接字FD锁定。
+后一种方法保证了正确性，但即使没有争用，锁定也会损害性能。
+
+
+
+\subsection{利用新型商用硬件}
+
+
+由于大规模 Web 服务、大数据处理、机器学习等应用对计算和网络的性能需求非常迫切，GPU，RDMA……
+
+
+为了加速软件包处理，以前的工作已经提出使用GPU \cite {packetshader}，专用网络处理器（NP）\cite {cavium,netronome} 和硬件交换机 \cite {duet}。
+GPU主要用于图形处理，最近扩展到具有海量数据并行性的其他应用程序。 GPU更适合批量操作。 PacketShader \cite {packetshader}，表明使用GPU可以实现40Gbps的分组交换速度。
+但是，批量操作会导致高延迟。
+例如，\cite {packetshader}中报告的转发延迟约为$200 \mu{}s$。
+
+
+
+为了摆脱操作系统内核的开销， \cite {rizzo2012netmap,intel2014data}直接轮询来自NIC的网络数据包，并且\cite {jeong2014mtcp,marinos2014network}使用用户空间轻量级网络堆栈处理它们。
+键值存储系统 \cite {kapoor2012chronos,ousterhout2010case,ousterhout2015ramcloud,lim2014mica,li2016full}受益于这种高性能优化。
+作为朝着这个方向迈出的又一步，最近的作品\cite {infiniband2000infiniband,kalia2014using,kalia2016design,kalia2014using,kalia2016design}利用RDMA NIC的基于硬件的网络堆栈，使用双面RDMA作为KVS客户端和服务器之间的RPC机制进一步提高每核吞吐量并减少延迟。尽管如此，这些系统仍受CPU限制（\S \ref {kvdirect:sec:state-of-the-art-kvs}）。
+
+另一种不同的方法是利用单侧RDMA。 Pilaf~ \cite {mitchell2013using}和FaRM~ \cite {dragojevic2014farm}采用单向RDMA读取进行GET操作，FaRM实现了使网络饱和的吞吐量。 Nessie~ \cite {szepesi2014designing}，DrTM~ \cite {wei2015fast}，DrTM + R~ \cite {chen2016fast}和FaSST~ \cite {kalia2016fasst}利用分布式事务来实现单向RDMA的GET和PUT。但是，PUT操作的性能受到一致性保证的不可避免的同步开销的影响，受到RDMA原语的限制 \cite {kalia2016design}。此外，客户端CPU涉及KV处理，将每个核心的吞吐量限制在客户端的大约10~Mops。
+相比之下，本文将RDMA原语扩展到键值操作，同时保证服务器端的一致性，使KVS客户端完全透明，同时实现高吞吐量和低延迟，即使对于PUT操作也是如此。
+
+二级索引是通过其他键检索数据的重要功能
+比数据存储系统中的主键 \cite {escriva2012hyperdex,kejriwal2016slik}。 SLIK~ \cite {kejriwal2016slik}在键值存储系统中使用B +树算法支持多个二级密钥。探索如何支持二级索引以帮助本文迈向通用数据存储系统将会很有趣。 SwitchKV~ \cite {li2016fast}利用基于内容的路由将请求路由到基于缓存密钥的后端节点，NetCache~ \cite {netcache-sosp17}进一步将KV缓存在交换机中。这种负载平衡和缓存也将使我们的系统受益。
+Eris~ \cite {eris}利用网络序列发生器来实现高效的分布式事务，这可以为客户端同步的单侧RDMA方法带来新的生命。
+
+存储虚拟化……
+
+
+第三行研究将套接字系统的一部分卸载到NIC硬件上。
+TCP卸载引擎（TOE） \cite {tcp-chimney-offload}将部分或完整的TCP / IP堆栈卸载到NIC，但它们仅在专用区域中起飞（例如iSCSI HBA~ \cite {iscsi-hba}）和无状态卸载（例如校验和，流动转向和LSO / LRO~ \cite {lsolro}）。
+由于数据中心的硬件趋势和应用需求，\emph {stateful}卸载的故事近年来有所不同 \cite {chuanxiong-rdma-keynote}。
+因此，RDMA~ \cite {infiniband2000infiniband}在生产数据中心中广泛使用 \cite {guo2016rdma}。
+与基于软件的TCP / IP网络堆栈相比，RDMA使用硬件卸载来提供超低延迟和接近零的CPU开销。
+要使套接字应用程序能够使用RDMA，RSocket~ \cite {rsockets}，SDP~ \cite {socketsdirect}和UNH EXS~ \cite {russell2008extended}将套接字操作转换为RDMA谓词。
+它们具有相似的设计，而RSocket是最活跃的设计。
+FreeFlow~ \cite {nsdi19freeflow}虚拟化容器覆盖网络的RDMA NIC，它利用SHM进行主机内部和RDMA进行主机间通信。
+FreeFlow使用RSocket将套接字转换为RDMA。
+
+
+应用层：存储复制，数据库事务
+
+GPS: Google Spanner
+
+可编程交换机
+
+Recent years witness a trend of co-designing consensus protocols with data center network.
+The key idea is to provide FIFO and total ordering in the network, going a step further than best-effort ordering in Fast Paxos~\cite{lamport2006fast,kemme1999processing,moraru2013there,pedone1998optimistic}.
+Speculative Paxos~\cite{ports2015designing} and NOPaxos~\cite{li2016just} use a switch as a centralized sequencer or serialization point.
+NetPaxos~\cite{dang2015netpaxos,dang2016paxos} and \cite{dang2016network} implement Paxos in switches.
+Eris~\cite{eris} proposes in-network concurrency control using switch as a centralized sequencer, which is a scalability bottleneck.
+NetChain~\cite{jin2018netchain} is a strongly-consistent fault-tolerant key-value store in switches, but the switch has very limited storage capacity.
+
+HyperLoop nsdi
+
+
+\subsection{设计新硬件}
+
+为深度学习设计新硬件，TPU……
 
 随着通用处理器的性能提升遇到了瓶颈，各大云服务商开始探索使用定制化硬件来 ``减税降负''，也就是把数据中心的虚拟化、操作系统和高层抽象的开销从通用处理器转移到定制化硬件上。
-本质上，这与 GPU 等定制化计算硬件的加速原理类似，即用硬件实现规则的、通用的操作，而把不规则的、不常用的操作留给通用处理器上的软件。
+使用定制化硬件并不是在硬件中原样实现已有的软件，而是对已有软件进行重构，划分出数据面和控制面，数据面优化后在硬件中实现，控制面则留在软件上。
+采用新硬件的方案尽管性能较高，但不仅需要新硬件的资产和运营成本，还需要软硬件协同设计的开发成本，往往比优化软件的开发成本更高。
+因此，不是所有软件都适合用硬件来加速，需要权衡成本和收益。
 
-在数据中心税中，由于大规模 Web 服务、大数据处理、机器学习等应用对网络的性能需求非常迫切，软件虚拟网络又很难以可接受的成本提供如此高的性能，可编程网卡是最早被公有云大规模部署的定制化硬件之一。
+
+
+可编程网卡是最早被公有云大规模部署的定制化硬件之一。
 以微软 Azure 云为代表的云服务商在数据中心的每台服务器上部署了一块可编程网卡，用以加速计算节点上的虚拟网络 \cite{smartnic}。
 为了在提供高性能的同时保持一定的可编程性和灵活性，业界提出了专用芯片（ASIC）、网络处理器（Network Processor）、多核通用处理器片上系统（SoC）、现场可编程门阵列（FPGA）等可编程网卡架构。
-
-
-
-
-
-学术界网络功能虚拟化（NFV）软件（NetBricks 等），GPU 等……
-
-学术界还提出了用柜顶网络交换机（Top-of-Rack switch）和图形处理器（GPU）加速网络功能。
 
 学术界也提出了多种基于专用芯片的可编程网卡架构……
 基于专用芯片的柜顶交换机和可编程网卡灵活性较差，而基于通用处理器的可编程网卡和 GPU 有一定的性能局限性。
 FPGA 在性能和灵活性间达到了折中，因此微软采用了基于 FPGA 的可编程网卡 \cite{putnam2014reconfigurable}。
 
-FPGA 编程，SoC 可编程网卡编程……
-
 AWS …… 国内 ……
 
-除了网络系统，本文进一步探索存储系统和操作系统的优化。
+FPGA是一项成熟的技术，最近已经部署用于加速数据中心服务，包括网络功能 \cite {putnam2014reconfigurable,smartnic,rubow2010chimpp,lavasani2012compiling}。
+众所周知，FPGA的可编程性很低，有丰富的前人工作提供了高级编程抽象 \cite {bluespec,auerbach2010lime,bacon2013fpga,singh2011implementing,bachrach2012chisel,wester2015transformation}。
+Gorilla \cite {lavasani2012compiling} 为FPGA上的数据包交换提出了一种特定于域的高级语言。
+然而，Chimpp \cite {rubow2010chimpp} 试图将Click模型引入HDL来开发模块化路由器。
+
+Click2NetFPGA~\cite {Click2NetFPGA}通过直接将Click模块化路由器〜\ cite {kohler2000click}程序编译到FPGA中来提供模块化架构。
+然而，\cite {Click2NetFPGA}的性能比我们在本文中报告的要低得多（两个数量级），因为它们的系统设计存在几个瓶颈（例如，内存和数据包I / O），它们也是 错过几个重要的优化以确保完全流水线处理（如\S \ref {clicknp:sec:optimization}中所述）。
+此外，\cite {Click2NetFPGA}不支持FPGA / CPU联合处理，因此无法在数据平面运行时更新配置或读取状态。
 
 
-加州大学伯克利分校对无服务器计算（serverless computing）的预测报告 \cite{jonas2019cloud} 表明，尽管无服务器计算的范式有诸多优势，也是各大云服务商争相推广的新服务，但由于云存储的性能问题和临时存储服务的缺失，很多类型的应用使用无服务器计算的性能和成本不理想。
 
-RDMA 数据结构、数据库事务、存储虚拟化……
 
-网络协议栈加速，软件加速方案（eRPC 等）……
+作为一种灵活且可定制的硬件，FPGA现已广泛部署在数据中心规模 \cite {putnam2014reconfigurable,caulfield2016cloud}中，并且针对可编程性进行了大幅改进 \cite {bacon2013fpga,li2016clicknp}。一些早期的工作已探索在FPGA上构建KVS。但是其中一些是不实用的，限制片上数据存储（大约几MB内存） \cite {liang16fpl}或板载DRAM（通常是8GB内存） \cite {istvan2013flexible,chalamalasetti2013fpga,istvan2015hash}。
+\cite {blott2015scaling}专注于提高系统容量而不是吞吐量，并采用SSD作为板载DRAM的二级存储。
+\cite {liang16fpl,chalamalasetti2013fpga}限制它们在固定大小键值对中的使用，这只能用于特殊用途，而不是一般的键值存储。
+\cite {blott13hotcloud,lavasani2014fpga}使用主机DRAM存储哈希表，而\cite {tokusashi2016multilevel}使用NIC DRAM作为主机DRAM的缓存，但它们没有针对网络和PCIe DMA带宽进行优化，导致性能不佳。
+本文充分利用了NIC DRAM和主机DRAM，使我们基于FPGA的键值存储系统通用，并且能够进行大规模部署。此外，我们精心的硬件和软件协同设计，以及对PCIe和网络的优化，将性能推向了物理限制，推进了最先进的解决方案。
+
+
+传统上，FPGA使用Verilog、VHDL等硬件描述语言编程。众所周知，硬件描述语言难以调试、编写和修改，给软件人员使用FPGA带来了很大挑战。
+
+
+图2.2：用HLS工具编程FPGA
+
+为了提高FPGA的开发效率，FPGA厂商提供了高层次综合（HLS）工具~\cite{vivado}，可以把C代码编译成硬件模块。但这些工具只是硬件开发工具链的补充，程序员仍然需要手动将从C语言生成的硬件模块插入到HDL项目中，且FPGA与主机CPU之间的通信也需要自行处理。这样的模型仍然不足以让软件开发人员使用FPGA。
+
+
+
+图2.3：用OpenCL编程FPGA
+
+近年来，为了让软件开发人员使用FPGA，FPGA厂商提出了基于OpenCL的编程工具链~\cite{aoc}，提供了类似GPU的编程模型。软件开发人员可以把用OpenCL语言编写的核（kernel）卸载到FPGA上。但是，这种方法中多个并行执行的核间需要通过板上共享内存进行通信，而FPGA上的DRAM共享内存吞吐量和延迟都不理想，共享内存还会成为通信瓶颈。其次，FPGA与CPU之间的通信模型是类似GPU的批处理模型，这使得处理延迟较高（约1毫秒），不适用于需要微秒级延迟的网络数据包处理。
+
+
+
+
 
 
 
 \section{本文的研究内容和贡献}
 
 
-本文旨在探索基于可编程网卡的高性能数据中心系统。本文提出一个基于 FPGA 可编程网卡，对云计算数据中心计算、网络、存储节点实现全栈加速的系统。如图 \ref{arch:fig:accel-arch} 所示……
+本文旨在探索基于可编程网卡的高性能数据中心系统。本文提出一个基于 FPGA 可编程网卡，对云计算数据中心计算、网络、存储节点实现全栈加速的系统。如图 \ref{intro:fig:accel-arch} 所示，我们把计算、网络、存储节点上的普通网卡替换为可编程网卡。我们在计算节点上实现了虚拟网卡和虚拟网络，虚拟本地存储和云存储，以及轻量级用户态运行库和硬件传输协议相结合的通信原语，替代了图 \ref{intro:fig:virt-architecture} 中的软件虚拟化服务和操作系统网络协议栈。我们利用数据面与控制面分离的思想，在网络节点上实现虚拟网络功能，在存储节点上实现数据结构处理，用可编程网卡提高了数据面性能，并保留原有软件控制面的灵活性。
 
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/accel_arch.pdf}
 	\caption{基于可编程网卡的数据中心系统总体架构。}
-	\label{arch:fig:accel-arch}
+	\label{intro:fig:accel-arch}
 \end{figure}
 
 首先，本文提出用可编程网卡加速云计算中的虚拟网络功能。我们提出了首个在商用服务器中用 FPGA 加速的高灵活性、高性能网络功能处理平台 ClickNP。众所周知，FPGA 编程对软件工程师很不友好。为了简化 FPGA 编程，我们设计了类 C 的 ClickNP 语言和模块化的编程模型，并开发了一系列优化技术，以充分利用 FPGA 的海量并行性。我们实现了 ClickNP 开发工具链，可以与多种商用高层次综合工具集成。我们基于 ClickNP 设计和实现了 200 多个网络元件，并用这些元件组建起多种网络功能。相比基于 CPU 的软件网络功能，ClickNP 的吞吐量提高了 10 倍，延迟降低到 1/10；且具有可忽略的 CPU 开销，可以为云计算中的每个计算节点节约 20\% 的 CPU 核。
@@ -94,9 +235,9 @@ RDMA 数据结构、数据库事务、存储虚拟化……
 
 本论文的内容结构安排如下：
 第 1 章为绪论。
-第 2 章介绍了数据中心的背景知识和硬件的发展趋势，分析了可编程网卡的四种架构，并调研了可编程网卡在数据中心的应用。
-第 3 章提出了基于可编程网卡的高性能数据中心系统架构。
-第 4 章提出用可编程网卡加速云计算中的虚拟网络功能。为了简化FPGA编程，提出了首个适用于高速网络数据包处理、基于高级语言的模块化FPGA编程框架ClickNP。
-第 5 章提出用可编程网卡加速远程数据结构访问，并设计实现了一个高性能内存键值存储系统 KV-Direct。
-第 6 章提出用可编程网卡和用户态运行库相结合的方法为应用程序提供操作系统原语，并设计实现了一个用户态套接字系统 SocksDirect。
+第 2 章介绍数据中心的背景知识、虚拟化架构和相关工作，分析硬件的发展趋势，对可编程网卡的架构进行分类，并调研可编程网卡在数据中心的应用。
+第 3 章提出基于可编程网卡的数据中心系统架构。
+第 4 章提出用可编程网卡加速云计算中的虚拟网络功能。为了简化 FPGA 编程，提出首个适用于高速网络数据包处理、基于高级语言的模块化 FPGA 编程框架 ClickNP。
+第 5 章提出用可编程网卡加速远程数据结构访问，并设计实现一个高性能内存键值存储系统 KV-Direct。
+第 6 章提出用可编程网卡和用户态运行库相结合的方法为应用程序提供操作系统原语，并设计实现一个用户态套接字系统 SocksDirect。
 第 7 章总结全文并展望未来研究方向。
