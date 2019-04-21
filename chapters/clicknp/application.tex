@@ -44,7 +44,7 @@ PktCap就是一个展示联合CPU / FPGA处理重要性的例子。
 \textbf{A3. IPSec网关（IPSecGW）。}
 软件NF的一个问题是，当数据包需要一些计算密集型处理时，CPU很快就会成为瓶颈，例如，IPSec \cite {packetshader}。
 我们构建了一个IPSec数据路径，能够使用AES-256-CTR加密和SHA-1身份验证处理IPSec数据包。
-如\S \ref {clicknp：subsec：lib}所示，单个AES\_CTR元素只能实现27.8~Gbps的吞吐量。因此，我们需要两个AES\_CTR元素并行运行以实现线速率。
+如\S \ref {clicknp:subsec:lib}所示，单个AES\_CTR元素只能实现27.8~Gbps的吞吐量。因此，我们需要两个AES\_CTR元素并行运行以实现线速率。
 然而，SHA-1很棘手。 SHA-1将数据包分成较小的数据块（64B）。
 虽然一个数据块中的计算可以流水线化，但是一个IP数据包内的连续块之间存在依赖关系 - 下一个块的计算无法在前一个块完成之前开始！
 如果我们按顺序处理这些数据块，吞吐量将低至1.07 Gbps。

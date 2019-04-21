@@ -180,7 +180,7 @@ L4LB需要一次访问DDR内存。因此处理速度降低到11Mpps。
 在本实验中，我们修改了一个软件TCP流生成器\cite {mqecn}，以便在数据包有效负载中放置流优先级，即流的总大小。
 我们根据\cite {pfabric}中的数据挖掘工作负载生成流，并使用\textit {RateLimit}元素将限制出口端口进一步设置为10~Gbps。
 我们应用pFabric根据流优先级调度出口缓冲区中的流量。
-图 \ref {clicknp：fig：pfabric}显示了pFabric，具有Droptail队列的TCP的平均流完成时间（FCT）和理想值。
+图 \ref {clicknp:fig:pfabric}显示了pFabric，具有Droptail队列的TCP的平均流完成时间（FCT）和理想值。
 该实验验证了pFabric在这种简单的场景中实现了接近理想的FCT。
 
 \begin{figure}[h!]

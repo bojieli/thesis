@@ -39,24 +39,26 @@
 
 \subsection{优化软件}
 
+为了支持虚拟网络，云服务商部署了软件实现的虚拟交换机，如微软的 VFP \cite{firestone2017vfp} 和谷歌的 Andromeda \cite{andromeda}。
+为了支持网络功能，云服务商还部署了软件实现的虚拟网络功能。例如，Ananta \cite {ananta} 是一个部署在微软数据中心的软件负载均衡器，用于提供云规模的负载均衡服务。
 
-虚拟网络：基于软件的数据包转发 \cite {routebricks,Egi:2008:THP:1544012.1544032}。
+
+基于软件的数据包转发 \cite {routebricks,Egi:2008:THP:1544012.1544032}。
 他们表明，多核x86 CPU可以以每服务器10Gbps的速度转发数据包，并且可以通过集群更多服务器来扩展容量。
-最近，许多系统被设计用于实现各种类型的NF \cite {comb,Greenhalgh:2009:FPR:1517480.1517484,martins2014clickos}。
+最近，许多系统被设计用于实现各种类型的网络功能 \cite {comb,Greenhalgh:2009:FPR:1517480.1517484,martins2014clickos}。
 同样，所有这些系统都利用CPU中的多核并行性来实现每台机器接近10Gbps的吞吐量，并在需要更高容量时向外扩展以使用更多机器。
 
-Andromeda \cite{andromeda}
+
 
 我们仍然根据我们仅使用主机内核运行我们的SDN堆栈的原始策略来评估所有选项，特别是像DPDK \cite{dpdk} 这样的技术表明我们可以通过绕过OS网络堆栈来显着降低数据包处理成本 并在轮询模式下运行核心。 考虑到我们无法使ASIC满足我们的可编程性要求，这个选项击败了ASIC，但是如第3节所述，将内核烧录到VM托管成本的成本和性能开销足够高，即使是效率低下的多核SoC也是如此 更好的方法。
 
+虽然软件实现的虚拟交换机和网络功能可以使用更多数量的 CPU 核来支持更高的性能，但这样做会增加相当大的资产和运营成本 \cite {ananta,duet}。
 与其竞争对手一样，Azure作为IaaS产品直接向客户销售虚拟机，并竞争这些虚拟机的价格。我们在IaaS中的盈利能力是客户为虚拟机支付的价格与托管虚拟机的成本之间的差异。由于我们已经为每台服务器固定了成本，因此降低VM成本的最佳方法是将更多VM打包到每台主机服务器上。因此，大多数云通常在给定的2插槽（经济和性能标准）刀片上合理地部署最大数量的CPU核心。在撰写本文时，物理核心（2个超线程）的售价为0.1美元/小时左右，或者最大潜在收入约为900美元/年，在服务器的生命周期内售价为4500美元（服务器通常持续3到5年）在我们的数据中心）。即使考虑到某些部分核心在任何时候都未售出，并且云通常为客户提供购买容量的折扣，与专用硬件相比，甚至使用一个物理核心进行主机网络也是相当昂贵的。我们的业务从根本上依赖于为每个主机销售尽可能多的内核到客户虚拟机，因此我们将竭尽全力减少主机开销。因此，应避免使用主机CPU内核运行高速SDN数据路径。
 
 
 为了加速网络功能，ClickOS \cite{martins2014clickos} 和 NetBricks \cite{netbricks} 提出了基于 CPU 的网络功能处理框架。
 排一条线的，run to completion 的
 
-Ananta \cite {ananta}是一个部署在Microsoft数据中心的软件负载均衡器，用于提供云规模的负载均衡服务。
-虽然软件NF可以扩展以提供更多容量，但这样做会在CAPEX和OPEX中增加相当大的成本 \cite {ananta,duet}。
 
 
 存储……
@@ -175,10 +177,10 @@ AWS …… 国内 ……
 
 FPGA是一项成熟的技术，最近已经部署用于加速数据中心服务，包括网络功能 \cite {putnam2014reconfigurable,smartnic,rubow2010chimpp,lavasani2012compiling}。
 众所周知，FPGA的可编程性很低，有丰富的前人工作提供了高级编程抽象 \cite {bluespec,auerbach2010lime,bacon2013fpga,singh2011implementing,bachrach2012chisel,wester2015transformation}。
-Gorilla \cite {lavasani2012compiling} 为FPGA上的数据包交换提出了一种特定于域的高级语言。
+Gorilla \cite {lavasani2012compiling} 为FPGA上的数据包交换提出了一种领域特定的高级语言。
 然而，Chimpp \cite {rubow2010chimpp} 试图将Click模型引入HDL来开发模块化路由器。
 
-Click2NetFPGA~\cite {Click2NetFPGA}通过直接将Click模块化路由器〜\ cite {kohler2000click}程序编译到FPGA中来提供模块化架构。
+Click2NetFPGA~\cite {Click2NetFPGA}通过直接将Click模块化路由器\cite {kohler2000click}程序编译到FPGA中来提供模块化架构。
 然而，\cite {Click2NetFPGA}的性能比我们在本文中报告的要低得多（两个数量级），因为它们的系统设计存在几个瓶颈（例如，内存和数据包I / O），它们也是 错过几个重要的优化以确保完全流水线处理（如\S \ref {clicknp:sec:optimization}中所述）。
 此外，\cite {Click2NetFPGA}不支持FPGA / CPU联合处理，因此无法在数据平面运行时更新配置或读取状态。
 
@@ -194,16 +196,9 @@ Click2NetFPGA~\cite {Click2NetFPGA}通过直接将Click模块化路由器〜\ ci
 
 传统上，FPGA使用Verilog、VHDL等硬件描述语言编程。众所周知，硬件描述语言难以调试、编写和修改，给软件人员使用FPGA带来了很大挑战。
 
+为了提高FPGA的开发效率，FPGA厂商提供了高层次综合（HLS）工具~\cite{vivado,intel-hls}，可以把C代码编译成硬件模块。学术界提出了 Chisel \cite{bachrach2012chisel} 等。但这些工具只是硬件开发工具链的补充，程序员仍然需要手动将从C语言生成的硬件模块插入到HDL项目中，且FPGA与主机CPU之间的通信也需要自行处理。这样的模型仍然不足以让软件开发人员使用FPGA。
 
-图2.2：用HLS工具编程FPGA
-
-为了提高FPGA的开发效率，FPGA厂商提供了高层次综合（HLS）工具~\cite{vivado}，可以把C代码编译成硬件模块。但这些工具只是硬件开发工具链的补充，程序员仍然需要手动将从C语言生成的硬件模块插入到HDL项目中，且FPGA与主机CPU之间的通信也需要自行处理。这样的模型仍然不足以让软件开发人员使用FPGA。
-
-
-
-图2.3：用OpenCL编程FPGA
-
-近年来，为了让软件开发人员使用FPGA，FPGA厂商提出了基于OpenCL的编程工具链~\cite{aoc}，提供了类似GPU的编程模型。软件开发人员可以把用OpenCL语言编写的核（kernel）卸载到FPGA上。但是，这种方法中多个并行执行的核间需要通过板上共享内存进行通信，而FPGA上的DRAM共享内存吞吐量和延迟都不理想，共享内存还会成为通信瓶颈。其次，FPGA与CPU之间的通信模型是类似GPU的批处理模型，这使得处理延迟较高（约1毫秒），不适用于需要微秒级延迟的网络数据包处理。
+近年来，为了让软件开发人员使用FPGA，FPGA厂商提出了基于OpenCL的编程工具链~\cite{aoc,sdaccel}，提供了类似GPU的编程模型。软件开发人员可以把用OpenCL语言编写的核（kernel）卸载到FPGA上。但是，这种方法中多个并行执行的核间需要通过板上共享内存进行通信，而FPGA上的DRAM共享内存吞吐量和延迟都不理想，共享内存还会成为通信瓶颈。其次，FPGA与CPU之间的通信模型是类似GPU的批处理模型，这使得处理延迟较高（约1毫秒），不适用于需要微秒级延迟的网络数据包处理。
 
 
 

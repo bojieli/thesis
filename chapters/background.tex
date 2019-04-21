@@ -77,7 +77,7 @@
 
 为此，2013 年，斯坦福大学提出了 P4 \cite{bosshart2014p4}，提供可编程的数据包解析、有状态的匹配-操作流水线等编程抽象。
 学术界提出了 P4 语言在可编程交换机芯片 \cite{bosshart2013forwarding}、可编程网卡 \cite{kaufmann2016high}、FPGA \cite{wang2017p4fpga}、CPU 虚拟交换机 \cite{shahbaz2016pisces} 上的多种实现。
-工业界的 Barefoot Tofino 交换机芯片 \cite{barefoot-tofino}、Mellanox Connect-X 网卡 \cite{mellanox} 也支持了 P4 语言。
+工业界的 Barefoot Tofino 交换机芯片 \cite{barefoot-tofino}、Mellanox Connect-X 网卡 \cite{mellanox}、基于 FPGA 的 Xilinx SDNet 网络处理器 \cite{xilinx-p4} 等也支持了 P4 语言。
 
 然而，基于网络交换机的虚拟网络在云数据中心中有一个根本挑战。
 一台柜顶交换机连接了数十台机架服务器，一台机架服务器又可以虚拟化出数十台虚拟机，因此交换机需要支持至多上千台虚拟机的数据面封装和转发规则，现有商用交换机芯片的查找表容量不足。
@@ -144,7 +144,7 @@ E2 \cite{palkar2015e2} 网络功能
 
 
 
-\subsection{能源问题的挑战}
+\subsection{数据中心功耗的挑战}
 
 如今的一个大型数据中心可以占据几个足球场的面积，容纳数十万台服务器，消耗几十甚至上百兆瓦的电力，相当于一个小型工业城镇的耗电量。据统计，2018 年全球数据中心约消耗 416 太瓦时的电力，相当于 2\% 左右的全球电力能源 \cite{datacenter-energy}，占整个信息与通信产业（ICT）能耗的约 33\%。据预测，2025 年，信息与通信产业将消耗 17.8\% 至 20.7\% 的全球电力能源，其中数据中心占 43\% 至 58\% \cite{power-consumption}，这意味着 2025 年数据中心将消耗全球电力的约 10\%。因此，数据中心的性能与效率不仅关系到互联网公司的资产和运营成本，还关系到信息产业的未来。
 

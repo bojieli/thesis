@@ -63,9 +63,9 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 
 
 \textbf {有效载荷和元数据之间的一致性。}
-对于SHM，英特尔和AMD的X86处理器提供了整体商店订购 \cite {sewell2010x86，intel-manual}，这意味着其他内核按照与编写时相同的顺序观察到两次写入。一个8字节的\texttt {MOV}指令是原子的，所以写一个标题是原子的。由于发送方在有效负载之后写入标头，因此接收方将读取一致的消息因此，不需要存储器栅栏指令。
+对于SHM，英特尔和AMD的X86处理器提供了整体商店订购 \cite {sewell2010x86,intel-manual}，这意味着其他内核按照与编写时相同的顺序观察到两次写入。一个8字节的\texttt {MOV}指令是原子的，所以写一个标题是原子的。由于发送方在有效负载之后写入标头，因此接收方将读取一致的消息因此，不需要存储器栅栏指令。
 
-因为RDMA不能确保消息中的写入顺序 \cite {infiniband2000infiniband}，我们确实需要确保消息完全到达。虽然在使用go-back-0或go-back-N loss recovery~ \cite {dragojevic2014farm}的RDMA网卡中观察到消息写入顺序，但对于具有选择性重传的更高级NIC，情况并非如此 \cite {mprdma，mittal2018revisiting} 。在\libipc {}中，发送方使用\textit {RDMA write with immediate}动词在接收方生成完成。接收器轮询RDMA \emph {完成队列}而不是环形缓冲区。 RDMA确保接收器上的高速缓存一致性，并且在将数据写入\libipc {}环形缓冲区 \cite {infiniband2000infiniband}之后保证完成消息。
+因为RDMA不能确保消息中的写入顺序 \cite {infiniband2000infiniband}，我们确实需要确保消息完全到达。虽然在使用go-back-0或go-back-N loss recovery~ \cite {dragojevic2014farm}的RDMA网卡中观察到消息写入顺序，但对于具有选择性重传的更高级NIC，情况并非如此 \cite {mprdma,mittal2018revisiting} 。在\libipc {}中，发送方使用\textit {RDMA write with immediate}动词在接收方生成完成。接收器轮询RDMA \emph {完成队列}而不是环形缓冲区。 RDMA确保接收器上的高速缓存一致性，并且在将数据写入\libipc {}环形缓冲区 \cite {infiniband2000infiniband}之后保证完成消息。
 
 
 \textbf {平摊轮询开销。}
@@ -185,7 +185,7 @@ LOS~ \cite {huang2017high}定期用内核FD调用非阻塞\texttt {epoll \_wait}
 因为\libipc {}被设计为快速且无阻塞，所以消息传递启动器很快就会收到响应。
 
 \textbf {挑战3:让多个线程分时核心。}
-对于阻塞操作（例如，阻塞recv，connect和epoll\_wait），\libipc {}首先轮询环形缓冲区一次。如果操作没有完成，而不是无限轮询，\libipc {}调用\textit {sched \_yield}以产生同一核心上的其他进程。如章节 \ref {socksdirect:subsec:bottleneck}中所述，协同多任务处理中的上下文切换仅需要0.4~$\mu$s。但是，应用程序可能需要等待很长时间才能进行外部事件，从而导致频繁的唤醒浪费。在这方面，我们计算连续唤醒，它不处理任何消息，并在达到阈值时将进程置于休眠状态。
+对于阻塞操作（例如，阻塞recv，connect和epoll\_wait），\libipc {}首先轮询环形缓冲区一次。如果操作没有完成，而不是无限轮询，\libipc {}调用\textit {sched \_yield}以产生同一核心上的其他进程。如章节 \ref {socksdirect:subsec:motivation} 中所述，协同多任务处理中的上下文切换仅需要0.4~$\mu$s。但是，应用程序可能需要等待很长时间才能进行外部事件，从而导致频繁的唤醒浪费。在这方面，我们计算连续唤醒，它不处理任何消息，并在达到阈值时将进程置于休眠状态。
 如果\libipc {}继续产生一定数量的轮次，它将使自己进入睡眠状态。在睡眠之前，它会向监视器和所有对等方发送消息，以便稍后通过消息将其唤醒。
 
 %\textbf{Handling events from kernel.}
