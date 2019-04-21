@@ -5,6 +5,8 @@
 
 \section{数据中心的性能挑战}
 
+\subsection{数据中心的过去、现在与未来}
+
 从 20 世纪 50 年代计算机的诞生到 90 年代互联网兴起前，人类的算力大部分用于高性能计算、数字化企业和个人计算机（PC），其产生的数据大多存储在一个个信息孤岛上。需要处理大量信息的大型机乃至超级计算机一般采用软硬件一体化系统，即软硬件是由同一个公司团队开发的。由于采用了高速硬件互连、硬件冗余，这些系统往往同时具备高性能和高可靠性，但成本随系统规模的扩大急剧增加。为了充分利用昂贵的计算机，虚拟化的概念应运而生。其中 20 世纪 50 至 60 年代的分时系统 \cite{strachey1959time,amdahl1964architecture} 实现了多个用户任务分时复用硬件，发展成为 70 年代 UNIX 等现代操作系统 \cite{bach1986design} 的前身。20 世纪 70 至 90 年代，虚拟机监视器（Virtual Machine Monitor，VMM）进一步实现了多个操作系统分时复用硬件 \cite{popek1974formal,agesen2010evolution}，为云计算的发展做了技术准备。
 
 20 世纪末，连接信息孤岛的搜索引擎拉开了互联网时代的序幕。数据中心不仅需要搜集、处理和索引海量信息，还需要实时响应大量用户的信息检索请求。传统的超级计算机、大型机和企业级存储不仅成本高昂，也无法满足海量信息存储和用户请求处理的可扩放性。为此，Google 提出用普通商用服务器组建可扩放的数据中心，用软件来实现存储的分区和冗余、用户请求的分派，在相对不可靠的硬件基础上组建起容错的系统 \cite{dean2008mapreduce}。
@@ -36,7 +38,7 @@
 
 \textbf{数据中心操作系统：为应用提供虚拟化抽象，一虚多，多虚一}
 
-
+\subsection{虚拟化的数据中心架构}
 
 尽管现代的云服务提供了上百种不同的服务和解决方案，其基础也是计算机所必需的计算、内存、存储、网络和互连资源。
 在目前基于机架服务器的数据中心中，由于计算设备和内存间高带宽、低延迟的需求，计算和内存一般是绑定在同一台服务器中的。
@@ -57,6 +59,38 @@
 
 
 
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{figures/virt_arch.pdf}
+	\caption{虚拟化的数据中心架构。}
+	\label{background:fig:virt-architecture}
+\end{figure}
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{figures/VPC_arch.pdf}
+	\caption{数据中心虚拟网络架构。}
+	\label{background:fig:network-architecture}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.6\textwidth]{figures/network_perf_trend.pdf}
+	\caption{数据中心网络性能的提升速度远超 CPU。}
+	\label{background:fig:network-perf-trend}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.6\textwidth]{figures/storage_arch.pdf}
+	\caption{数据中心云存储架构。}
+	\label{background:fig:storage_arch}
+\end{figure}
+
+
+
+\subsection{能源问题的挑战}
 
 如今的一个大型数据中心可以占据几个足球场的面积，容纳数十万台服务器，消耗几十甚至上百兆瓦的电力，相当于一个小型工业城镇的耗电量。据统计，2018 年全球数据中心约消耗 416 太瓦时的电力，相当于 2\% 左右的全球电力能源 \cite{datacenter-energy}，占整个信息与通信产业（ICT）能耗的约 33\%。据预测，2025 年，信息与通信产业将消耗 17.8\% 至 20.7\% 的全球电力能源，其中数据中心占 43\% 至 58\% \cite{power-consumption}，这意味着 2025 年数据中心将消耗全球电力的约 10\%。因此，数据中心的性能与效率不仅关系到互联网公司的资产和运营成本，还关系到信息产业的未来。
 
@@ -94,6 +128,8 @@
 综上，在当前的半导体技术框架下，单位面积集成电路的性能已经不再能维持两年提升一倍的速度，而且性能的提升也意味着功耗的提升，``免费的午餐'' 结束了。
 如果计算、存储和通信系统的性能只是依靠消耗更多的能源和材料线性增长，显然是既不经济又不可持续的。
 
+\subsection{性能优化的空间}
+
 在摩尔定律和 Dennard 缩放定律的红利逐渐消失的今天，我们是否可以继续提升计算机性能，维持信息产业的高速发展呢？
 答案是肯定的。
 当前的计算机系统性能还有大量的可优化空间，我们还有机会 ``从摩尔定律这个柠檬里又榨出这么多汁来'' \cite{threebody}。
@@ -104,6 +140,15 @@
 可以看到，Xeon E5 每时钟周期能执行的运算数是 4004 的约 150 倍，而晶体管数是 300 万倍。即使考虑到 64 位计算比 4 位计算复杂的因素，仍然意味着 4004 每个晶体管对算力的贡献比 Xeon E5 高数百倍。
 这是由于冯·诺伊曼结构微处理器的指令集和微体系结构越来越复杂，一方面是为了提高单线程性能，另一方面是为了支持多核间的通信与同步、操作系统和虚拟化技术，真正用于计算的晶体管占比越来越少了。
 
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{figures/moores_law_redefined.pdf}
+	\caption{通用处理器的频率和 Dennard 缩放逐渐终结，但定制化硬件重新定义并延续了摩尔定律。}
+	\label{background:fig:moores_law_redefined}
+\end{figure}
+
+
 芯片，通用处理器，冯诺依曼架构。
 
 操作系统，大量开销，数据中心税。
@@ -112,42 +157,6 @@
 
 数据中心层面：大部分物理服务器的使用率只有大约10\%到15\%，但是功耗却与使用率最高时相差无几。云为什么需要热迁移？
 
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.8\textwidth]{figures/virt_arch.pdf}
-	\caption{虚拟化的数据中心架构。}
-	\label{background:fig:virt-architecture}
-\end{figure}
-
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.8\textwidth]{figures/VPC_arch.pdf}
-	\caption{数据中心虚拟网络架构。}
-	\label{background:fig:network-architecture}
-\end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.6\textwidth]{figures/network_perf_trend.pdf}
-	\caption{数据中心网络性能的提升速度远超 CPU。}
-	\label{background:fig:network-perf-trend}
-\end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.6\textwidth]{figures/storage_arch.pdf}
-	\caption{数据中心云存储架构。}
-	\label{background:fig:storage_arch}
-\end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.8\textwidth]{figures/moores_law_redefined.pdf}
-	\caption{通用处理器的频率和 Dennard 缩放逐渐终结，但定制化硬件重新定义并延续了摩尔定律。}
-	\label{background:fig:moores_law_redefined}
-\end{figure}
 
 \iffalse
 
