@@ -11,6 +11,7 @@
 与此同时，数据中心的运营模式也在经历一场云化的变革。数据中心的算力逐渐集中到少数几家云厂商，每家拥有数以百万计的服务器。由于云数据中心的规模大，云服务商一方面有足够的规模来平摊服务器、板卡甚至芯片的设计和流片成本，另一方面通过软件优化也可以提高性能指标、降低成本，获得可观的经济效益。由于上述应用负载特性的转变和数据中心的云化，工程师获得了从硬件、系统软件到应用的全栈优化机会。
 
 在云数据中心中，不同的租户共享一个巨大的计算、存储和网络资源池。为了实现资源共享和性能隔离，数据中心需要实现计算、存储和网络的虚拟化。如图 \ref{intro:fig:virt-architecture} 所示，在基础设施作为服务（IaaS）的云服务模式下，计算节点上需要提供虚拟网络、虚拟云存储、虚拟本地存储等服务，实际的网络和云存储资源则位于独立的网络节点和存储节点上。计算节点上的虚拟网络和存储服务把数据中心内物理上分散的网络和存储资源虚拟化成逻辑上统一的资源（``多虚一''）。网络和存储节点则不仅需要把物理资源共享给多个计算节点上不同租户的虚拟机使用（``一虚多''），还需要提供数据处理功能和高层抽象。网络节点需要提供防火墙、负载均衡、加密隧道网关、网络地址转换（NAT）等网络功能；存储节点需要进行数据结构处理以提供对象存储、文件系统存储等高层抽象，还需要进行复制（replication）以实现容灾。
+第 \ref{chapter:background} 将详细介绍数据中心虚拟化的背景知识。
 
 
 \begin{figure}[htbp]
@@ -53,29 +54,39 @@
 NetBricks \cite{netbricks} 回到了 ``运行到结束'' 模型，但用高级语言实现网络功能，并在编译器和运行框架的层面上保证网络功能之间的隔离性。
 NFP \cite{sun2017nfp} 利用多个并行的网络功能流水线提高数据包处理的性能。
 
+虽然软件实现的虚拟交换机和网络功能可以使用更多数量的 CPU 核和更大的网络节点集群来支持更高的性能，但这样做会增加相当大的资产和运营成本 \cite {ananta,duet}。
+云服务商在 IaaS 业务中的盈利能力是客户为虚拟机支付的价格与托管虚拟机的成本之间的差异。
+由于每台服务器的资产和运营成本在上架部署时就已基本确定，因此降低托管虚拟机成本的最佳方法是在每台计算节点服务器上打包更多的客户虚拟机，并减少网络和存储节点的服务器数量。
+目前，物理 CPU 核（2 个超线程）的售价为 0.1 美元/小时左右，亦即最大潜在收入约为 900 美元/年。
+在数据中心，服务器通常服役 3 到 5 年，因此一个物理 CPU 核在服务器生命周期内的售价最高可达 4500 美元 \cite{smartnic}。
+即使考虑到总有一部分 CPU 核没有被售出，并且云经常为大客户提供折扣，与专用硬件相比，即使专门分配一个物理 CPU 核用于虚拟网络也是相当昂贵的。
+
 为了数据的可靠性、容量的可扩放性和分布式计算中的数据共享，云上的数据一般是存储在分布式存储系统中。
-作为一种重要的基础设施，分布式键值存储系统的研究和开发受到性能的驱动。大量分布式KVS基于CPU。为了降低计算成本，Masstree~ \cite {mao2012cache}，MemC3~ \cite {fan2013memc3}和libcuckoo~ \cite {li2014algorithmic}优化锁定，缓存，散列和内存分配算法。MICA~ \cite {lim2014mica}将哈希表分区到每个核心，从而完全避免同步。然而，这种方法为偏移的工作负载（skewed workload）引入了 CPU 核之间的不平衡。
+作为一种重要的基础设施，分布式键值存储（Key-Value Storage）系统的研究和开发受到性能的驱动。
+早期的键值存储系统，如 Memcached \cite{memcached} 的性能不令人满意。
+为了降低计算成本，Masstree~ \cite {mao2012cache}，MemC3~ \cite {fan2013memc3} 和 libcuckoo~ \cite {li2014algorithmic} 优化锁、缓存、哈希和内存分配算法。
+MICA~ \cite {lim2014mica} 将哈希表分区到每个核心，从而完全避免同步。
+然而，由于 CPU 并行性的限制，我们将在第 \ref{chapter:kvdirect} 章看到，每个 CPU 核只能处理约 500 万次键值操作请求，远低于内存随机访存所能提供的硬件性能。
+此外，这种方法在偏移的工作负载（skewed workload）下，会导致 CPU 核之间的负载不平衡。
 
+为了降低操作系统网络协议栈的开销，不依靠新型硬件的软件优化工作主要可分为两类。
+第一类工作是优化内核 TCP / IP 协议栈。 FastSocket~ \cite {lin2016scalable}，Affinity-Accept~ \cite {pesterev2012improving}，FlexSC~ \cite {soares2010flexsc} 和零拷贝套接字 \cite {thadani1995efficient,chu1996zero,linux-zero-copy} 实现良好的兼容性和隔离性。
+MegaPipe~ \cite {han2012megapipe} 和StackMap~ \cite {yasukata2016stackmap} 提出了新的API来实现零拷贝和改进 I/O 多路复用，代价是需要修改应用程序。
+但是，大量的内核开销仍然存在，这将在第 \ref {chapter:socksdirect} 中详细讨论。
 
-内核网络堆栈优化：第一项工作是优化内核TCP / IP堆栈。 FastSocket~ \cite {lin2016scalable}，Affinity-Accept~ \cite {pesterev2012improving}，FlexSC~ \cite {soares2010flexsc}和零拷贝套接字 \cite {thadani1995efficient,chu1996zero,linux-zero-copy}实现良好的兼容性和隔离性。
-
-MegaPipe~ \cite {han2012megapipe}和StackMap~ \cite {yasukata2016stackmap}提出了新的API来实现零拷贝和改进I / O多路复用，代价是需要修改应用程序。
-但是，大量的内核开销仍然存在。
-支持零拷贝的挑战是套接字语义，如章节 \ref {socksdirect:subsec:per-byte-overhead}中所述。
-
-用户空间TCP / IP堆栈：第二项工作完全绕过内核TCP / IP堆栈并在用户空间中实现TCP / IP。
-在这个类别中，IX~ \cite {belay2017ix}和Arrakis~\cite {peter2016arrakis}是新的操作系统架构，它使用虚拟化来确保安全性和隔离性。 IX利用LwIP~ \cite {dunkels2001design}在用户空间中实现TCP / IP，同时使用内核转发每个数据包以实现性能隔离和QoS。相比之下，Arrakis将QoS卸载到NIC，因此绕过数据平面的内核。
-他们使用NIC在同一主机中的应用程序之间转发数据包。
-如表 \ref {socksdirect:tab:operation-performance}所示，从CPU到NIC的发夹延迟远远高于核心间缓存迁移延迟。
-吞吐量也受到内存映射I / O（MMIO）门铃延迟和PCIe带宽的限制 \cite {neugebauer2018understanding,li2017kv}。
-
-除了这些新的OS体系结构外，许多用户空间套接字在Linux上使用高性能数据包I / O框架，例如Netmap~ \cite {rizzo2012netmap}，Intel DPDK~ \cite {dpdk}和PF\_RING \cite {pf-ring}，以便直接访问用户空间中的NIC队列。
-SandStorm~ \cite {marinos2014network}，mTCP~ \cite {jeong2014mtcp}，Seastar~ \cite {seastar}和F-Stack~ \cite {fstack}提出了新的API，因此需要修改应用程序。
-大多数API更改旨在支持零拷贝，标准API仍然会复制数据。
-FaSST~ \cite {kalia2016fasst}和eRPC~ \cite {kalia2018datacenter}提供RPC API而不是套接字。
-LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS~ \cite {huang2017high}符合标准套接字API。
-用户空间TCP / IP堆栈提供了比Linux更好的性能，但它仍然不接近RDMA和SHM。
-一个重要原因是现有的工作都不支持在线程和进程之间共享套接字，导致多线程锁定开销。
+第二类工作完全绕过内核 TCP / IP 协议栈并在用户空间中实现 TCP / IP。
+在这个类别中，IX~ \cite {belay2017ix} 和 Arrakis~\cite {peter2016arrakis} 提出了新的操作系统架构，使用虚拟化来确保安全性和隔离性。
+IX 利用 LwIP~ \cite {dunkels2001design} 在用户空间中实现TCP / IP，同时使用内核转发每个数据包以实现性能隔离和QoS。相比之下，Arrakis将QoS卸载到NIC，因此绕过数据平面的内核。
+这些工作使用网卡在同一主机中的应用程序之间转发数据包。
+然而，从 CPU 到网卡的往返延迟远远高于核心间缓存迁移延迟。
+吞吐量也受到内存映射 I/O 的门铃（doorbell）延迟和 PCIe 带宽的限制 \cite {neugebauer2018understanding,li2017kv}。
+除了这些新的操作系统体系结构，许多用户空间套接字在 Linux 上构建了高性能数据包 I/O 框架，例如 Netmap~ \cite {rizzo2012netmap}，Intel DPDK~ \cite {dpdk} 和 PF\_RING \cite {pf-ring}，以便直接访问用户空间中的 NIC 队列。
+SandStorm~ \cite {marinos2014network}，mTCP~ \cite {jeong2014mtcp}，Seastar~ \cite {seastar} 和 F-Stack~ \cite {fstack}提出了新的 API，因此需要修改应用程序。
+大多数 API 更改旨在支持零拷贝，标准 API 仍然会复制数据。
+FaSST~ \cite {kalia2016fasst} 和 eRPC~ \cite {kalia2018datacenter} 提供 RPC API 而不是套接字。
+LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL \cite {dbl} 和 LOS \cite {huang2017high}符合标准套接字API。
+用户空间 TCP / IP 协议栈提供了比 Linux 更好的性能，但它仍然不接近 RDMA 和共享内存。
+一个重要原因是现有的工作都不支持在线程和进程之间套接字的无锁共享，导致多线程间锁的开销。
 不支持套接字共享还导致进程分叉（fork）和容器热迁移（container live migration）中的兼容性问题。
 这将在第 \ref{chapter:socksdirect} 章中进一步讨论。
 
@@ -144,19 +155,12 @@ HyperLoop nsdi
 采用新硬件的方案尽管性能较高，但不仅需要新硬件的资产和运营成本，还需要软硬件协同设计的开发成本，往往比优化软件的开发成本更高。
 因此，不是所有软件都适合用硬件来加速，需要权衡成本和收益。
 
-
-虽然软件实现的虚拟交换机和网络功能可以使用更多数量的 CPU 核和更大的网络节点集群来支持更高的性能，但这样做会增加相当大的资产和运营成本 \cite {ananta,duet}。
-云服务商在 IaaS 业务中的盈利能力是客户为虚拟机支付的价格与托管虚拟机的成本之间的差异。
-由于每台服务器的资产和运营成本在上架部署时就已基本确定，因此降低托管虚拟机成本的最佳方法是在每台计算节点服务器上打包更多的客户虚拟机。
-目前，物理 CPU 核（2 个超线程）的售价为 0.1 美元/小时左右，亦即最大潜在收入约为 900 美元/年。
-在数据中心，服务器通常服役 3 到 5 年，因此一个物理 CPU 核在服务器生命周期内的售价最高可达 4500 美元 \cite{smartnic}。
-即使考虑到总有一部分 CPU 核没有被售出，并且云经常为大客户提供折扣，与专用硬件相比，即使专门分配一个物理 CPU 核用于虚拟网络也是相当昂贵的。
 为了尽可能减少计算节点上用于虚拟网络的 CPU 核，以微软 Azure 云为代表的云服务商在数据中心的每台服务器上部署了一块可编程网卡，用以加速计算节点上的虚拟网络 \cite{smartnic}。
 为了在提供高性能的同时保持一定的可编程性和灵活性，业界提出了专用芯片（ASIC）、网络处理器（Network Processor）、多核通用处理器片上系统（SoC）、现场可编程门阵列（FPGA）等可编程网卡架构。
 
 学术界也提出了多种基于专用芯片的网卡架构，如 FlexNIC \cite{kaufmann2016high}。
 基于专用芯片的柜顶交换机和可编程网卡灵活性较差，而基于通用处理器的可编程网卡和 GPU 有一定的性能局限性。
-FPGA 在性能和灵活性间达到了折中，因此微软采用了基于 FPGA 的可编程网卡 \cite{putnam2014reconfigurable}。
+FPGA 在性能和灵活性间达到了折中，因此微软采用了基于 FPGA 的可编程网卡 \cite{putnam2014reconfigurable}，这将在第 \ref{chapter:background} 中详细介绍。
 
 AWS Nitro …… 国内 ……
 
