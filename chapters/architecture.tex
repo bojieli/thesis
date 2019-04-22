@@ -13,15 +13,13 @@
 \end{figure}
 
 第 \ref{chapter:intro} 章已经讨论过，如图 \ref{arch:fig:virt-architecture} 所示，虚拟化的数据中心主要可以分为计算、网络、存储节点。
-在网络和存储节点，我们采用控制面与数据面分离的设计思想。数据面是操作相对频繁、逻辑相对简单的处理，而控制面是操作相对不频繁、逻辑相对复杂的处理。我们在可编程网卡中实现数据面，在主机 CPU 上实现控制面。这包括第 \ref{chapter:clicknp} 章的虚拟网络功能和第 \ref{chapter:kvdirect} 章的数据结构处理。加速虚拟网络功能和远程数据结构访问也是本文最重要的创新。
+在网络和存储节点，我们采用控制面与数据面分离的设计思想。数据面是操作相对频繁、逻辑相对简单的处理，而控制面是操作相对不频繁、逻辑相对复杂的处理。我们在可编程网卡中实现数据面，在主机 CPU 上实现控制面，实现了数据面完全不经过主机 CPU。这包括第 \ref{chapter:clicknp} 章的虚拟网络功能和第 \ref{chapter:kvdirect} 章的数据结构处理。加速虚拟网络功能和远程数据结构访问也是本文最重要的创新。
 
-在计算节点，亦即客户虚拟机所在的服务器主机上，我们用可编程网卡实现虚拟机监控器（hypervior）的虚拟化功能和高层抽象。
+在计算节点，亦即客户虚拟机所在的服务器主机上，我们用可编程网卡实现虚拟机监控器（hypervior）的虚拟化功能和操作系统原语。
 虚拟化分为 ``一虚多'' 和 ``多虚一'' 两个方面。
-``一虚多''，即可编程网卡把计算节点内的硬件资源虚拟化成多个逻辑资源，实现外部机器和本地虚拟机的多路复用。例如，第 \ref{chapter:clicknp} 章的 ClickNP 将硬件网卡和网络链路虚拟化为多个租户的虚拟网络；第 \ref{chapter:socksdirect} 章的 SocksDirect 实现了容器网络。
+``一虚多''，即可编程网卡把计算节点内的硬件资源虚拟化成多个逻辑资源，实现外部机器和本地虚拟机的多路复用。例如，第 \ref{chapter:clicknp} 章的 ClickNP 将硬件网卡和网络链路虚拟化为多个租户的虚拟网络；第 \ref{chapter:clicknp} 章的 KV-Direct 实现了多个客户端并发访问共享键值存储，并能保证一致性；第 \ref{chapter:socksdirect} 章的 SocksDirect 实现了容器网络。
 ``多虚一''，即可编程网卡把数据中心内物理上分散的资源虚拟化成一个逻辑资源，实现逻辑资源到物理资源的映射和路由。例如，第 \ref{chapter:clicknp} 章的 ClickNP 将数据中心内网络功能虚拟化成逻辑上统一的网络功能；第 \ref{chapter:clicknp} 章的 KV-Direct 客户端将分布式键值存储虚拟化成一个大的哈希表；还可以实现存储和内存的解聚（disaggregation）。
-高层抽象分为操作系统原语和数据结构操作原语两个方面。
-为了加速操作系统原语并控制硬件的复杂度，我们把操作系统原语分为可编程网卡上的可靠通信协议和主机 CPU 上运行的用户态库、用户态管理程序，如第 \ref{chapter:socksdirect} 章的套接字通信原语。
-为了提供数据结构操作原语，应用程序通过轻量级用户态库直接访问网卡，如第 \ref{chapter:kvdirect} 章的键值操作原语。
+为了加速操作系统原语并控制硬件的复杂度，我们把操作系统原语划分为可编程网卡上的可靠通信协议和主机 CPU 上运行的用户态库、用户态管理程序，如第 \ref{chapter:socksdirect} 章的套接字通信原语。
 
 图 \ref{arch:fig:accel-arch} 显示了基于可编程网卡的系统总体架构。下面我们将按照网络、存储和高层抽象的顺序，简要介绍本文后续各章的总体设计。
 
@@ -39,6 +37,8 @@
 
 \subsection{网络虚拟化加速}
 
+第 \ref{chapter:clicknp} 章的 ClickNP 将硬件网卡和网络链路虚拟化为多个租户的虚拟网络；第 \ref{chapter:socksdirect} 章的 SocksDirect 实现了容器网络。
+
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/virtual_network.pdf}
@@ -48,9 +48,7 @@
 
 \subsection{网络功能加速}
 
-
-位置：存储、网关等节点。CPU bypass（控制面数据面分离，数据面 offload，控制面仍在 CPU 上）
-
+我们在可编程网卡中实现数据面，在主机 CPU 上实现控制面，实现了数据面完全不经过主机 CPU。
 
 直接处理网络数据包并直接返回，数据面无需经过 CPU（ClickNP NF offload）。
 
@@ -66,6 +64,10 @@
 
 \subsection{存储虚拟化加速}
 
+第 \ref{chapter:clicknp} 章的 KV-Direct 客户端将分布式键值存储虚拟化成一个大的哈希表；
+
+不管是本地访问还是远程访问，都统一经过可编程网卡。
+
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/virt_storage.pdf}
@@ -75,10 +77,13 @@
 
 \subsection{数据结构处理加速}
 
+数据面是操作相对频繁、逻辑相对简单的处理，而控制面是操作相对不频繁、逻辑相对复杂的处理。我们在可编程网卡中实现数据面，在主机 CPU 上实现控制面，实现了数据面完全不经过主机 CPU。
+
+第 \ref{chapter:clicknp} 章的 KV-Direct 实现了多个客户端并发访问共享键值存储，并能保证一致性
 
 网卡直接访问内存数据结构
 
-直接访问远程硬件资源，而无需经过远程机器的 CPU （KV-Direct内存数据结构的服务器端，还可以访问闪存（SSD）记录日志后直接返回 ACK，缩短处理延迟）。
+直接访问远程硬件资源，而无需经过远程机器的 CPU。
 
 \begin{figure}[htbp]
 	\centering
@@ -88,6 +93,8 @@
 \end{figure}
 
 \section{操作系统加速}
+
+可编程网卡上的可靠通信协议和主机 CPU 上运行的用户态库、用户态管理程序
 
 OS kernel 给应用程序提供的原语可以重构为（控制面）协调和管理（仍在内核或用户态 daemon） + （数据面）用户态 library 负责高层抽象 + （数据面）可编程网卡负责多路复用、调度唤醒和可靠传输等低层语义，需要思考数据面上软硬件的接口（SocksDirect）。
 
@@ -123,9 +130,11 @@ FPGA 高级语言编程：ClickNP，适合流式处理的模块化 FPGA 高级�
 
 \subsection{基础服务中间件}
 
-有状态处理（stateful processing）、数据结构、可扩放 RDMA
+
+
+第 \ref{chapter:kvdirect} 章提出的 FPGA 内有状态处理（stateful processing）、数据结构。
+第 \ref{chapter:clicknp} 章的有状态网络功能、第 \ref{chapter:kvdirect} 章的内存键值存储、第 \ref{chapter:socksdirect} 章的可扩放 RDMA 的基础。
+尽管第 \ref{chapter:clicknp} 章的 ClickNP 在第 \ref{chapter:kvdirect} 章之前发表，发表时的有状态处理和哈希表是使用与应用逻辑耦合紧密的方式实现的，既不容易扩放到大量并发连接，代码的可维护性也不强。
+使用第 \ref{chapter:kvdirect} 章的 KV-Direct 作为基础后，这些网络功能的实现将变得模块化和可扩放。
 
 本文使用高级语言编程框架实现基础服务中间件，中间件未来可以硬件化。
-
-\subsection{主机上的用户态运行库}
-
