@@ -117,6 +117,8 @@ TCP 卸载引擎（TCP Offload Engine，TOE） \cite {tcp-chimney-offload} 将�
 它们具有相似的设计，其中 RSocket 的开发最活跃，是套接字转换 RDMA 的事实标准。
 FreeFlow~ \cite {nsdi19freeflow} 利用 RDMA 网卡提供容器（container）覆盖网络（overlay network），它利用共享内存进行主机内部通信，利用 RDMA 进行主机间通信。
 FreeFlow 使用 RSocket 将套接字转换为 RDMA。
+但是，RSocket 的性能和兼容性都不令人满意。
+我们在第 \ref{chapter:socksdirect} 章将提出一个与现有应用兼容，并能充分利用 RDMA 网卡性能的套接字系统。
 
 为了加速键值存储系统，近年来的工作 \cite {kalia2014using,kalia2016design,kalia2014using,kalia2016design} 利用 RDMA 网卡基于硬件的网络协议栈，使用双面RDMA作为KVS客户端和服务器之间的RPC机制进一步提高每核吞吐量并减少延迟。尽管这些工作进一步降低了网络通信的开销，但如上一节所讨论的，这些系统仍然受到 CPU 的并行性限制。
 
@@ -126,18 +128,16 @@ FreeFlow 使用 RSocket 将套接字转换为 RDMA。
 利用支持 P4 \cite{bosshart2014p4} 的可编程交换机 \cite{barefoot-tofino} 来加速键值存储系统也是近年来研究的热点。
 SwitchKV~\cite {li2016fast} 利用基于内容的路由将请求路由到基于缓存键的后端节点，NetCache~ \cite {netcache-sosp17} 进一步将访问频繁的键值缓存在交换机中。这种负载平衡和缓存也将使我们的系统受益。
 
-为了在键值存储系统中支持事务，近年来学术界有数据中心网络与共识协议（consensus protocol）共同设计的趋势。
+为了在键值存储系统中支持事务（transaction），近年来学术界有数据中心网络与共识协议（consensus protocol）共同设计的趋势。
+传输顺序在共识协议中至关重要，因此近年来的快速 Paxos~\cite{lamport2006fast,kemme1999processing,moraru2013there,pedone1998optimistic} 协议采用尽力而为的方法提高传输的有序性。
+进一步的工作是在网络中提供先入先出（FIFO）和全序（total ordering）的传输顺序保证。
+Speculative Paxos~\cite{ports2015designing} 和 NOPaxos~\cite{li2016just} 利用可编程交换机作为中心化的序列号发生器或序列化点。
+NetPaxos \cite{dang2015netpaxos,dang2016paxos} 和 \cite{dang2016network} 把传统 Paxos 协议放在网络交换机中实现。
+Eris~\cite{eris} 提出使用网络交换机作为序列号发生器，在网络中实现并发控制，实现了快速事务处理。
+NetChain~\cite{jin2018netchain} 在网络交换机中实现了一个高一致性、容错的键值存储。
+Hyperloop~\cite{kim2018hyperloop} 在存储节点上利用可编程网卡把写操作写入非易失性内存中的缓冲区，并立即向计算节点回复确认消息，再由存储节点上的软件异步处理非易失性内存中的写操作。这消除了写操作等待存储节点软件处理的延迟。
+Google Spanner~\cite{corbett2013spanner} 利用全球同步的 GPS 时钟实现了跨地理区域复制的高性能数据库。
 
-The key idea is to provide FIFO and total ordering in the network, going a step further than best-effort ordering in Fast Paxos~\cite{lamport2006fast,kemme1999processing,moraru2013there,pedone1998optimistic}.
-Speculative Paxos~\cite{ports2015designing} and NOPaxos~\cite{li2016just} use a switch as a centralized sequencer or serialization point.
-NetPaxos~\cite{dang2015netpaxos,dang2016paxos} and \cite{dang2016network} implement Paxos in switches.
-Eris~\cite{eris} proposes in-network concurrency control using switch as a centralized sequencer, which is a scalability bottleneck.
-NetChain~\cite{jin2018netchain} is a strongly-consistent fault-tolerant key-value store in switches, but the switch has very limited storage capacity.
-
-HyperLoop nsdi
-
-
-GPS: Google Spanner
 
 
 \subsection{设计新硬件}
