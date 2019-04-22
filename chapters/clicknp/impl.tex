@@ -97,6 +97,16 @@ PCIe通道可以在中断或轮询模式下工作。
 	\label{clicknp:fig:pcie}
 \end{figure}
 
+\subsection{Verilog 元件}
+
+\textbf{把 Verilog 元件封装成一个 OpenCL kernel，使用 Avalon ST 或 AXI 接口与外部连接。}
+
+\subsection{元件热迁移和高可用}
+
+\textbf{热升级：不丢包，的时候原来的 FPGA 不处理了，buffer 起来。把旧 FPGA 的状态迁移到新 FPGA，让交换机开始往新 FPGA 的 buffer 里灌，然后从旧 FPGA 的 buffer 里把数据倒出来在新的 FPGA 里处理，处理完后开始处理新 FPGA 自己的 buffer，迁移结束。}
+
+\textbf{高可用：状态机复制的方法，两个 FPGA 收到相同的数据包序列，只要元件内部没有随机化或与时间相关的处理逻辑，就能保证两个 FPGA 收到的数据包序列相同。检测到备份节点故障，只需启动一个新的备份节点，然后执行热升级操作。检测到主节点故障，切换输出到备份节点（可能出现少量数据包丢失或重复，TCP 可以安全地处理这些情况）。}
+
 \egg{
 
 \egg{
