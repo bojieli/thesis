@@ -61,14 +61,6 @@ NFP \cite{sun2017nfp} 利用多个并行的网络功能流水线提高数据包�
 在数据中心，服务器通常服役 3 到 5 年，因此一个物理 CPU 核在服务器生命周期内的售价最高可达 4500 美元 \cite{smartnic}。
 即使考虑到总有一部分 CPU 核没有被售出，并且云经常为大客户提供折扣，与专用硬件相比，即使专门分配一个物理 CPU 核用于虚拟网络也是相当昂贵的。
 
-为了数据的可靠性、容量的可扩放性和分布式计算中的数据共享，云上的数据一般是存储在分布式存储系统中。
-作为一种重要的基础设施，分布式键值存储（Key-Value Storage）系统的研究和开发受到性能的驱动。
-早期的键值存储系统，如 Memcached \cite{memcached} 的性能不令人满意。
-为了降低计算成本，Masstree~ \cite {mao2012cache}，MemC3~ \cite {fan2013memc3} 和 libcuckoo~ \cite {li2014algorithmic} 优化锁、缓存、哈希和内存分配算法。
-MICA~ \cite {lim2014mica} 将哈希表分区到每个核心，从而完全避免同步。
-然而，由于 CPU 并行性的限制，我们将在第 \ref{chapter:kvdirect} 章看到，每个 CPU 核只能处理约 500 万次键值操作请求，远低于内存随机访存所能提供的硬件性能。
-此外，这种方法在偏移的工作负载（skewed workload）下，会导致 CPU 核之间的负载不平衡。
-
 为了降低操作系统网络协议栈的开销，不依靠新型硬件的软件优化工作主要可分为两类。
 第一类工作是优化内核 TCP / IP 协议栈。 FastSocket~ \cite {lin2016scalable}，Affinity-Accept~ \cite {pesterev2012improving}，FlexSC~ \cite {soares2010flexsc} 和零拷贝套接字 \cite {thadani1995efficient,chu1996zero,linux-zero-copy} 实现良好的兼容性和隔离性。
 MegaPipe~ \cite {han2012megapipe} 和StackMap~ \cite {yasukata2016stackmap} 提出了新的API来实现零拷贝和改进 I/O 多路复用，代价是需要修改应用程序。
@@ -90,53 +82,52 @@ LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL \cite {dbl} 和 LO
 不支持套接字共享还导致进程分叉（fork）和容器热迁移（container live migration）中的兼容性问题。
 这将在第 \ref{chapter:socksdirect} 章中进一步讨论。
 
+为了数据的可靠性、容量的可扩放性和分布式计算中的数据共享，云上的数据一般存储在分布式存储系统中。
+作为一种重要的基础设施，分布式键值存储（Key-Value Storage）系统的研究和开发一直是系统学术界和工业界热点。
+本文主要关注基于内存的键值存储系统，用途包括 Web 服务的对象缓存系统，NoSQL 数据库中的数据索引 \cite {chang2008bigtable}，机器学习中的参数服务器 \cite {li2014scaling}，图计算 \cite {shao2013trinity,xiao17tux2} 和分布式同步中的序列发生器 \cite {kalia2016design,eris} 等。
+早期的内存键值存储系统，如 Memcached \cite{memcached} 的性能不令人满意。
+为了降低计算成本，Masstree~ \cite {mao2012cache}，MemC3~ \cite {fan2013memc3} 和 libcuckoo~ \cite {li2014algorithmic} 优化锁、缓存、哈希和内存分配算法。
+MICA~ \cite {lim2014mica} 将哈希表分区到每个核心，从而完全避免同步。
+
+为了摆脱操作系统内核的开销，最近的键值存储系统  \cite {kapoor2012chronos,ousterhout2010case,ousterhout2015ramcloud,lim2014mica,li2016full} 利用 Netmap \cite {rizzo2012netmap} 和 DPDK \cite{intel2014data} 等高性能网络数据包处理框架，轮询来自网卡的网络数据包，并且使用上文所述的用户空间轻量级网络协议栈处理它们。
+然而，由于 CPU 并行性的限制，我们将在第 \ref{chapter:kvdirect} 章看到，即使不考虑网络的开销，每个 CPU 核也只能处理约 500 万次键值操作请求，远低于内存随机访存所能提供的硬件性能。
+此外，这种方法在偏移的工作负载（skewed workload）下，会导致 CPU 核之间的负载不平衡。
+
+
+
 
 
 \subsection{利用新型商用硬件}
 
 
-由于大规模 Web 服务、大数据处理、机器学习等应用对计算和网络的性能需求非常迫切，GPU，RDMA……
+由于大规模 Web 服务、大数据处理、机器学习等应用对计算和网络的性能需求非常迫切，图形处理器（GPU）等计算加速设备和远程直接内存访问（RDMA） \cite{infiniband2000infiniband} 等网络加速技术在越来越多的数据中心广泛部署。
 
+为了加速虚拟网络和网络功能，以前的工作已经提出使用 GPU \cite {packetshader}，网络处理器（Network Processor，NP） \cite {cavium,netronome} 和硬件网络交换机 \cite {duet}。
+GPU 早期主要用于图形处理，近年来扩展到具有海量数据并行性的其他应用程序。
+PacketShader \cite {packetshader} 表明使用 GPU 可以实现 40Gbps 的分组交换速度。
+GPU 适合批量操作，但是，批量操作会导致高延迟。
+例如，PacketShader \cite {packetshader} 报告的转发延迟约为 $200 \mu{}s$。
 
-为了加速软件包处理，以前的工作已经提出使用GPU \cite {packetshader}，专用网络处理器（NP）\cite {cavium,netronome} 和硬件交换机 \cite {duet}。
-GPU主要用于图形处理，最近扩展到具有海量数据并行性的其他应用程序。 GPU更适合批量操作。 PacketShader \cite {packetshader}，表明使用GPU可以实现40Gbps的分组交换速度。
-但是，批量操作会导致高延迟。
-例如，\cite {packetshader}中报告的转发延迟约为$200 \mu{}s$。
+为了降低操作系统通信原语的开销，一系列工作将套接字系统的一部分卸载到网卡硬件上。
+TCP 卸载引擎（TCP Offload Engine，TOE） \cite {tcp-chimney-offload} 将部分或全部的 TCP / IP 协议栈卸载到网卡，但它们仅在专用领域中成功了，例如 iSCSI HBA 存储卡 \cite {iscsi-hba} 和无状态卸载（例如校验和、接收侧扩放（RSS）、大发送数据卸载（LSO）、大接收数据卸载（LRO） \cite {lsolro}）。
+由于数据中心的硬件趋势和应用需求，\emph {有状态}卸载的故事近年来有所不同 \cite {chuanxiong-rdma-keynote}。
+因此，RDMA \cite {infiniband2000infiniband} 在生产数据中心中广泛使用 \cite {guo2016rdma}。
+与基于软件的 TCP / IP 网络协议栈相比，RDMA 使用硬件卸载来提供超低延迟和接近零的 CPU 开销。
+为了使套接字应用程序能够使用 RDMA，RSocket \cite {rsockets}，SDP~ \cite {socketsdirect} 和 UNH EXS~ \cite {russell2008extended} 将套接字操作转换为 RDMA 原语。
+它们具有相似的设计，其中 RSocket 的开发最活跃，是套接字转换 RDMA 的事实标准。
+FreeFlow~ \cite {nsdi19freeflow} 利用 RDMA 网卡提供容器（container）覆盖网络（overlay network），它利用共享内存进行主机内部通信，利用 RDMA 进行主机间通信。
+FreeFlow 使用 RSocket 将套接字转换为 RDMA。
 
+为了加速键值存储系统，近年来的工作 \cite {kalia2014using,kalia2016design,kalia2014using,kalia2016design} 利用 RDMA 网卡基于硬件的网络协议栈，使用双面RDMA作为KVS客户端和服务器之间的RPC机制进一步提高每核吞吐量并减少延迟。尽管这些工作进一步降低了网络通信的开销，但如上一节所讨论的，这些系统仍然受到 CPU 的并行性限制。
 
-
-为了摆脱操作系统内核的开销， \cite {rizzo2012netmap,intel2014data}直接轮询来自NIC的网络数据包，并且\cite {jeong2014mtcp,marinos2014network}使用用户空间轻量级网络堆栈处理它们。
-键值存储系统 \cite {kapoor2012chronos,ousterhout2010case,ousterhout2015ramcloud,lim2014mica,li2016full}受益于这种高性能优化。
-作为朝着这个方向迈出的又一步，最近的作品\cite {infiniband2000infiniband,kalia2014using,kalia2016design,kalia2014using,kalia2016design}利用RDMA NIC的基于硬件的网络堆栈，使用双面RDMA作为KVS客户端和服务器之间的RPC机制进一步提高每核吞吐量并减少延迟。尽管如此，这些系统仍受CPU限制（\S \ref {kvdirect:sec:state-of-the-art-kvs}）。
-
-另一种不同的方法是利用单侧RDMA。 Pilaf~ \cite {mitchell2013using}和FaRM~ \cite {dragojevic2014farm}采用单向RDMA读取进行GET操作，FaRM实现了使网络饱和的吞吐量。 Nessie~ \cite {szepesi2014designing}，DrTM~ \cite {wei2015fast}，DrTM + R~ \cite {chen2016fast}和FaSST~ \cite {kalia2016fasst}利用分布式事务来实现单向RDMA的GET和PUT。但是，PUT操作的性能受到一致性保证的不可避免的同步开销的影响，受到RDMA原语的限制 \cite {kalia2016design}。此外，客户端CPU涉及KV处理，将每个核心的吞吐量限制在客户端的大约10~Mops。
+另一种不同的方法是利用单侧RDMA。 Pilaf~ \cite {mitchell2013using} 和FaRM~ \cite {dragojevic2014farm} 采用单向RDMA读取进行GET操作，FaRM实现了使网络饱和的吞吐量。 Nessie~ \cite {szepesi2014designing}，DrTM~ \cite {wei2015fast}，DrTM + R~ \cite {chen2016fast} 和FaSST~ \cite {kalia2016fasst} 利用分布式事务来实现单向RDMA的GET和PUT。但是，PUT操作的性能受到一致性保证的不可避免的同步开销的影响，受到RDMA原语的限制 \cite {kalia2016design}。此外，客户端CPU涉及KV处理，将每个核心的吞吐量限制在客户端的大约10~Mops。
 相比之下，本文将RDMA原语扩展到键值操作，同时保证服务器端的一致性，使KVS客户端完全透明，同时实现高吞吐量和低延迟，即使对于PUT操作也是如此。
 
-二级索引是通过其他键检索数据的重要功能
-比数据存储系统中的主键 \cite {escriva2012hyperdex,kejriwal2016slik}。 SLIK~ \cite {kejriwal2016slik}在键值存储系统中使用B +树算法支持多个二级密钥。探索如何支持二级索引以帮助本文迈向通用数据存储系统将会很有趣。 SwitchKV~ \cite {li2016fast}利用基于内容的路由将请求路由到基于缓存密钥的后端节点，NetCache~ \cite {netcache-sosp17}进一步将KV缓存在交换机中。这种负载平衡和缓存也将使我们的系统受益。
-Eris~ \cite {eris}利用网络序列发生器来实现高效的分布式事务，这可以为客户端同步的单侧RDMA方法带来新的生命。
+利用支持 P4 \cite{bosshart2014p4} 的可编程交换机 \cite{barefoot-tofino} 来加速键值存储系统也是近年来研究的热点。
+SwitchKV~\cite {li2016fast} 利用基于内容的路由将请求路由到基于缓存键的后端节点，NetCache~ \cite {netcache-sosp17} 进一步将访问频繁的键值缓存在交换机中。这种负载平衡和缓存也将使我们的系统受益。
 
-存储虚拟化……
+为了在键值存储系统中支持事务，近年来学术界有数据中心网络与共识协议（consensus protocol）共同设计的趋势。
 
-
-第三行研究将套接字系统的一部分卸载到NIC硬件上。
-TCP卸载引擎（TOE） \cite {tcp-chimney-offload}将部分或完整的TCP / IP堆栈卸载到NIC，但它们仅在专用区域中起飞（例如iSCSI HBA~ \cite {iscsi-hba}）和无状态卸载（例如校验和，流动转向和LSO / LRO~ \cite {lsolro}）。
-由于数据中心的硬件趋势和应用需求，\emph {stateful}卸载的故事近年来有所不同 \cite {chuanxiong-rdma-keynote}。
-因此，RDMA~ \cite {infiniband2000infiniband}在生产数据中心中广泛使用 \cite {guo2016rdma}。
-与基于软件的TCP / IP网络堆栈相比，RDMA使用硬件卸载来提供超低延迟和接近零的CPU开销。
-要使套接字应用程序能够使用RDMA，RSocket~ \cite {rsockets}，SDP~ \cite {socketsdirect}和UNH EXS~ \cite {russell2008extended}将套接字操作转换为RDMA谓词。
-它们具有相似的设计，而RSocket是最活跃的设计。
-FreeFlow~ \cite {nsdi19freeflow}虚拟化容器覆盖网络的RDMA NIC，它利用SHM进行主机内部和RDMA进行主机间通信。
-FreeFlow使用RSocket将套接字转换为RDMA。
-
-
-应用层：存储复制，数据库事务
-
-GPS: Google Spanner
-
-可编程交换机
-
-Recent years witness a trend of co-designing consensus protocols with data center network.
 The key idea is to provide FIFO and total ordering in the network, going a step further than best-effort ordering in Fast Paxos~\cite{lamport2006fast,kemme1999processing,moraru2013there,pedone1998optimistic}.
 Speculative Paxos~\cite{ports2015designing} and NOPaxos~\cite{li2016just} use a switch as a centralized sequencer or serialization point.
 NetPaxos~\cite{dang2015netpaxos,dang2016paxos} and \cite{dang2016network} implement Paxos in switches.
@@ -144,6 +135,9 @@ Eris~\cite{eris} proposes in-network concurrency control using switch as a centr
 NetChain~\cite{jin2018netchain} is a strongly-consistent fault-tolerant key-value store in switches, but the switch has very limited storage capacity.
 
 HyperLoop nsdi
+
+
+GPS: Google Spanner
 
 
 \subsection{设计新硬件}
@@ -158,7 +152,8 @@ HyperLoop nsdi
 为了尽可能减少计算节点上用于虚拟网络的 CPU 核，以微软 Azure 云为代表的云服务商在数据中心的每台服务器上部署了一块可编程网卡，用以加速计算节点上的虚拟网络 \cite{smartnic}。
 为了在提供高性能的同时保持一定的可编程性和灵活性，业界提出了专用芯片（ASIC）、网络处理器（Network Processor）、多核通用处理器片上系统（SoC）、现场可编程门阵列（FPGA）等可编程网卡架构。
 
-学术界也提出了多种基于专用芯片的网卡架构，如 FlexNIC \cite{kaufmann2016high}。
+学术界也提出了多种基于专用芯片的网卡架构。
+FlexNIC \cite{kaufmann2016high} 提供了调度、卸载和包分类等新网卡功能。
 基于专用芯片的柜顶交换机和可编程网卡灵活性较差，而基于通用处理器的可编程网卡和 GPU 有一定的性能局限性。
 FPGA 在性能和灵活性间达到了折中，因此微软采用了基于 FPGA 的可编程网卡 \cite{putnam2014reconfigurable}，这将在第 \ref{chapter:background} 中详细介绍。
 
@@ -166,14 +161,7 @@ AWS Nitro …… 国内 ……
 
 
 
-FPGA是一项成熟的技术，最近已经部署用于加速数据中心服务，包括网络功能 \cite {putnam2014reconfigurable,smartnic,rubow2010chimpp,lavasani2012compiling}。
-众所周知，FPGA的可编程性很低，有丰富的前人工作提供了高级编程抽象 \cite {bluespec,auerbach2010lime,bacon2013fpga,singh2011implementing,bachrach2012chisel,wester2015transformation}。
-Gorilla \cite {lavasani2012compiling} 为FPGA上的数据包交换提出了一种领域特定的高级语言。
-然而，Chimpp \cite {rubow2010chimpp} 试图将Click模型引入HDL来开发模块化路由器。
 
-Click2NetFPGA~\cite {Click2NetFPGA}通过直接将Click模块化路由器\cite {kohler2000click}程序编译到FPGA中来提供模块化架构。
-然而，\cite {Click2NetFPGA}的性能比我们在本文中报告的要低得多（两个数量级），因为它们的系统设计存在几个瓶颈（例如，内存和数据包I / O），它们也是 错过几个重要的优化以确保完全流水线处理（如\S \ref {clicknp:sec:optimization}中所述）。
-此外，\cite {Click2NetFPGA}不支持FPGA / CPU联合处理，因此无法在数据平面运行时更新配置或读取状态。
 
 
 
@@ -181,15 +169,25 @@ Click2NetFPGA~\cite {Click2NetFPGA}通过直接将Click模块化路由器\cite {
 作为一种灵活且可定制的硬件，FPGA现已广泛部署在数据中心规模 \cite {putnam2014reconfigurable,caulfield2016cloud}中，并且针对可编程性进行了大幅改进 \cite {bacon2013fpga,li2016clicknp}。一些早期的工作已探索在FPGA上构建KVS。但是其中一些是不实用的，限制片上数据存储（大约几MB内存） \cite {liang16fpl}或板载DRAM（通常是8GB内存） \cite {istvan2013flexible,chalamalasetti2013fpga,istvan2015hash}。
 \cite {blott2015scaling}专注于提高系统容量而不是吞吐量，并采用SSD作为板载DRAM的二级存储。
 \cite {liang16fpl,chalamalasetti2013fpga}限制它们在固定大小键值对中的使用，这只能用于特殊用途，而不是一般的键值存储。
-\cite {blott13hotcloud,lavasani2014fpga}使用主机DRAM存储哈希表，而\cite {tokusashi2016multilevel}使用NIC DRAM作为主机DRAM的缓存，但它们没有针对网络和PCIe DMA带宽进行优化，导致性能不佳。
-本文充分利用了NIC DRAM和主机DRAM，使我们基于FPGA的键值存储系统通用，并且能够进行大规模部署。此外，我们精心的硬件和软件协同设计，以及对PCIe和网络的优化，将性能推向了物理限制，推进了最先进的解决方案。
+\cite {blott13hotcloud,lavasani2014fpga}使用主机DRAM存储哈希表，而\cite {tokusashi2016multilevel}使用网卡 DRAM作为主机DRAM的缓存，但它们没有针对网络和PCIe DMA带宽进行优化，导致性能不佳。
+本文第 \ref{chapter:kvdirect} 章充分利用了网卡 DRAM 和主机 DRAM，使我们基于FPGA的键值存储系统通用，并且能够进行大规模部署。此外，我们精心的软硬件协同设计，以及对PCIe和网络的优化，将性能推向了硬件极限。
 
 
+
+FPGA是一项成熟的技术，最近已经部署用于加速数据中心服务，包括网络功能 \cite {putnam2014reconfigurable,smartnic,rubow2010chimpp,lavasani2012compiling}。
 传统上，FPGA使用Verilog、VHDL等硬件描述语言编程。众所周知，硬件描述语言难以调试、编写和修改，给软件人员使用FPGA带来了很大挑战。
 
-为了提高FPGA的开发效率，FPGA厂商提供了高层次综合（HLS）工具~\cite{vivado,intel-hls}，可以把C代码编译成硬件模块。学术界提出了 Chisel \cite{bachrach2012chisel} 等。但这些工具只是硬件开发工具链的补充，程序员仍然需要手动将从C语言生成的硬件模块插入到HDL项目中，且FPGA与主机CPU之间的通信也需要自行处理。这样的模型仍然不足以让软件开发人员使用FPGA。
+为了提高FPGA的开发效率，FPGA厂商提供了高层次综合（HLS）工具~\cite{vivado,intel-hls}，可以把受限的 C 代码编译成硬件模块。学术界和工业界提出了 Bluespec \cite{bluespec}、Lime \cite{auerbach2010lime} 和 Chisel \cite{bachrach2012chisel} 等高效硬件开发语言 \cite{bacon2013fpga,singh2011implementing,wester2015transformation}，但它们需要开发者具有足够的硬件设计知识。但这些工具只是硬件开发工具链的补充，程序员仍然需要手动将从C语言生成的硬件模块插入到硬件描述语言的项目中，且 FPGA 与主机 CPU 之间的通信也需要自行处理。高层次综合工具和高效硬件开发语言可以提高硬件开发人员的工作效率，但仍然不足以让软件开发人员使用 FPGA。
 
 近年来，为了让软件开发人员使用FPGA，FPGA厂商提出了基于OpenCL的编程工具链~\cite{aoc,sdaccel}，提供了类似GPU的编程模型。软件开发人员可以把用OpenCL语言编写的核（kernel）卸载到FPGA上。但是，这种方法中多个并行执行的核间需要通过板上共享内存进行通信，而FPGA上的DRAM共享内存吞吐量和延迟都不理想，共享内存还会成为通信瓶颈。其次，FPGA与CPU之间的通信模型是类似GPU的批处理模型，这使得处理延迟较高（约1毫秒），不适用于需要微秒级延迟的网络数据包处理。
+
+本文第 \ref{chapter:clicknp} 章将提出一个让软件开发人员可用，且网络处理性能高的 FPGA 编程框架。
+事实上本文并不是第一个试图简化 FPGA 上网络编程的工作，但之前的工作或者对软件开发人员不友好，或者性能太差。
+Gorilla \cite {lavasani2012compiling} 为FPGA上的数据包交换提出了一种领域特定的高级语言；Chimpp \cite {rubow2010chimpp} 试图将 Click 模型引入硬件描述语言来开发模块化路由器。
+Click2NetFPGA~\cite {Click2NetFPGA} 通过直接将 Click 模块化路由器 \cite {kohler2000click} 的 C++ 程序编译到 FPGA 来提供模块化架构。
+然而，Click2NetFPGA 的性能的系统设计存在若干瓶颈（例如，内存和数据包 I/O），它们也没有优化代码以确保完全流水线处理，因此比本文达到的性能低两个数量级。
+此外，Click2NetFPGA 不支持FPGA / CPU联合处理，因此无法在数据平面运行时更新配置或读取状态。
+
 
 
 
