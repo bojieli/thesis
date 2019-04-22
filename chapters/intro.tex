@@ -107,10 +107,13 @@ GPU 早期主要用于图形处理，近年来扩展到具有海量数据并行�
 PacketShader \cite {packetshader} 表明使用 GPU 可以实现 40Gbps 的分组交换速度。
 GPU 适合批量操作，但是，批量操作会导致高延迟。
 例如，PacketShader \cite {packetshader} 报告的转发延迟约为 $200 \mu{}s$。
+网络处理器的历史则可以追溯到 20 世纪 90 年代 TCP 卸载的第一波浪潮。
+Click 模块化路由器 \cite{kohler2000click} 提出的第二年，NP-Click \cite{shah2004np} 就在网络处理器上实现了 Click 编程框架。
+硬件网络交换机的主要问题是灵活性和查找表容量不足 \cite {duet}。
 
 为了降低操作系统通信原语的开销，一系列工作将套接字系统的一部分卸载到网卡硬件上。
-TCP 卸载引擎（TCP Offload Engine，TOE） \cite {tcp-chimney-offload} 将部分或全部的 TCP / IP 协议栈卸载到网卡，但它们仅在专用领域中成功了，例如 iSCSI HBA 存储卡 \cite {iscsi-hba} 和无状态卸载（例如校验和、接收侧扩放（RSS）、大发送数据卸载（LSO）、大接收数据卸载（LRO） \cite {lsolro}）。
-由于数据中心的硬件趋势和应用需求，\emph {有状态}卸载的故事近年来有所不同 \cite {chuanxiong-rdma-keynote}。
+TCP 卸载引擎（TCP Offload Engine，TOE） \cite {tcp-chimney-offload} 将部分或全部的 TCP / IP 协议栈卸载到网卡，但由于通用处理器的性能按摩尔定律迅速增长，这些专用硬件的性能优势有限，仅在专用领域中获得成功，例如 iSCSI HBA 存储卡 \cite {iscsi-hba} 和无状态卸载（例如校验和、接收侧扩放（RSS）、大发送数据卸载（LSO）、大接收数据卸载（LRO） \cite {lsolro}）。
+近年来，由于数据中心的硬件趋势和应用需求，\emph {有状态}卸载的故事开始复兴 \cite {chuanxiong-rdma-keynote}。
 因此，RDMA \cite {infiniband2000infiniband} 在生产数据中心中广泛使用 \cite {guo2016rdma}。
 与基于软件的 TCP / IP 网络协议栈相比，RDMA 使用硬件卸载来提供超低延迟和接近零的 CPU 开销。
 为了使套接字应用程序能够使用 RDMA，RSocket \cite {rsockets}，SDP~ \cite {socketsdirect} 和 UNH EXS~ \cite {russell2008extended} 将套接字操作转换为 RDMA 原语。
@@ -142,51 +145,43 @@ Google Spanner~\cite{corbett2013spanner} 利用全球同步的 GPS 时钟实现�
 
 \subsection{设计新硬件}
 
-为深度学习设计新硬件，TPU……
-
 随着通用处理器的性能提升遇到了瓶颈，各大云服务商开始探索使用定制化硬件来 ``减税降负''，也就是把数据中心的虚拟化、操作系统和高层抽象的开销从通用处理器转移到定制化硬件上。
 使用定制化硬件并不是在硬件中原样实现已有的软件，而是对已有软件进行重构，划分出数据面和控制面，数据面优化后在硬件中实现，控制面则留在软件上。
 采用新硬件的方案尽管性能较高，但不仅需要新硬件的资产和运营成本，还需要软硬件协同设计的开发成本，往往比优化软件的开发成本更高。
 因此，不是所有软件都适合用硬件来加速，需要权衡成本和收益。
 
 为了尽可能减少计算节点上用于虚拟网络的 CPU 核，以微软 Azure 云为代表的云服务商在数据中心的每台服务器上部署了一块可编程网卡，用以加速计算节点上的虚拟网络 \cite{smartnic}。
-为了在提供高性能的同时保持一定的可编程性和灵活性，业界提出了专用芯片（ASIC）、网络处理器（Network Processor）、多核通用处理器片上系统（SoC）、现场可编程门阵列（FPGA）等可编程网卡架构。
-
-学术界也提出了多种基于专用芯片的网卡架构。
-FlexNIC \cite{kaufmann2016high} 提供了调度、卸载和包分类等新网卡功能。
+为了在提供高性能的同时保持一定的可编程性和灵活性，业界提出了专用芯片（ASIC）、网络处理器（Network Processor）、多核通用处理器片上系统（SoC）、现场可编程门阵列（FPGA）等可编程网卡架构，我们将在 \ref{smartnic-architecture} 节中详细讨论。
+学术界也提出了多种可编程网卡架构。
+例如，FlexNIC \cite{kaufmann2016high} 提供了调度、卸载和包分类等新网卡功能。
 基于专用芯片的柜顶交换机和可编程网卡灵活性较差，而基于通用处理器的可编程网卡和 GPU 有一定的性能局限性。
-FPGA 在性能和灵活性间达到了折中，因此微软采用了基于 FPGA 的可编程网卡 \cite{putnam2014reconfigurable}，这将在第 \ref{chapter:background} 中详细介绍。
+FPGA 在性能和灵活性间达到了折中，因此微软采用了基于 FPGA 的可编程网卡 \cite{putnam2014reconfigurable}，我们将在第 \ref{chapter:background} 章中详细介绍。
 
-AWS Nitro …… 国内 ……
-
-
-
-
-
-
-
-
-作为一种灵活且可定制的硬件，FPGA现已广泛部署在数据中心规模 \cite {putnam2014reconfigurable,caulfield2016cloud}中，并且针对可编程性进行了大幅改进 \cite {bacon2013fpga,li2016clicknp}。一些早期的工作已探索在FPGA上构建KVS。但是其中一些是不实用的，限制片上数据存储（大约几MB内存） \cite {liang16fpl}或板载DRAM（通常是8GB内存） \cite {istvan2013flexible,chalamalasetti2013fpga,istvan2015hash}。
-\cite {blott2015scaling}专注于提高系统容量而不是吞吐量，并采用SSD作为板载DRAM的二级存储。
-\cite {liang16fpl,chalamalasetti2013fpga}限制它们在固定大小键值对中的使用，这只能用于特殊用途，而不是一般的键值存储。
-\cite {blott13hotcloud,lavasani2014fpga}使用主机DRAM存储哈希表，而\cite {tokusashi2016multilevel}使用网卡 DRAM作为主机DRAM的缓存，但它们没有针对网络和PCIe DMA带宽进行优化，导致性能不佳。
+一些早期的工作已探索在 FPGA 上构建键值存储系统。但是其中一些只使用片上数据存储（大约几MB内存） \cite {liang16fpl} 或板载 DRAM（例如8 GB内存） \cite {istvan2013flexible,chalamalasetti2013fpga,istvan2015hash}，因此存储容量有限。
+工作 \cite {blott2015scaling} 专注于提高系统容量而不是吞吐量，并采用 SSD 作为板载 DRAM 的二级存储。
+工作 \cite {liang16fpl,chalamalasetti2013fpga} 只能存储固定大小的键值对，这样的键值存储系统只能用于一些特定的应用，不够通用。
+工作 \cite {blott13hotcloud,lavasani2014fpga} 使用主机 DRAM 存储哈希表，而工作 \cite {tokusashi2016multilevel} 使用网卡 DRAM 作为主机 DRAM 的缓存，但它们没有针对网络和 PCIe DMA 带宽进行优化，导致性能不佳。
 本文第 \ref{chapter:kvdirect} 章充分利用了网卡 DRAM 和主机 DRAM，使我们基于FPGA的键值存储系统通用，并且能够进行大规模部署。此外，我们精心的软硬件协同设计，以及对PCIe和网络的优化，将性能推向了硬件极限。
 
 
 
-FPGA是一项成熟的技术，最近已经部署用于加速数据中心服务，包括网络功能 \cite {putnam2014reconfigurable,smartnic,rubow2010chimpp,lavasani2012compiling}。
-传统上，FPGA使用Verilog、VHDL等硬件描述语言编程。众所周知，硬件描述语言难以调试、编写和修改，给软件人员使用FPGA带来了很大挑战。
+FPGA 长期被用于实现网络路由器和交换机。
+NetFPGA \cite{lockwood2007netfpga} 提出了一个在 FPGA 上实现路由器的开放硬件平台。
+近年来，FPGA 也被用于加速网络功能 \cite {rubow2010chimpp,lavasani2012compiling}。
+早在 Click 模块化路由器 \cite{kohler2000click} 编程框架被提出的第二年，Xilinx 就提出了用 FPGA 实现 Click 的 Cliff \cite{kulkarni2004mapping}，需要硬件开发人员使用硬件描述语言把一个 Click 元件实现为一个硬件模块。
+此后，CUSP \cite{schelle2005cusp} 和 Chimpp \cite {rubow2010chimpp} 提出了一系列改进，简化了硬件模块的互连，提高了软硬件协同处理、软件仿真的能力。
+然而，上述工作使用 Verilog、VHDL 等硬件描述语言编程 FPGA。众所周知，硬件描述语言难以调试、编写和修改，给软件人员使用 FPGA 带来了很大挑战。
 
-为了提高FPGA的开发效率，FPGA厂商提供了高层次综合（HLS）工具~\cite{vivado,intel-hls}，可以把受限的 C 代码编译成硬件模块。学术界和工业界提出了 Bluespec \cite{bluespec}、Lime \cite{auerbach2010lime} 和 Chisel \cite{bachrach2012chisel} 等高效硬件开发语言 \cite{bacon2013fpga,singh2011implementing,wester2015transformation}，但它们需要开发者具有足够的硬件设计知识。但这些工具只是硬件开发工具链的补充，程序员仍然需要手动将从C语言生成的硬件模块插入到硬件描述语言的项目中，且 FPGA 与主机 CPU 之间的通信也需要自行处理。高层次综合工具和高效硬件开发语言可以提高硬件开发人员的工作效率，但仍然不足以让软件开发人员使用 FPGA。
+为了提高 FPGA 的开发效率，FPGA厂商提供了高层次综合（HLS）工具~\cite{vivado,intel-hls}，可以把受限的 C 代码编译成硬件模块。学术界和工业界提出了 Bluespec \cite{bluespec}、Lime \cite{auerbach2010lime} 和 Chisel \cite{bachrach2012chisel} 等高效硬件开发语言 \cite{bacon2013fpga,singh2011implementing,wester2015transformation}，但它们需要开发者具有足够的硬件设计知识。Gorilla \cite {lavasani2012compiling} 为 FPGA 上的数据包交换提出了一种领域特定的高级语言。但这些工具只是硬件开发工具链的补充，程序员仍然需要手动将从C语言生成的硬件模块插入到硬件描述语言的项目中，且 FPGA 与主机 CPU 之间的通信也需要自行处理。高层次综合工具和高效硬件开发语言可以提高硬件开发人员的工作效率，但仍然不足以让软件开发人员使用 FPGA。
 
 近年来，为了让软件开发人员使用FPGA，FPGA厂商提出了基于OpenCL的编程工具链~\cite{aoc,sdaccel}，提供了类似GPU的编程模型。软件开发人员可以把用OpenCL语言编写的核（kernel）卸载到FPGA上。但是，这种方法中多个并行执行的核间需要通过板上共享内存进行通信，而FPGA上的DRAM共享内存吞吐量和延迟都不理想，共享内存还会成为通信瓶颈。其次，FPGA与CPU之间的通信模型是类似GPU的批处理模型，这使得处理延迟较高（约1毫秒），不适用于需要微秒级延迟的网络数据包处理。
 
-本文第 \ref{chapter:clicknp} 章将提出一个让软件开发人员可用，且网络处理性能高的 FPGA 编程框架。
-事实上本文并不是第一个试图简化 FPGA 上网络编程的工作，但之前的工作或者对软件开发人员不友好，或者性能太差。
-Gorilla \cite {lavasani2012compiling} 为FPGA上的数据包交换提出了一种领域特定的高级语言；Chimpp \cite {rubow2010chimpp} 试图将 Click 模型引入硬件描述语言来开发模块化路由器。
-Click2NetFPGA~\cite {Click2NetFPGA} 通过直接将 Click 模块化路由器 \cite {kohler2000click} 的 C++ 程序编译到 FPGA 来提供模块化架构。
+Click2NetFPGA~\cite {Click2NetFPGA} 利用高层次综合工具，直接将 Click 模块化路由器 \cite {kohler2000click} 的 C++ 代码编译到 FPGA 来提供模块化架构。
 然而，Click2NetFPGA 的性能的系统设计存在若干瓶颈（例如，内存和数据包 I/O），它们也没有优化代码以确保完全流水线处理，因此比本文达到的性能低两个数量级。
-此外，Click2NetFPGA 不支持FPGA / CPU联合处理，因此无法在数据平面运行时更新配置或读取状态。
+此外，Click2NetFPGA 不支持 FPGA / CPU 联合处理，因此无法在数据平面运行时更新配置或读取状态。
+
+本文第 \ref{chapter:clicknp} 章将提出一个让软件开发人员可用，且网络处理性能高的模块化 FPGA 编程框架。
+
 
 
 

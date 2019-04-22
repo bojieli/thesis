@@ -17,7 +17,8 @@ GPU主要用于图形处理，最近扩展到具有海量数据并行性的其�
 但是，批量操作会导致高延迟。
 例如，\cite {packetshader}中报告的转发延迟约为$200 \mu{}s$，比 \name{} 大两个数量级。
 与GPU相比，FPGA更灵活，可以重新配置以捕获数据和流水线并行，这两者在NF中非常常见。
-然而，NP专门用于处理网络流量并且具有许多硬连线网络加速器。
+网络处理器专门用于处理网络流量并且具有许多硬连线（hard-wired）的网络加速器。
+NP-Click \cite{shah2004np} 在网络处理器上实现了 Click 编程框架。
 相比之下，FPGA是一种通用计算平台。
 除了NF之外，FPGA在数据中心还有许多其他应用，使其更具吸引力
 大规模部署 \cite {putnam2014reconfigurable}。
@@ -73,7 +74,7 @@ GPU主要用于图形处理，最近扩展到具有海量数据并行性的其�
 FPGA是一项成熟的技术，最近已经部署用于加速数据中心服务，包括网络功能 \cite {putnam2014reconfigurable,smartnic,rubow2010chimpp,lavasani2012compiling}。
 众所周知，FPGA的可编程性很低，有丰富的前人工作提供了高级编程抽象 \cite {bluespec,auerbach2010lime,bacon2013fpga,singh2011implementing,bachrach2012chisel,wester2015transformation}。
 Gorilla \cite {lavasani2012compiling} 为FPGA上的数据包交换提出了一种特定于域的高级语言。
-然而，Chimpp \cite {rubow2010chimpp} 试图将Click模型引入HDL来开发模块化路由器。
+Cliff \cite{kulkarni2004mapping}、CUSP \cite{schelle2005cusp} 和 Chimpp \cite {rubow2010chimpp} 将Click模型引入硬件描述语言来开发模块化路由器。
 \name 沿此方向工作，与以前的工作互补。
 \name 致力于数据中心的NF，通过提供高度灵活的模块化架构和利用商业HLS工具解决可编程性问题。
 
