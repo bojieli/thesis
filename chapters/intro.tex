@@ -126,7 +126,8 @@ FreeFlow 使用 RSocket 将套接字转换为 RDMA。
 相比之下，本文将RDMA原语扩展到键值操作，同时保证服务器端的一致性，使KVS客户端完全透明，同时实现高吞吐量和低延迟，即使对于PUT操作也是如此。
 
 利用支持 P4 \cite{bosshart2014p4} 的可编程交换机 \cite{barefoot-tofino} 来加速键值存储系统也是近年来研究的热点。
-SwitchKV~\cite {li2016fast} 利用基于内容的路由将请求路由到基于缓存键的后端节点，NetCache~ \cite {netcache-sosp17} 进一步将访问频繁的键值缓存在交换机中。这种负载平衡和缓存也将使我们的系统受益。
+SwitchKV~\cite {li2016fast} 利用基于内容的路由将请求路由到基于缓存键的后端节点，NetCache~ \cite {netcache-sosp17} 进一步将访问频繁的键值缓存在交换机中。
+NetChain~\cite{jin2018netchain} 在网络交换机中实现了一个高一致性、容错的键值存储。
 
 为了在键值存储系统中支持事务（transaction），近年来学术界有数据中心网络与共识协议（consensus protocol）共同设计的趋势。
 传输顺序在共识协议中至关重要，因此近年来的快速 Paxos~\cite{lamport2006fast,kemme1999processing,moraru2013there,pedone1998optimistic} 协议采用尽力而为的方法提高传输的有序性。
@@ -134,7 +135,6 @@ SwitchKV~\cite {li2016fast} 利用基于内容的路由将请求路由到基于�
 Speculative Paxos~\cite{ports2015designing} 和 NOPaxos~\cite{li2016just} 利用可编程交换机作为中心化的序列号发生器或序列化点。
 NetPaxos \cite{dang2015netpaxos,dang2016paxos} 和 \cite{dang2016network} 把传统 Paxos 协议放在网络交换机中实现。
 Eris~\cite{eris} 提出使用网络交换机作为序列号发生器，在网络中实现并发控制，实现了快速事务处理。
-NetChain~\cite{jin2018netchain} 在网络交换机中实现了一个高一致性、容错的键值存储。
 Hyperloop~\cite{kim2018hyperloop} 在存储节点上利用可编程网卡把写操作写入非易失性内存中的缓冲区，并立即向计算节点回复确认消息，再由存储节点上的软件异步处理非易失性内存中的写操作。这消除了写操作等待存储节点软件处理的延迟。
 Google Spanner~\cite{corbett2013spanner} 利用全球同步的 GPS 时钟实现了跨地理区域复制的高性能数据库。
 
