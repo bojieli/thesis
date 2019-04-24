@@ -191,17 +191,44 @@
 
 \subsection{高级语言编程框架}
 
-FPGA 高级语言编程：ClickNP，适合流式处理的模块化 FPGA 高级语言编程
+第 \ref{chapter:clicknp} 章将提出适合流式处理的模块化 FPGA 高级语言编程框架 ClickNP。
+如图 \ref{arch:fig:element_arch} 所示，ClickNP 的基本处理模块是元件（element）。元件之间使用管道（channel）连接。
+每个元件使用类 C 语言编程，可以被编译成 FPGA 上的逻辑模块或者 CPU 上的线程。
+每个元件逻辑上可以类比成一个 CPU 核，是一个状态机，由私有内部状态、全局状态、若干输入管道、若干输出管道、数据处理函数和信号处理函数构成。
+全局状态使用板上 DRAM 实现，私有内部状态使用片上 BRAM 或寄存器实现。
+FPGA 上逻辑模块之间的管道用先进先出队列（FIFO）实现，CPU 上线程之间的管道用共享内存队列实现，FPGA 和 CPU 元件之间的管道用 PCIe I/O 管道实现。
+数据处理函数从输入管道中读取数据，处理后发送到输出管道中。信号处理函数用于响应主机控制程序的信号。
 
-虚拟机热迁移，计算节点对应的网卡状态；网络、存储节点热迁移（升级，扩容等），网卡状态；高可用性，故障恢复……
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.5\textwidth]{chapters/clicknp/image/element_arch.pdf}
+	\caption{ClickNP 编程框架中的元件。}
+	\label{arch:fig:element_arch}
+\end{figure}
+
+元件的结构设计使其能实现无阻塞、完全流水线的数据处理。
+元件不仅可以在主机上用传统软件开发工具进行调试和测试，ClickNP 编程框架还可以为其生成调试逻辑，实现在 FPGA 运行过程中的日志、断点、查询状态等调试功能。
+此外，在虚拟机热迁移（live migration）和高可用（high availability，HA）中，网卡等外设中的状态备份和迁移是一个挑战。
+ClickNP 编程框架可以自动生成状态导入导出逻辑，并与管道输入输出控制配合，可以通过状态迁移实现元件和虚拟机的热迁移，通过热备份或冷备份实现可编程网卡不同等级的高可用性。
 
 \subsection{基础服务中间件}
 
+第 \ref{chapter:clicknp} 章的 ClickNP 架构比较适合无状态或状态简单的流水线式数据包处理，而对基于连接状态或应用层请求的处理，就显得捉襟见肘。
+例如，第 \ref{chapter:clicknp} 章四层负载均衡器应用中的调度器和哈希表与应用逻辑耦合紧密，既不容易扩放到大量并发连接，代码的可维护性也不强，事实上在开发过程中花费了大量的时间来解决死锁问题。
+第 \ref{chapter:kvdirect} 章的 KV-Direct 系统将提出 FPGA 内的有状态处理（stateful processing）和哈希表数据结构设计，这些基础组件是第 \ref{chapter:clicknp} 章的有状态网络功能、第 \ref{chapter:kvdirect} 章的内存键值存储、第 \ref{chapter:socksdirect} 章的可扩放 RDMA 的基础。
+
+为了模块化和可扩放性，使用 KV-Direct 作为基础后，可编程网卡上应用的架构如图 \ref{arch:fig:kvdirect_arch} 所示。
+事务代表着前后依赖关系，例如有状态网络处理中的一个连接，分多个数据包的一个应用层 HTTP 请求，或者键值存储中对同一个键（key）的操作。
+同一个事务中的不同请求需要依次处理，而不同事务中的请求可以并发处理。
+为了隐藏延迟、最大化并发处理能力，请求调度器从基于 KV-Direct 的事务状态键值存储中查找该请求对应的事务编号，并将正在处理事务的请求排入队列。
+基于 ClickNP 的数据处理流水线根据请求数据和事务状态进行处理，在处理过程中可能查询其他的数据结构（如内存分配表、主机虚拟地址映射表、防火墙规则表、路由表等）。
+如果请求处理完成，响应数据进入输出重排模块，重新排列响应的顺序以满足事务处理的一致性要求（例如，不同事务的请求也要按照到达顺序依次响应），最终输出到网络。
+如果请求的处理还需要依赖下一数据包或从主机内存 DMA 来的数据，为了不阻塞数据处理流水线，该请求会返回到调度器，等待依赖操作完成后再进行下一阶段的处理。
 
 
-第 \ref{chapter:kvdirect} 章提出的 FPGA 内有状态处理（stateful processing）、数据结构。
-第 \ref{chapter:clicknp} 章的有状态网络功能、第 \ref{chapter:kvdirect} 章的内存键值存储、第 \ref{chapter:socksdirect} 章的可扩放 RDMA 的基础。
-尽管第 \ref{chapter:clicknp} 章的 ClickNP 在第 \ref{chapter:kvdirect} 章之前发表，发表时的有状态处理和哈希表是使用与应用逻辑耦合紧密的方式实现的，既不容易扩放到大量并发连接，代码的可维护性也不强。
-使用第 \ref{chapter:kvdirect} 章的 KV-Direct 作为基础后，这些网络功能的实现将变得模块化和可扩放。
-
-本文使用高级语言编程框架实现基础服务中间件，中间件未来可以硬件化。
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=1.0\textwidth]{figures/kvdirect_arch.pdf}
+	\caption{基于 KV-Direct 的可编程网卡应用层架构。}
+	\label{arch:fig:kvdirect_arch}
+\end{figure}
