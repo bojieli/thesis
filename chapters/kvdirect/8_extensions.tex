@@ -6,7 +6,7 @@
 
 对于64B DMA操作，PCIe具有29％的TLP报头和填充开销（\S \ref {kvdirect:sec:challenge}），并且DMA引擎可能没有足够的并行性来使用小TLP使PCIe带宽延迟积（BDP）饱和（\S\ref{kvdirect:sec:implementation}）。
 我们系统中的PCIe根（root complex）支持更大的DMA操作，最高256字节的TLP有效负载。 在这种情况下，TLP头和填充开销仅为9％，并且DMA引擎具有足够的并行性（64）以通过27个正在进行的DMA读取来使PCIe链路饱和。
-要批量处理PCIe链路上的DMA操作，我们可以利用CPU来执行分散 - 聚集（scatter gather）（图〜\ ref {kvdirect：fig：sg-arch}）。
+要批量处理PCIe链路上的DMA操作，我们可以利用CPU来执行分散 - 聚集（scatter gather）（图 \ref {kvdirect:fig:sg-arch}）。
 首先，NIC DMA将地址发送到主机内存中的请求队列。 主机CPU轮询请求队列，执行随机内存访问，将数据放入响应队列并将MMIO门铃写入NIC。 然后，NIC通过DMA从响应队列中提取数据。
 
 \begin{figure}[t]
