@@ -111,6 +111,7 @@ pFabric显示在数据中心中实现接近最佳的流完成时间。
 入队和出队操作可以进一步并行化。
 因此，可以在一个周期中处理分组。
 
+\iffalse
 \textbf{A6. 容错的 LTE SPGW。}
 
 \textbf{A7. 端口扫描检测。}
@@ -120,6 +121,7 @@ pFabric显示在数据中心中实现接近最佳的流完成时间。
 \textbf{A9. 正则表达式匹配。}
 
 \textbf{A10. 神经网络推理。}
+\fi
 
 \egg{
 pFabric \cite{alizadeh2013pfabric} is a near-optimal datacenter transport based on priority scheduling and dropping. Packets are scheduled based on its flow size or remaining flow size in a small queue. Our pFabric scheduler implementation (Figure \ref{clicknp:fig:PFabric}) support 4-giga strict priorities, including a PriorityQueue which deques the packet with highest priority and drops overflow packets with lowest priority, a ReorderQueue to find the earliest packet from the flow with highest priority to avoid starvation and keep packet ordering, and a PacketBuffer to receive packets into buffer and schedule or drop packets out of buffer. Since queue size in a perfectly load balanced fabric should be small, we choose shift register priority queue for maximum throughput and clock frequency.
