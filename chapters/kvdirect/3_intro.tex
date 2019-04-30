@@ -68,7 +68,6 @@
 {\includegraphics[width=.33\textwidth,page=3]{cropped_access.pdf}}
 \caption{KVS数据通路和处理装置的设计空间。 行表示数据路径。 一个KV操作（细线）可能需要多个基于地址的存储器访问（粗线）。 黑框表示KV处理发生的位置。}
 \label{kvdirect:fig:memaccess}
-
 \end{figure*}
 
 内存中键值存储（KVS）是许多数据中心中的关键分布式系统组件。 KVS允许在分布式客户端之间访问共享键值哈希表。从历史上看，诸如Memcached \cite {fitzpatrick2004distributed}之类的KVS作为Web服务的对象缓存系统获得了普及。亚马逊\cite {decandia2007dynamo}和Facebook \cite {atikoglu2012workload,nishtala2013scaling}等大型网络服务提供商已大规模部署了分布式键值存储。最近，随着基于主内存的计算成为数据中心的一个主要趋势 \cite{ousterhout2010case,dragojevic2014farm}，KVS开始超越缓存并成为在分布式系统中存储共享数据结构的基础架构。

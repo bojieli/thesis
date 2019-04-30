@@ -127,9 +127,20 @@ FreeFlow 使用 RSocket 将套接字转换为 RDMA。
 但是，RSocket 的性能和兼容性都不令人满意。
 我们在第 \ref{chapter:socksdirect} 章将提出一个与现有应用兼容，并能充分利用 RDMA 网卡性能的套接字系统。
 
-为了加速键值存储系统，近年来的工作 \cite {kalia2014using,kalia2016design,kalia2014using,kalia2016design} 利用 RDMA 网卡基于硬件的网络协议栈，使用双面RDMA作为KVS客户端和服务器之间的RPC机制进一步提高每核吞吐量并减少延迟。尽管这些工作进一步降低了网络通信的开销，但如上一节所讨论的，这些系统仍然受到 CPU 的并行性限制。
+为了加速键值存储系统，近年来的工作 \cite {kalia2014using,kalia2016design,kalia2014using,kalia2016design} 利用 RDMA 网卡基于硬件的网络协议栈，使用双面RDMA作为KVS客户端和服务器之间的RPC机制进一步提高每核吞吐量并减少延迟，如图 \ref{intro:fig:memaccess-a} 所示。尽管这些工作进一步降低了网络通信的开销，但如上一节所讨论的，这些系统仍然受到 CPU 的并行性限制。
 
-另一种不同的方法是利用单侧RDMA。 Pilaf~ \cite {mitchell2013using} 和FaRM~ \cite {dragojevic2014farm} 采用单向RDMA读取进行GET操作，FaRM实现了使网络饱和的吞吐量。 Nessie~ \cite {szepesi2014designing}，DrTM~ \cite {wei2015fast}，DrTM + R~ \cite {chen2016fast} 和FaSST~ \cite {kalia2016fasst} 利用分布式事务来实现单向RDMA的GET和PUT。但是，PUT操作的性能受到一致性保证的不可避免的同步开销的影响，受到RDMA原语的限制 \cite {kalia2016design}。此外，客户端CPU涉及KV处理，将每个核心的吞吐量限制在客户端的大约10~Mops。
+
+\begin{figure*}[t]
+	\centering
+	\subfloat[软件 / 双面 RDMA。\label{intro:fig:memaccess-a}]
+	{\includegraphics[width=.4\textwidth,page=1]{cropped_access.pdf}}
+	\subfloat[单侧 RDMA。\label{intro:fig:kvdirect-b}]
+	{\includegraphics[width=.4\textwidth,page=2]{cropped_access.pdf}}
+	\caption{键值存储系统的架构。线表示数据路径。一个键值操作（细线）可能需要多个基于地址的存储器访问（粗线）。黑色背景的方框表示键值数据结构处理发生的位置。}
+	\label{intro:fig:kvdirect}
+\end{figure*}
+
+另一种不同的方法是利用单侧RDMA，如图 \ref{intro:fig:kvdirect-b} 所示。 Pilaf~ \cite {mitchell2013using} 和FaRM~ \cite {dragojevic2014farm} 采用单向RDMA读取进行GET操作，FaRM实现了使网络饱和的吞吐量。 Nessie~ \cite {szepesi2014designing}，DrTM~ \cite {wei2015fast}，DrTM + R~ \cite {chen2016fast} 和FaSST~ \cite {kalia2016fasst} 利用分布式事务来实现单向RDMA的GET和PUT。但是，PUT操作的性能受到一致性保证的不可避免的同步开销的影响，受到RDMA原语的限制 \cite {kalia2016design}。此外，客户端CPU涉及KV处理，将每个核心的吞吐量限制在客户端的大约10~Mops。
 相比之下，本文将RDMA原语扩展到键值操作，同时保证服务器端的一致性，使KVS客户端完全透明，同时实现高吞吐量和低延迟，即使对于PUT操作也是如此。
 
 利用支持 P4 \cite{bosshart2014p4} 的可编程交换机 \cite{barefoot-tofino} 来加速键值存储系统也是近年来研究的热点。
@@ -180,7 +191,16 @@ NetFPGA \cite{lockwood2007netfpga} 提出了一个在 FPGA 上实现路由器的
 
 为了提高 FPGA 的开发效率，FPGA厂商提供了高层次综合（HLS）工具~\cite{vivado,intel-hls}，可以把受限的 C 代码编译成硬件模块。学术界和工业界提出了 Bluespec \cite{bluespec}、Lime \cite{auerbach2010lime} 和 Chisel \cite{bachrach2012chisel} 等高效硬件开发语言 \cite{bacon2013fpga,singh2011implementing,wester2015transformation}，但它们需要开发者具有足够的硬件设计知识。Gorilla \cite {lavasani2012compiling} 为 FPGA 上的数据包交换提出了一种领域特定的高级语言。但这些工具只是硬件开发工具链的补充，程序员仍然需要手动将从C语言生成的硬件模块插入到硬件描述语言的项目中，且 FPGA 与主机 CPU 之间的通信也需要自行处理。高层次综合工具和高效硬件开发语言可以提高硬件开发人员的工作效率，但仍然不足以让软件开发人员使用 FPGA。
 
-近年来，为了让软件开发人员使用FPGA，FPGA厂商提出了基于OpenCL的编程工具链~\cite{aoc,sdaccel}，提供了类似GPU的编程模型。软件开发人员可以把用OpenCL语言编写的核（kernel）卸载到FPGA上。但是，这种方法中多个并行执行的核间需要通过板上共享内存进行通信，而FPGA上的DRAM共享内存吞吐量和延迟都不理想，共享内存还会成为通信瓶颈。其次，FPGA与CPU之间的通信模型是类似GPU的批处理模型，这使得处理延迟较高（约1毫秒），不适用于需要微秒级延迟的网络数据包处理。
+近年来，为了让软件开发人员使用FPGA，FPGA厂商提出了基于OpenCL的编程工具链~\cite{aoc,sdaccel}，提供了类似GPU的编程模型，如图 \ref{intro:fig:opencl} 所示。软件开发人员可以把用OpenCL语言编写的核（kernel）卸载到FPGA上。但是，这种方法中多个并行执行的核间需要通过板上共享内存进行通信，而FPGA上的DRAM共享内存吞吐量和延迟都不理想，共享内存还会成为通信瓶颈。其次，FPGA与CPU之间的通信模型是类似GPU的批处理模型，这使得处理延迟较高（约1毫秒），不适用于需要微秒级延迟的网络数据包处理。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.7\textwidth]{figures/opencl.pdf}
+	\caption{基于 OpenCL 的 FPGA 编程工具链。}
+	\label{intro:fig:opencl}
+\end{figure}
+
 
 Click2NetFPGA~\cite {Click2NetFPGA} 利用高层次综合工具，直接将 Click 模块化路由器 \cite {kohler2000click} 的 C++ 代码编译到 FPGA 来提供模块化架构。
 然而，Click2NetFPGA 的性能的系统设计存在若干瓶颈（例如，内存和数据包 I/O），它们也没有优化代码以确保完全流水线处理，因此比本文达到的性能低两个数量级。
