@@ -435,7 +435,7 @@ Slim~ \cite {slim}将三次内核往返减少到一次。
 \label{socksdirect:subsec:per-byte-overhead}
 \quad
 
-\parab {Payload copy。}
+\parab {内容（payload）复制。}
 在大多数套接字系统中，\texttt {send}和\texttt {recv}的语义会导致应用程序和网络堆栈之间的内存复制。 对于非阻塞\texttt {send}，系统需要将数据复制出缓冲区，因为应用程序可能会在\texttt {send}返回后立即覆盖缓冲区。 简单地删除副本可能会违反应用程序的正确性。
 零拷贝\texttt {recv}甚至比\texttt {send}更难。
 Linux提供了基于准备就绪的事件模型，即应用程序知道传入的数据（例如通过\texttt {epoll}）然后调用\texttt {recv}，因此NIC接收但未传递给应用程序的数据必须 存储在系统缓冲区中。
