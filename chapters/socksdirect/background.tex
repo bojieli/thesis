@@ -493,7 +493,7 @@ LOS~ \cite {huang2017high}将FD空间划分为用户和内核部分，但违反�
 
 MegaPipe~ \cite {han2012megapipe}和StackMap~ \cite {yasukata2016stackmap}提出了新的API来实现零拷贝和改进I / O多路复用，代价是需要修改应用程序。
 但是，大量的内核开销仍然存在。
-支持零拷贝的挑战是套接字语义，如章节 \ref {socksdirect:subsec:per-byte-overhead}中所述。
+支持零拷贝的挑战是套接字语义。
 
 \parab {用户空间TCP / IP堆栈:}第二类工作完全绕过内核TCP / IP堆栈并在用户空间中实现TCP / IP。
 在这个类别中，IX~ \cite {belay2017ix}和Arrakis~\cite {peter2016arrakis}是新的操作系统架构，它使用虚拟化来确保安全性和隔离性。 IX利用LwIP~ \cite {dunkels2001design}在用户空间中实现TCP / IP，同时使用内核转发每个数据包以实现性能隔离和QoS。相比之下，Arrakis将QoS卸载到NIC，因此绕过数据平面的内核。
