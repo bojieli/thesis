@@ -218,7 +218,15 @@ E2 \cite{palkar2015e2} 提出了高可用、高可扩放性的网络功能调度
 ``数据中心税'' 的最后一个方面是操作系统的开销，主要是指操作系统处理 I/O 操作的开销。
 网络和存储操作统称 I/O 操作。
 以网络操作为例，分布式应用程序基于消息传递范式的进程间通信普遍使用操作系统中的套接字（socket）原语。
-对于 HTTP 负载均衡器、DNS 服务器、Memcached \cite{memcached} 和 Redis \cite{redis} 键-值存储服务器等通信密集型的应用程序，操作系统占用了 50\% 至 90\% 的 CPU 时间，大部分用来处理套接字操作。
+如图 \ref{background:fig:kernel_time} 所示，对于 HTTP 负载均衡器、DNS 服务器、Memcached \cite{memcached} 和 Redis \cite{redis} 键-值存储服务器等通信密集型的应用程序，操作系统占用了 50\% 至 90\% 的 CPU 时间，大部分用来处理套接字操作。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.6\textwidth]{figures/kernel_time.pdf}
+	\caption{通信密集型应用程序在操作系统内核中消耗了大量的 CPU 时间。}
+	\label{background:fig:kernel_time}
+\end{figure}
 
 在 Linux 操作系统中，应用程序通过文件描述符（FD）进行 I/O 操作。
 从概念上讲，Linux 网络协议栈由三层组成。首先，虚拟文件系统（VFS）层为应用程序提供基于文件描述符的套接字 API。
