@@ -19,22 +19,22 @@ KVS服务器上的可编程网卡是一个重新配置为\textit {KV处理器}�
 \small
 \begin{tabular}{p{.4\textwidth}|p{.5\textwidth} }
 \toprule
-get ($k$) $\rightarrow v$ & Get the value of key $k$. \\
+get ($k$) $\rightarrow v$ & 获取键 $k$ 的值。 \\
 \midrule
-put ($k, v$) $\rightarrow$ bool & Insert or replace a $(k, v)$ pair. \\
+put ($k, v$) $\rightarrow$ bool & 插入或替换 $(k, v)$ 对。 \\
 \midrule
-delete ($k$) $\rightarrow$ bool & Delete key $k$. \\
+delete ($k$) $\rightarrow$ bool & 删除键 $k$。 \\
 \midrule
 \midrule
-update{\_}scalar2scalar ($k, \Delta, \lambda(v, \Delta) \rightarrow v$) $\rightarrow v$ & Atomically update the value of key~$k$ using function~$\lambda$ on scalar~$\Delta$, and return the original value. \\
+update{\_}scalar2scalar ($k, \Delta, \lambda(v, \Delta) \rightarrow v$) $\rightarrow v$ & 原子更新键 $k$，使用函数 $\lambda$，作用于 $\Delta$ 上，返回原始值。\\
 \midrule
-update{\_}scalar2vector ($k, \Delta, \lambda(v, \Delta) \rightarrow v$) $\rightarrow [v]$ & Atomically update all elements in vector~$k$ using function~$\lambda$ and scalar~$\Delta$, and return the original vector. \\
+update{\_}scalar2vector ($k, \Delta, \lambda(v, \Delta) \rightarrow v$) $\rightarrow [v]$ & 原子更新键 $k$ 中的所有元素，使用函数 $\lambda$ 和标量 $\Delta$，返回原始向量。 \\
 \midrule
-update{\_}vector2vector ($k, [\Delta], \lambda(v, \Delta) \rightarrow v$) $\rightarrow [v]$ & Atomically update each element in vector~$k$ using function~$\lambda$ on the corresponding element in vector~$[\Delta]$, and return the original vector. \\
+update{\_}vector2vector ($k, [\Delta], \lambda(v, \Delta) \rightarrow v$) $\rightarrow [v]$ & 原子更新键 $k$ 中的所有元素，使用函数 $\lambda$，基于向量 $[\Delta]$ 中的对应元素，并返回原始向量。 \\
 \midrule
-reduce ($k, \Sigma, \lambda(v, \Sigma) \rightarrow \Sigma$) $\rightarrow \Sigma$ & Reduce vector~$k$ to a scalar using function~$\lambda$ on initial value, and return the reduction result~$\Sigma$. \\
+reduce ($k, \Sigma, \lambda(v, \Sigma) \rightarrow \Sigma$) $\rightarrow \Sigma$ & 把向量 $k$ 归约成一个标量，使用函数 $\lambda$，并返回归约结果 $\Sigma$。 \\
 \midrule
-filter ($k, \lambda(v) \rightarrow$ bool) $\rightarrow [v]$ & Filter elements in a vector~$k$ by function~$\lambda$, and return the filtered vector. \\
+filter ($k, \lambda(v) \rightarrow$ bool) $\rightarrow [v]$ & 在向量 $k$ 中筛选元素，使用函数 $\lambda$，并返回筛选后的向量。 \\
 \bottomrule
 \end{tabular}
 
@@ -118,7 +118,7 @@ KV-Direct仔细设计哈希表，以便在每次查找和插入时实现接近�
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.6\textwidth]{inline_thresh.pdf}
-\caption{Average memory access count under varying inline thresholds (10B, 15B, 20B, 25B) and memory utilizations.}
+\caption{不同内联阈值下的平均内存访问次数和内存利用率。}
 \label{kvdirect:fig:inline-offline}
 
 \end{figure}

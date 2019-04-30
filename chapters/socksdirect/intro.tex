@@ -2,12 +2,16 @@
 \section{引言}
 \label{socksdirect:sec:intro}
 
+本章的主题是操作系统通信原语加速，在全文中的位置如图 \ref{socksdirect:fig:sys-arch} 所示。
+
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{images/sys_arch.pdf}
 	\caption{本章主题：操作系统通信原语加速，用红色标出。}
 	\label{socksdirect:fig:sys-arch}
 \end{figure}
+
+作为本文介绍的最后一个研究工作，本文实现了一个与现有应用兼容的用户态套接字通信库。同时，基于前面章节提出的 ClickNP 编程框架和 KV-Direct 数据结构处理服务，在可编程网卡内实现了可扩放 RDMA。
 
 \begin{figure}[htbp]
 	\centering

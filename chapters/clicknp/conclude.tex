@@ -18,7 +18,7 @@
 
 \begin{sidewaystable}[h]
 	\centering
-	\caption{A selected set of key elements in \name. }
+	\caption{\name 中的一些网络元件。}
 	\label{clicknp:tab:elements}
 	\scalebox{0.9}{
 		\begin{tabular}{l|l|l|l|l|l|l|r|r}
@@ -46,9 +46,8 @@
 			RateLimiter (A1,5) & 16K flows & MS, DW & 141.5 & 141.5 Mpps & 7.0x / 65.3x & 14 & 16.9\% & 14.1\% \\
 			\bottomrule
 			
-			\multicolumn{9}{l} {\textbf{Optimization method.} REG=Using Registers; MS=Memory Scattering; UL=Unroll Loop; DW=Delay Write.} \\
-			\multicolumn{9}{l} {\parbox{\textwidth}{The \textbf{Speedup} column compares the performance between
-					the optimized version and our earlier implementation without applying techniques discussed in \S\ref{clicknp:sec:optimization} as well as a CPU implementation.}}
+			\multicolumn{9}{l} {\textbf{优化方法。} REG=Using Registers 使用寄存器; MS=Memory Scattering 内存散射; UL=Unroll Loop 循环展开; DW=Delay Write 延迟写入。} \\
+			\multicolumn{9}{l} {\parbox{\textwidth}{\textbf{性能提升} 一列对比了应用第 \S\ref{clicknp:sec:optimization}  节的优化后和优化前的 FPGA 性能。也列出了与 CPU 实现间的性能对比。}}
 			
 		\end{tabular} 
 		

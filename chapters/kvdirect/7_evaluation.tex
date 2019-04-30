@@ -136,7 +136,7 @@ RDMA NIC的更高吞吐量可归因于其更高的时钟频率和更低的处理
 \begin{figure}[t]
 \centering
 {\includegraphics[width=.5\textwidth,page=1]{load_balancer.pdf}}
-\caption{DMA throughput with load dispatch (load dispatch ratio = 0.5).}
+\caption{负载分派下的 DMA 吞吐量（固定负载分派比例为 0.5）。}
 \label{kvdirect:fig:cache-tput}
 
 \end{figure}
@@ -157,14 +157,14 @@ RDMA NIC的更高吞吐量可归因于其更高的时钟频率和更低的处理
 \scalebox{0.8}{
 \begin{tabular}{|l|r|r|r|r|r|}
 \hline
-Vector Size (B)              & 64    & 128   & 256   & 512   & 1024  \\ \hline
-Vector update with return    & 11.52 & 11.52 & 11.52 & 11.52 & 11.52 \\ \hline
-Vector update without return & 4.37  & 4.53  & 4.62  & 4.66  & 4.68  \\ \hline
-One key per element          & 2.09  & 2.09  & 2.09  & 2.09  & 2.09  \\ \hline
-Fetch to client              & 0.03  & 0.06  & 0.12  & 0.24  & 0.46  \\ \hline
+向量大小 (字节)              & 64    & 128   & 256   & 512   & 1024  \\ \hline
+向量更新（有返回）    & 11.52 & 11.52 & 11.52 & 11.52 & 11.52 \\ \hline
+向量更新（无返回） & 4.37  & 4.53  & 4.62  & 4.66  & 4.68  \\ \hline
+每个元素一个键         & 2.09  & 2.09  & 2.09  & 2.09  & 2.09  \\ \hline
+取回客户端处理             & 0.03  & 0.06  & 0.12  & 0.24  & 0.46  \\ \hline
 \end{tabular}
 }
-\caption{Throughput (GB/s) of vector operations with vector update or alternatives.}
+\caption{向量操作的吞吐量 (GB/s)。}
 \label{kvdirect:tab:vec_throughput}
 
 \end{table}
@@ -177,11 +177,11 @@ Fetch to client              & 0.03  & 0.06  & 0.12  & 0.24  & 0.46  \\ \hline
 
 \begin{figure}[t]
 \centering
-\subfloat[Throughput.\label{kvdirect:fig:network-batching-bw}]
+\subfloat[吞吐量。\label{kvdirect:fig:network-batching-bw}]
 {\includegraphics[width=.5\textwidth,page=1]{net_batching_bw.pdf}}
-\subfloat[Latency.\label{kvdirect:fig:network-batching-bw}]
+\subfloat[延迟。\label{kvdirect:fig:network-batching-bw}]
 {\includegraphics[width=.5\textwidth,page=1]{net_batching_lat.pdf}}
-\caption{Efficiency of network batching.}
+\caption{网络批量化的效率。}
 \label{kvdirect:fig:eval-network-batching}
 
 \end{figure}
@@ -221,7 +221,7 @@ The remaining few percent of operations have intrinsic higher processing delay d
 \centering
 \begin{tabular}{|l|l|l|r|r|r|r|r|r|r|}
 \toprule
-KVS  & Comment & Bottleneck & \multicolumn{2}{c|}{Tput (Mops)} & \multicolumn{2}{c|}{Power Efficiency (Kops/W)} & \multicolumn{2}{c|}{Avg Delay ($\mu$s)} \\
+KVS  & 注释 & 性能瓶颈 & \multicolumn{2}{c|}{吞吐量 (Mops)} & \multicolumn{2}{c|}{功耗效率 (Kops/W)} & \multicolumn{2}{c|}{平均延迟 ($\mu$s)} \\
 \cline{4-9}
  & & & GET & PUT & GET & PUT & GET & PUT \\
 \midrule
@@ -239,18 +239,18 @@ Mega-KV~\cite{zhang2015mega} & GPU (4~GiB on-board RAM) & GPU KV processing & 16
 \textbf{KV-Direct (10 NICs)} & Programmable NIC, one Gen3 x8 each & PCIe \& DRAM & 1220 & 610 & 3417 (4518) & 1708 (2259) & 4.3 & 5.4 \\
 \bottomrule
 \end{tabular}
-\caption{Comparison of KV-Direct with other KVS systems under long-tail (skewed Zipf) workload of 10B tiny KVs. For metrics not reported in the papers, we emulate the systems using similar hardware and report our approximate measurements. For CPU-bypass systems, numbers in parentheses report power difference under peak load and idle.}
+\caption{KV-Direct 与其他键值存储系统在长尾（倾斜  Zipf）负载和 10 字节小键下的比较。对于相关工作未报告的性能数字，我们使用相似的硬件来模拟这些系统，并报告我们粗略的测量结果。对于 CPU 绕过的系统，括号内的数字报告峰值负载和空闲情况下的功耗差异。}
 \label{kvdirect:tab:kvs-compare}
 
 \end{sidewaystable}
 
 \begin{figure}[t]
 \centering
-\subfloat[Uniform.\label{kvdirect:fig:ycsb-tput-uniform}]
+\subfloat[均匀分布。\label{kvdirect:fig:ycsb-tput-uniform}]
 {\includegraphics[width=.5\textwidth,page=1]{ycsb-tput-uniform.pdf}}
-\subfloat[Long-tail.\label{kvdirect:fig:ycsb-tput-longtail}]
+\subfloat[长尾分布。\label{kvdirect:fig:ycsb-tput-longtail}]
 {\includegraphics[width=.5\textwidth,page=1]{ycsb-tput-longtail.pdf}}
-\caption{Throughput of KV-Direct under YCSB workload.}
+\caption{KV-Direct 在 YCSB 负载下的吞吐量。}
 \label{kvdirect:fig:ycsb-tput}
 
 \end{figure}

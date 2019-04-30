@@ -233,16 +233,16 @@ RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或
 
 \begin{figure}[t]
 \centering
-\subfloat[Throughput.\label{kvdirect:fig:dma-tput}]
+\subfloat[DMA 吞吐量。\label{kvdirect:fig:dma-tput}]
 {\includegraphics[width=.5\textwidth,page=1]{pcie_bw.pdf}}
-\subfloat[DMA Read Latency.\label{kvdirect:fig:dma-lat}]
+\subfloat[DMA 读延迟。\label{kvdirect:fig:dma-lat}]
 {\includegraphics[width=.5\textwidth,page=1]{pcie_latency.pdf}}
-\caption{PCIe random DMA performance.}
+\caption{PCIe 随机 DMA 性能。}
 \label{kvdirect:fig:dma-perf}
 
 \end{figure}
 
-KV-Direct将KV处理从CPU移动到服务器中的可编程NIC（图\ref {kvdirect:fig:memaccess -c}）。
+KV-Direct将KV处理从CPU移动到服务器中的可编程NIC（图\ref {kvdirect:fig:memaccess-c}）。
 与RDMA相同，KV-Direct NIC通过PCIe访问主机内存。 PCIe是一种分组交换网络，具有大约500 ns的往返延迟和每Gen3 x8端点7.87~GB / s的理论带宽。
 在延迟方面，对于我们的可编程NIC，由于FPGA中的额外处理延迟，缓存的PCIe DMA读取延迟为800~ns。
 对于随机非缓存DMA读取，由于DRAM访问，DRAM刷新和PCIe DMA引擎中的PCIe响应重新排序，存在额外的250~ns平均延迟（图\ref {kvdirect:fig:dma-lat}）。
