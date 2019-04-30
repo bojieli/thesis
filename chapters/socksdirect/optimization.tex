@@ -220,7 +220,7 @@ LOS~ \cite {huang2017high}定期用内核FD调用非阻塞\texttt {epoll \_wait}
 %The detailed procedure is as follows.
 
 
-\begin{figure}[t!]
+\begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.6\textwidth]{images/conn-setup-new}
 	
@@ -301,7 +301,7 @@ FD回收池和分配计数器在进程中的所有线程之间共享。
 一个棘手的问题是接收的数据包被传递到原始套接字和内核网络堆栈，并且内核将使用RST响应，因为这样的连接不存在。
 为避免此行为，监视器会安装\emph {iptables}规则来过滤此类出站RST数据包。
 
-%\begin{figure}[t!]
+%\begin{figure}[htbp]
 %	\centering
 %	\includegraphics[width=0.25\textwidth]{images/conn-close-new}
 %	

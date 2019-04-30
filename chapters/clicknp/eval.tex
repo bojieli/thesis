@@ -39,7 +39,7 @@ Applications forward packets from tor\_in to nic\_out. When TrafficGen receives 
 The wire loopback RTT of TrafficGen is 0.85$\mu$s for 64B packets and 1.39$\mu$s for 1504B packets, which is the system error in all latency numbers we present.
 }
 
-\begin{figure*}[t!]
+\begin{figure*}[htbp]
 		\centering
 		\subfloat[]{
 			\includegraphics[width=0.5\textwidth]{eval/fw_1}
@@ -63,7 +63,7 @@ The wire loopback RTT of TrafficGen is 0.85$\mu$s for 64B packets and 1.39$\mu$s
 		\label{clicknp:fig:firewall}
 \end{figure*}
 
-\begin{figure*}[t!]
+\begin{figure*}[htbp]
 		\centering
 		\subfloat[]{
 			\includegraphics[width=0.5\textwidth]{eval/ipsec_1}
@@ -124,7 +124,7 @@ Dell S6000中的规则插入需要83.7 $\mu$s。
 图 \ref {clicknp:fig:IPSec}（b）显示了不同负载因子下的延迟。 同样，IPSecGW产生的恒定延迟为13 $\mu$s，
 但是StrongSwan会产生更大的延迟和更高的方差，最长可达5 ms！
 
-\begin{figure*}[t!]
+\begin{figure*}[htbp]
 	\centering
 	
 	\subfloat[]{
@@ -226,7 +226,7 @@ Next we tested the performance with adversary traffic to thest the worst case pe
 
 \subsection{资源利用率}
 
-\begin{table}[t!]
+\begin{table}[htbp]
 	\centering
 	
 	\caption{ClickNP 网络功能汇总。}
@@ -262,7 +262,7 @@ Next we tested the performance with adversary traffic to thest the worst case pe
 	Most ClickNP implementations show less than 100\% logic overhead and less than 30\% BRAM overhead. For tiny elements (\eg IP checksum), a fixed element overhead dominates.
 }
 
-\begin{table}[t!]
+\begin{table}[htbp]
 	\centering
 	
 	\caption{相比 NetFPGA 的面积开销。}
@@ -517,7 +517,7 @@ When packet size is small ($<256B$), the measured throughput is slightly less th
 bug in Ethernet MAC in the shell, which may drop a few flits when packet rate is high. 
 Figure~\ref{clicknp:fig:trafficgen}(b) shows the capture performance in packet per second.  
 
-\begin{figure}[t!]
+\begin{figure}[htbp]
 	\centering
 	\subfloat[] {
 	\includegraphics[width=0.225\textwidth]{eval/trafficgen}

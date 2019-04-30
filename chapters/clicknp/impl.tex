@@ -83,7 +83,7 @@ PCIe通道可以在中断或轮询模式下工作。
 同样，图 \ref {clicknp:fig:pcie}（b）显示了通信延迟。由于OpenCL未针对流处理进行优化，因此OpenCL延迟高达1~ms，通常是网络功能无法接受的。
 相比之下，PCIe I / O通道在轮询模式下具有非常低的1 $\mu$s的延迟（一个 CPU 核重复轮询状态寄存器），而在中断模式下的延迟为 9 $\mu$ s（几乎没有CPU开销） 。
 
-\begin{figure}[t!]
+\begin{figure}[htbp]
 	\centering
 	\subfloat[]{
 		\includegraphics[width=0.5\textwidth]{eval/pcie_1}
