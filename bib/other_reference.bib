@@ -467,6 +467,241 @@
 	publisher={ACM}
 }
 
+@article{jouppi2018motivation,
+	title={Motivation for and evaluation of the first tensor processing unit},
+	author={Jouppi, Norman and Young, Cliff and Patil, Nishant and Patterson, David},
+	journal={IEEE Micro},
+	volume={38},
+	number={3},
+	pages={10--19},
+	year={2018},
+	publisher={IEEE}
+}
+
+@article{3gpp-38300,
+	title={3GPP TS 38.300, Technical Specification Group Radio Access Network; NR; NR and NG-RAN Overall Description, Release 16},
+	author={3rd Generation Partnership Project (3GPP)},
+	year={2018}
+}
+
+
+@article{3gpp-23501,
+	title={3GPP TS 23.501, System architecture for the 5G System (5GS), Release 16},
+	author={3rd Generation Partnership Project (3GPP)},
+	year={2018}
+}
+
+@article{bernstein2014containers,
+	title={Containers and cloud: From lxc to docker to kubernetes},
+	author={Bernstein, David},
+	journal={IEEE Cloud Computing},
+	volume={1},
+	number={3},
+	pages={81--84},
+	year={2014},
+	publisher={IEEE}
+}
+
+@article{burns2016borg,
+	title={Borg, omega, and kubernetes},
+	author={Burns, Brendan and Grant, Brian and Oppenheimer, David and Brewer, Eric and Wilkes, John},
+	year={2016}
+}
+
+@article{zaharia2010spark,
+	title={Spark: Cluster computing with working sets.},
+	author={Zaharia, Matei and Chowdhury, Mosharaf and Franklin, Michael J and Shenker, Scott and Stoica, Ion},
+	journal={HotCloud},
+	volume={10},
+	number={10-10},
+	pages={95},
+	year={2010}
+}
+
+@book{white2012hadoop,
+	title={Hadoop: The definitive guide},
+	author={White, Tom},
+	year={2012},
+	publisher={" O'Reilly Media, Inc."}
+}
+
+@book{kshemkalyani2011distributed,
+	title={Distributed computing: principles, algorithms, and systems},
+	author={Kshemkalyani, Ajay D and Singhal, Mukesh},
+	year={2011},
+	publisher={Cambridge University Press}
+}
+
+@book{distributed-ml,
+	title={分布式机器学习：算法、理论与实践},
+	author={刘铁岩, 陈薇, 王太峰, 高飞},
+	year={2018},
+	publisher={机械工业出版社}
+}
+
+@book{langchaozhidian,
+	title={浪潮之巅},
+	author={吴军},
+	year={2011},
+	publisher={电子工业出版社}
+}
+
+@misc{python-to-c,
+	title={David Patterson Says It’s Time for New Computer Architectures and Software Languages},
+	author={Tekla S. Perry},
+	year={2018},
+	url={https://spectrum.ieee.org/view-from-the-valley/computing/hardware/david-patterson-says-its-time-for-new-computer-architectures-and-software-languages}
+}
+
+@Article (Journal){serving-dnns-real-time-datacenter-scale-project-brainwave,
+	author = {Chung, Eric and Fowers, Jeremy and Ovtcharov, Kalin and  and Caulfield, Adrian and Massengill, Todd and Liu, Ming and Ghandi, Mahdi and Lo, Daniel and Reinhardt, Steve and Alkalay, Shlomi and Angepat, Hari and Chiou, Derek  and Forin, Alessandro and Burger, Doug and Woods, Lisa and Weisz, Gabriel and Haselman, Michael and Zhang, Dan},
+	title = {Serving DNNs in Real Time at Datacenter Scale with Project Brainwave},
+	year = {2018},
+	month = {March},
+	abstract = {To meet the computational demands required of deep learning, cloud operators are turning toward specialized hardware for improved efficiency and performance. Project Brainwave, Microsoft's principal infrastructure for AI serving in real time, accelerates deep neural network (DNN) inferencing in major services such as Bing’s intelligent search features  and Azure. Exploiting distributed model parallelism and pinning over low-latency hardware microservices, Project Brainwave serves state-of-the-art, pre-trained DNN models with high efficiencies at low batch sizes. A high-performance, precision-adaptable FPGA soft processor is at the heart of the system, achieving up to 39.5 TFLOPs of effective performance at Batch 1 on a state-of-the-art Intel Stratix 10 FPGA.},
+	publisher = {IEEE},
+	url = {https://www.microsoft.com/en-us/research/publication/serving-dnns-real-time-datacenter-scale-project-brainwave/},
+	pages = {8-20},
+	journal = {IEEE Micro},
+	volume = {38},
+}
+
+@Inproceedings (Conference){a-configurable-cloud-scale-dnn-processor-for-real-time-ai,
+	author = {Fowers, Jeremy and Ovtcharov, Kalin and Papamichael, Michael and Massengill, Todd and Liu, Ming and Lo, Daniel and Alkalay, Shlomi and Haselman, Michael and Adams, Logan and Ghandi, Mahdi and Heil, Stephen and Patel, Prerak and Sapek, Adam and Weisz, Gabriel and Woods, Lisa and Lanka, Sitaram and Reinhardt, Steve and Caulfield, Adrian and Chung, Eric and Burger, Doug},
+	title = {A Configurable Cloud-Scale DNN Processor for Real-Time AI},
+	year = {2018},
+	month = {June},
+	abstract = {Interactive AI-powered services require low-latency evaluation of deep neural network (DNN) models—aka “realtime AI”. The growing demand for computationally expensive, state-of-the-art DNNs, coupled with diminishing performance gains of general-purpose architectures, has fueled an explosion of specialized Neural Processing Units (NPUs). NPUs for interactive services should satisfy two requirements: (1) execution of DNN models with low latency, high throughput, and high efficiency, and (2) flexibility to accommodate evolving state-of-the-art models (e.g., RNNs, CNNs, MLPs) without costly silicon updates. This paper describes the NPU architecture for Project Brainwave, a production-scale system for real-time AI. The Brainwave NPU achieves more than an order of magnitude improvement in latency and throughput over state-of-the-art GPUs on large RNNs at a batch size of 1. The NPU attains this performance using a single-threaded SIMD ISA paired with a distributed microarchitecture capable of dispatching over 7M operations from a single instruction. The spatially distributed microarchitecture, scaled up to 96,000 multiply-accumulate units, is supported by hierarchical instruction decoders and schedulers coupled with thousands of independently addressable high-bandwidth on-chip memories, and can transparently exploit many levels of fine-grain SIMD parallelism. When targeting an FPGA, microarchitectural parameters such as native datapaths and numerical precision can be “synthesis specialized” to models at compile time, enabling high FPGA performance competitive with hardened NPUs. When running on an Intel Stratix 10 280 FPGA, the Brainwave
+	NPU achieves performance ranging from ten to over thirty-five teraflops, with no batching, on large, memory-intensive RNNs.},
+	publisher = {ACM},
+	url = {https://www.microsoft.com/en-us/research/publication/a-configurable-cloud-scale-dnn-processor-for-real-time-ai/},
+	edition = {Proceedings of the 45th International Symposium on Computer Architecture, 2018},
+}
+
+@misc{graphcore,
+	title={Graphcore: Our IPU systems are designed to lower the cost of accelerating AI applications in cloud and enterprise datacenters to increase the performance of both training and inference by up to 100x compared to the fastest systems today.},
+	url={https://www.graphcore.ai},
+	year={2019}
+}
+
+@article{yao2018balanced,
+	title={Balanced Sparsity for Efficient DNN Inference on GPU},
+	author={Yao, Zhuliang and Cao, Shijie and Xiao, Wencong},
+	journal={arXiv preprint arXiv:1811.00206},
+	year={2018}
+}
+
+@inproceedings{cao2019efficient,
+	title={Efficient and Effective Sparse LSTM on FPGA with Bank-Balanced Sparsity},
+	author={Cao, Shijie and Zhang, Chen and Yao, Zhuliang and Xiao, Wencong and Nie, Lanshun and Zhan, Dechen and Liu, Yunxin and Wu, Ming and Zhang, Lintao},
+	booktitle={Proceedings of the 2019 ACM/SIGDA International Symposium on Field-Programmable Gate Arrays},
+	pages={63--72},
+	year={2019},
+	organization={ACM}
+}
+
+@inproceedings{zhang2015optimizing,
+	title={Optimizing fpga-based accelerator design for deep convolutional neural networks},
+	author={Zhang, Chen and Li, Peng and Sun, Guangyu and Guan, Yijin and Xiao, Bingjun and Cong, Jason},
+	booktitle={Proceedings of the 2015 ACM/SIGDA International Symposium on Field-Programmable Gate Arrays},
+	pages={161--170},
+	year={2015},
+	organization={ACM}
+}
+
+@inproceedings{ouyang2010fpga,
+	title={Fpga implementation of gzip compression and decompression for idc services},
+	author={Ouyang, Jian and Luo, Hong and Wang, Zilong and Tian, Jiazi and Liu, Chenghui and Sheng, Kehua},
+	booktitle={2010 International Conference on Field-Programmable Technology},
+	pages={265--268},
+	year={2010},
+	organization={IEEE}
+}
+
+@inproceedings{ouyang2017xpu,
+	title={XPU: A programmable FPGA accelerator for diverse workloads},
+	author={Ouyang, Jian},
+	booktitle={2017 IEEE Hot Chips 29 Symposium},
+	year={2017}
+}
+
+@misc{baidu-fpga-sql,
+	title={BAIDU TAKES FPGA APPROACH TO ACCELERATING SQL AT SCALE},
+	url={https://www.nextplatform.com/2016/08/24/baidu-takes-fpga-approach-accelerating-big-sql/},
+	author={Nicole Hemsoth},
+	year={2016}
+}
+
+@inproceedings{ouyang2014sda,
+	title={SDA: Software-defined accelerator for large-scale DNN systems},
+	author={Ouyang, Jian and Lin, Shiding and Qi, Wei and Wang, Yong and Yu, Bo and Jiang, Song},
+	booktitle={2014 IEEE Hot Chips 26 Symposium (HCS)},
+	pages={1--23},
+	year={2014},
+	organization={IEEE}
+}
+
+@inproceedings{ouyang2013active,
+	title={Active SSD design for energy-efficiency improvement of web-scale data analysis},
+	author={Ouyang, Jian and Lin, Shiding and Hou, Zhenyu and Wang, Peng and Wang, Yong and Sun, Guangyu},
+	booktitle={Proceedings of the 2013 International Symposium on Low Power Electronics and Design},
+	pages={286--291},
+	year={2013},
+	organization={IEEE Press}
+}
+
+@inproceedings{moritz2018ray,
+	title={Ray: A distributed framework for emerging $\{$AI$\}$ applications},
+	author={Moritz, Philipp and Nishihara, Robert and Wang, Stephanie and Tumanov, Alexey and Liaw, Richard and Liang, Eric and Elibol, Melih and Yang, Zongheng and Paul, William and Jordan, Michael I and others},
+	booktitle={13th $\{$USENIX$\}$ Symposium on Operating Systems Design and Implementation ($\{$OSDI$\}$ 18)},
+	pages={561--577},
+	year={2018}
+}
+
+@inproceedings{ramakrishnan2017azure,
+	title={Azure data lake store: a hyperscale distributed file service for big data analytics},
+	author={Ramakrishnan, Raghu and Sridharan, Baskar and Douceur, John R and Kasturi, Pavan and Krishnamachari-Sampath, Balaji and Krishnamoorthy, Karthick and Li, Peng and Manu, Mitica and Michaylov, Spiro and Ramos, Rog{\'e}rio and others},
+	booktitle={Proceedings of the 2017 ACM International Conference on Management of Data},
+	pages={51--63},
+	year={2017},
+	organization={ACM}
+}
+
+@article{sefraoui2012openstack,
+	title={OpenStack: toward an open-source solution for cloud computing},
+	author={Sefraoui, Omar and Aissaoui, Mohammed and Eleuldj, Mohsine},
+	journal={International Journal of Computer Applications},
+	volume={55},
+	number={3},
+	pages={38--42},
+	year={2012},
+	publisher={Published by Foundation of Computer Science}
+}
+
+@inproceedings{son2017protego,
+	title={Protego: Cloud-scale multitenant ipsec gateway},
+	author={Son, Jeongseok and Xiong, Yongqiang and Tan, Kun and Wang, Paul and Gan, Ze and Moon, Sue},
+	booktitle={2017 $\{$USENIX$\}$ Annual Technical Conference ($\{$USENIX$\}$$\{$ATC$\}$ 17)},
+	pages={473--485},
+	year={2017}
+}
+
+@inproceedings{li2017eris,
+	title={Eris: Coordination-free consistent transactions using in-network concurrency control},
+	author={Li, Jialin and Michael, Ellis and Ports, Dan RK},
+	booktitle={Proceedings of the 26th Symposium on Operating Systems Principles},
+	pages={104--120},
+	year={2017},
+	organization={ACM}
+}
+
+@book{hanzo2002turbo,
+	title={Turbo coding, turbo equalisation and space-time coding},
+	author={Hanzo, Lajos and Liew, Tong Hooi and Yeap, Bee Leong},
+	year={2002},
+	publisher={John Wiley \& Sons}
+}
+
 @article{dennard1974design,
 	title={Design of ion-implanted MOSFET's with very small physical dimensions},
 	author={Dennard, Robert H and Gaensslen, Fritz H and Rideout, V Leo and Bassous, Ernest and LeBlanc, Andre R},
