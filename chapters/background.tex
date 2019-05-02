@@ -873,7 +873,7 @@ FPGA 也并不是万能药，主要有如下几方面的挑战。
 	\begin{enumerate}
 		\item 2013 年起，用于必应（Bing）搜索的文档选择和排序算法 \cite{putnam2014reconfigurable}；2016 年起，使用硬件微服务（hardware microservice）将多个 FPGA 上没有占用完全的资源整合（consolidate）到较少数量的 FPGA 上，提高 FPGA 的使用率。
 		\item 压缩和加密算法 \cite{a-scalable-high-bandwidth-architecture-for-lossless-compression-on-fpgas}；早期仅用于必应搜索，后期扩展到 Office 365、Cosmos / Azure 数据湖（data lake）、Onedrive、云存储等服务。
-		\item 2015 年起，用于机器学习推理 \cite{serving-dnns-real-time-datacenter-scale-project-brainwave,a-configurable-cloud-scale-dnn-processor-for-real-time-ai}；不仅支持深度学习模型，还支持传统机器学习模型。
+		\item 2015 年起，用于机器学习推理 \cite{accelerating-deep-convolutional-neural-networks-using-specialized-hardware,toward-accelerating-deep-learning-scale-using-specialized-hardware-datacenter,serving-dnns-real-time-datacenter-scale-project-brainwave,a-configurable-cloud-scale-dnn-processor-for-real-time-ai}；不仅支持深度学习模型，还支持传统机器学习模型。
 		\item 2016 年起，推出 FPGA 实例的虚拟机，对第三方出租 FPGA 算力。
 	\end{enumerate}
 	\item 基础架构：
@@ -958,9 +958,9 @@ FPGA（SmartNIC）对每个虚拟机虚拟出一块网卡，虚拟机通过 SR-I
 对很多类型的应用，随着分布式 FPGA 加速器的规模扩大，其性能提升是超线性的。例如 CNN inference，当只用一块 FPGA 的时候，由于片上内存不足以放下整个模型，需要不断访问 DRAM 中的模型权重，性能瓶颈在DRAM；如果 FPGA 的数量足够多，每块 FPGA 负责模型中的一层或者一层中的若干个特征，使得模型权重完全载入片上内存，就消除了DRAM 的性能瓶颈，完全发挥出 FPGA 计算单元的性能。当然，拆得过细也会导致通信开销的增加。把任务拆分到分布式 FPGA集群的关键在于平衡计算和通信。
 
 
-2016 年 9 月，《连线》（Wired）杂志发表了一篇《微软把未来押注在 FPGA 上》的报道 [3]，讲述了 Catapult 项目的前世今生。紧接着，Catapult 项目的负责人 Doug Burger 在 Ignite 2016 大会上与微软 CEO Satya Nadella 一起做了 FPGA 加速机器翻译的演示。演示的总计算能力是 103 万 T ops，也就是 1.03 Exa-op，相当于 10 万块顶级 GPU 计算卡。
+2016 年 9 月，《连线》（Wired）杂志发表了一篇《微软把未来押注在 FPGA 上》的报道 \cite{microsoft-wired-fpga}，讲述了 Catapult 项目的前世今生。紧接着，Catapult 项目的负责人 Doug Burger 在 Ignite 2016 大会上与微软 CEO Satya Nadella 一起做了 FPGA 加速机器翻译的演示。演示的总计算能力是 103 万 T ops，也就是 1.03 Exa-op，相当于 10 万块顶级 GPU 计算卡。
 
-在 MICRO’16 会议上，微软提出了硬件即服务（Hardware as a Service，HaaS）的概念 \cite{configurable-cloud-acceleration}，即把硬件作为一种可调度的云服务，使得 FPGA服务的集中调度、管理和大规模部署成为可能。
+在 MICRO'16 会议上，微软提出了硬件即服务（Hardware as a Service，HaaS）的概念 \cite{configurable-cloud-acceleration}，即把硬件作为一种可调度的云服务，使得 FPGA服务的集中调度、管理和大规模部署成为可能。
 
 
 
