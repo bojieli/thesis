@@ -16,7 +16,7 @@
 \name 以 Catapult Shell 架构构建\cite {putnam2014reconfigurable}。
 \textit {shell}包含许多可重用的逻辑位，这些逻辑对所有应用程序都是通用的，并将它们抽象为一组明确定义的接口，例如，PCIe，直接内存访问（DMA），DRAM内存管理单元（MMU），和以太网MAC。
 \name FPGA程序合成为 Catapult \textit {role}。
-但是，由于\name 依赖于商品HLS工具链来生成FPGA HDL，并且不同的工具可以为shell管理的资源生成自己的（和不同的）接口，我们需要一个名为\textit {HLS-的垫片层特定运行时}，用于执行HLS特定接口与shell接口之间的转换。
+但是，由于\name 依赖于商品HLS工具链来生成FPGA 硬件描述语言，并且不同的工具可以为shell管理的资源生成自己的（和不同的）接口，我们需要一个名为\textit {HLS-的垫片层特定运行时}，用于执行HLS特定接口与shell接口之间的转换。
 
 \name{} host 进程通过 \name{} library与 \name{} role 进行通信，这进一步依赖于 Catapult PCIe 驱动程序中的服务与FPGA硬件进行交互。
 \name{} library 实现了两个重要的功能：
@@ -52,7 +52,7 @@ flit的格式如图 \ref {clicknp:fig:element}（b）所示。每个flit包含�
 当在 \name elements之间流动时，大量数据（例如，完整大小的数据包）被分成多个flits。
 第一个flit标有 \textbf {sop}（数据包开始），最后一个flit标有 \textbf {eop}（数据包结束）。
 如果数据块的大小不是32，则最后一个flit的 \textbf {pad}字段表示已填充到有效负载的字节数。
-通过HDL综合工具优化了flit中的保留字段。
+通过硬件描述语言综合工具优化了flit中的保留字段。
 我们注意到，将大数据分解为flits不仅可以减少延迟，还可以在不同元素处同时处理分组的不同片段，以增加并行性。
 最后，为了实现网络功能，可以将多个\name 元素互连以形成定向处理图，称为\name \textit {配置}。
 
@@ -209,7 +209,7 @@ Current generation of Catapult FPGA has 172,600 ALMs (Adaptive Logic Modules) ea
 
 The Altera SDK for OpenCL \cite{singh2011implementing} is a programming framework that abstract away the traditional hardware FPGA development flow. In the OpenCL \cite{khronos2008opencl} model, data-plane functions are wrapped in \textit{kernels} and compiled into hardware accelerators, and control plane on the host machine communicates with kernels via a standard set of APIs. Altera OpenCL introduces \textit{channels} to allow communication among kernels without host intervention.
 
-Central to Altera OpenCL is a compiler \cite{czajkowski2012opencl} that extracts parallelism in OpenCL kernels and generates Verilog code. A parser based on LLVM first parses OpenCL kernel and produces intermediate representation (IR) consisting of instructions and dependencies between them. Then the IR is optimized via live-variable analysis and generate CDFG (Control Data Flow Graph). Based on CDFG, scheduler determines the required clock cycles of each operation, then sequence the operations into a pipeline, where independent operations are parallelized and dependent operations are pipelined. Finally the compiler links to IP library and generates Verilog HDL, as well as a profiling report containing estimated resource utilization and an optimization report containing data dependencies that lead to pipeline stall.
+Central to Altera OpenCL is a compiler \cite{czajkowski2012opencl} that extracts parallelism in OpenCL kernels and generates Verilog code. A parser based on LLVM first parses OpenCL kernel and produces intermediate representation (IR) consisting of instructions and dependencies between them. Then the IR is optimized via live-variable analysis and generate CDFG (Control Data Flow Graph). Based on CDFG, scheduler determines the required clock cycles of each operation, then sequence the operations into a pipeline, where independent operations are parallelized and dependent operations are pipelined. Finally the compiler links to IP library and generates Verilog 硬件描述语言, as well as a profiling report containing estimated resource utilization and an optimization report containing data dependencies that lead to pipeline stall.
 
 OpenCL is designed primarily for batch processing instead of stream processing, which is a gap that ClickNP needs to bridge. In network stream processing, kernels run in an infinite loop, so the kernels will never finish.
 

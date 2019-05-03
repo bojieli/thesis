@@ -33,10 +33,10 @@ NP-Click \cite{shah2004np} 在网络处理器上实现了 Click 编程框架。
 虽然单个BRAM的带宽可能有限，但如果我们并行访问数千个BRAM，则总内存带宽可以是多TBps！
 因此，为了实现高性能，程序员必须充分利用这种大规模的并行性。
 
-传统上，FPGA使用诸如Verilog和VHDL之类的HDL进行编程。
+传统上，FPGA使用诸如Verilog和V硬件描述语言之类的硬件描述语言进行编程。
 这些语言水平太低，难以学习，编程也很复杂。
 因此，大型软件程序员社区已经远离FPGA多年了~\cite {bacon2013fpga}。
-为了简化这一点，许多高级综合（HLS）工具/系统已经在工业界和学术界开发，试图将高级语言（主要是C）的程序转换为HDL。
+为了简化这一点，许多高级综合（HLS）工具/系统已经在工业界和学术界开发，试图将高级语言（主要是C）的程序转换为硬件描述语言。
 但是，正如我们将在下一小节中所示，它们都不适合网络功能处理，这是本工作的重点。
 
 \subsection{基于 FPGA 的网络功能编程}
@@ -60,8 +60,8 @@ NP-Click \cite{shah2004np} 在网络处理器上实现了 Click 编程框架。
 
 
 现有的FPGA高级编程工具都不能满足上述所有要求。
-大多数HLS工具，例如 Vivado HLS~\cite{vivado}，只是HDL工具链的辅助工具。
-这些工具不是直接将程序编译成FPGA映像，而是仅生成硬件模块，即IP核，必须手动嵌入在HDL项目和连接到其它HDL模块，这是大多数软件程序员无法完成的任务。
+大多数HLS工具，例如 Vivado HLS~\cite{vivado}，只是硬件描述语言工具链的辅助工具。
+这些工具不是直接将程序编译成FPGA映像，而是仅生成硬件模块，即IP核，必须手动嵌入在硬件描述语言项目和连接到其它硬件描述语言模块，这是大多数软件程序员无法完成的任务。
 
 但是，Altera OpenCL可以直接将OpenCL程序编译为FPGA~ \cite {aoc}。
 但是，OpenCL编程模型直接源自GPU编程，并且不是用于数据包处理的模块化。
@@ -101,13 +101,13 @@ Fortunately, reconfigurable hardware is an architecture that provides both progr
 
 \subsection{FPGA Programming Challenge}
 
-Despite FPGA's potential in network processing, the programmablity of FPGA is traditionally provided by hardware description languages (HDL) such as Verilog, which requires hardware knowledge and are much harder to program and debug than higher-level languages such as C/C++. Thus, existing FPGA-based network processors such as NetFPGA \cite{lockwood2007netfpga} are hard to program for software engineers.
+Despite FPGA's potential in network processing, the programmablity of FPGA is traditionally provided by hardware description languages (硬件描述语言) such as Verilog, which requires hardware knowledge and are much harder to program and debug than higher-level languages such as C/C++. Thus, existing FPGA-based network processors such as NetFPGA \cite{lockwood2007netfpga} are hard to program for software engineers.
 
 Many works, e.g. OpenFlow \cite{mckeown2008openflow}, P4 \cite{bosshart2014p4} and 软件定义网络et \cite{xilinxsdnet}, provides the programmability by abstracting a set of primitives in network processing and defining a high-level programming language to compose the primitives. This direction has proved effective, but the programmability is limited to a set of pre-defined actions, which could not keep pace with rapid development of data center network functions. Our work strive to make the primitives extensible for software engineers.
 
 Fortunately, several frameworks have been proposed to provide abstractions for generic FPGA programming. Examples of such works include Xilinx Vivado HLS (High Level Synthesis) \cite{feist2012vivado} based on C/C++, Altera SDK for OpenCL \cite{czajkowski2012opencl} based on C-like OpenCL and IBM Lime \cite{auerbach2010lime} based on Java.
 
-However, FPGA has a completely different architecture than general-purpose CPUs. For software programmers that bear Von Neumann model in mind, the compilers may generate surprisingly poor hardware logic for reasonable code in high-level language. For example, Click2NetFPGA \cite{Click2NetFPGA} uses LLVM and HLS tools to compile optimized Click C++ code into HDL, but the resulting FPGA-based router can only process 178 K pps (packets per second) for 98B packets, and 215 Mbps for large packets, which is 30 -- 50x slower than a CPU core in ClickOS \cite{martins2014clickos}. The bottleneck for small packets is the IP header checking stage \cite{Click2NetFPGA} because this stage is not fully pipelined; the bottleneck for large packets is the byte-wide shared memory \cite{Click2NetFPGA}, indicating a shared-memory design suitable for Von Neumann model would yield poor performance on FPGA.
+However, FPGA has a completely different architecture than general-purpose CPUs. For software programmers that bear Von Neumann model in mind, the compilers may generate surprisingly poor hardware logic for reasonable code in high-level language. For example, Click2NetFPGA \cite{Click2NetFPGA} uses LLVM and HLS tools to compile optimized Click C++ code into 硬件描述语言, but the resulting FPGA-based router can only process 178 K pps (packets per second) for 98B packets, and 215 Mbps for large packets, which is 30 -- 50x slower than a CPU core in ClickOS \cite{martins2014clickos}. The bottleneck for small packets is the IP header checking stage \cite{Click2NetFPGA} because this stage is not fully pipelined; the bottleneck for large packets is the byte-wide shared memory \cite{Click2NetFPGA}, indicating a shared-memory design suitable for Von Neumann model would yield poor performance on FPGA.
 
 FPGA has millions of logic gates with 10x slower clock rate than CPU, thousands of distributed fast SRAMs each with only KB capacity, and a large DRAM with 10x lower throughput than DRAMs in CPU architecture. Consequently, exploiting both spatial and temporal parallelism is crucial to unleashing the performance of FPGA. In network stream processing, most operations are independent of each other and therefore can be either parallelized (spatial) or pipelined (temporal), so that each stage of the pipeline can process different packets in parallel.
 
@@ -122,7 +122,7 @@ We highlight several design goals for our ClickNP framework to enable software e
 
 \smalltitle{Code reuse.} Many network applications share a common set of elements, for example packet parser, lookup tables and packet modifications. Code of these elements should be reusable and elements should be composable. Software engineers should be able to write many network applications simply by connecting elements in the library.
 
-\smalltitle{Debugging support.} First, as HDL (e.g. Verilog) simulation and debugging is both time consuming and requires extensive hardware knowledge, the framework should be able to compile OpenCL-based ClickNP programs to native x86 code for emulation, and provide traffic generators and receivers to test functionality. Second, as CPU is neither capable of sending or receiving packets at 60 Mpps, we need a FPGA-based network benchmark suite to perform stress testing on the network processor.
+\smalltitle{Debugging support.} First, as 硬件描述语言 (e.g. Verilog) simulation and debugging is both time consuming and requires extensive hardware knowledge, the framework should be able to compile OpenCL-based ClickNP programs to native x86 code for emulation, and provide traffic generators and receivers to test functionality. Second, as CPU is neither capable of sending or receiving packets at 60 Mpps, we need a FPGA-based network benchmark suite to perform stress testing on the network processor.
 
 \smalltitle{Separation of control plane and data plane.} On one hand, our throughput requirement requires most network packets to be processed through the reconfigurable hardware without any CPU intervention. On the other hand, 软件定义网络 and 网络功能虚拟化 applications are usually complicated and have external dependencies. Therefore a clear interface between the control plane and the data plane is mandatory, where data plane programs are written within ClickNP framework and target massive parallelism, and control plane programs need only slight modifications to call our host library and perform on-the-fly reconfigurations.
 
