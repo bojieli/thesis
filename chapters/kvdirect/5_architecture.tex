@@ -3,17 +3,17 @@
 
 \subsection{系统架构}
 
-键值-Direct使\textit {远程直接键值访问}成为可能。
-客户端将\textit {键值-Direct 操作}（\S \ref {kvdirect:sec:kv-operations}）发送到键值存储服务器，而可编程网卡处理请求并发送回结果，绕过CPU。
+KV-Direct使\textit {远程直接键值访问}成为可能。
+客户端将\textit {KV-Direct 操作}（\S \ref {kvdirect:sec:kv-operations}）发送到键值存储服务器，而可编程网卡处理请求并发送回结果，绕过CPU。
 键值存储服务器上的可编程网卡是一个重新配置为\textit {键值处理器}的FPGA（\S \ref {kvdirect:sec:kv-processor}）。
-图\ref {kvdirect:fig:kvdirect-arch}显示了键值-Direct的架构。
+图\ref {kvdirect:fig:kvdirect-arch}显示了KV-Direct的架构。
 
-\subsection{键值-Direct 操作}
+\subsection{KV-Direct 操作}
 \label{kvdirect:sec:kv-operations}
 
 \begin{table}
 \centering
-\caption{键值-Direct 操作。}
+\caption{KV-Direct 操作。}
 \label{kvdirect:tab:kv-operations}
 
 \small
@@ -40,16 +40,16 @@ filter ($k, \lambda(v) \rightarrow$ bool) $\rightarrow [v]$ & 在向量 $k$ 中�
 
 \end{table}
 
-键值-Direct将单面RDMA操作扩展到键值操作，如表\ref {kvdirect:tab:kv-operations}中所述。
-除了表\ref {kvdirect:tab:kv-operations}顶部所示的标准键值存储操作外，键值-Direct还支持两种类型的向量运算：
+KV-Direct将单面RDMA操作扩展到键值操作，如表\ref {kvdirect:tab:kv-operations}中所述。
+除了表\ref {kvdirect:tab:kv-operations}顶部所示的标准键值存储操作外，KV-Direct还支持两种类型的向量运算：
 将标量发送到服务器上的网卡，网卡将更新应用于向量中的每个元素;或者向服务器发送一个向量，并且网卡逐个元素地更新原始向量。
-此外，键值-Direct支持用户定义的更新功能，作为原子操作的概括。
+此外，KV-Direct支持用户定义的更新功能，作为原子操作的概括。
 更新功能需要在执行前预先注册并编译为硬件逻辑。
 使用用户定义的更新功能的键值操作类似于\textit {动态消息}（active messages）\cite {eicken1992active}，从而节省了通信和同步成本。
 
 当对键执行向量操作更新（update），归约（reduce）或过滤（filter）时，其值被视为固定位宽元素的数组。
 每个函数 $\lambda$ 对向量中的一个元素，客户端指定的参数 $\Delta$ 和/或初始值 $\Sigma$ 进行归约操作。
-键值-Direct开发工具链多次复制$\lambda$以利用FPGA中的并行性并将计算吞吐量与PCIe吞吐量相匹配，然后使用高级综合（HLS）工具将其编译为可重新配置的硬件逻辑\cite {aoc} 。
+KV-Direct开发工具链多次复制$\lambda$以利用FPGA中的并行性并将计算吞吐量与PCIe吞吐量相匹配，然后使用高级综合（HLS）工具将其编译为可重新配置的硬件逻辑\cite {aoc} 。
 HLS工具自动提取复制函数中的数据依赖性，并生成完全流水线的可编程逻辑。
 在执行键值存储客户端之前，键值存储服务器上的可编程网卡应加载包含展开的$\lambda$的硬件逻辑。
 
@@ -81,7 +81,7 @@ HLS工具自动提取复制函数中的数据依赖性，并生成完全流水�
 对于GET操作，至少需要读取一次内存。
 对于PUT或DELETE操作，对于哈希表，一次读取和一次写入最小。
 基于日志的数据结构可以实现每个PUT一次写入，但它牺牲了GET性能。
-键值-Direct仔细设计哈希表，以便在每次查找和插入时实现接近理想的DMA访问，以及内存分配器。每次动态内存分配平摊下来，只需不到0.1次DMA操作。
+KV-Direct仔细设计哈希表，以便在每次查找和插入时实现接近理想的DMA访问，以及内存分配器。每次动态内存分配平摊下来，只需不到0.1次DMA操作。
 
 \subsubsection{哈希表}
 \label{kvdirect:sec:hashtable}
@@ -139,7 +139,7 @@ Cuckoo哈希\cite {pagh2004cuckoo}和跳房子哈希（Hopscotch Hash）\cite {h
 线性探测可能受到主群集的影响，因此其性能对散列函数的均匀性敏感。
 我们选择\textit {拉链法}来解决哈希冲突，这会平衡查找和插入，同时对哈希群集更加健壮。
 
-%In 键值-Direct, we measure memory utilization instead of load factor, because chaining has dynamic size and that we care more about the overall storage efficiency counting all indexing, metadata and memory fragmentation overhead.
+%In KV-Direct, we measure memory utilization instead of load factor, because chaining has dynamic size and that we care more about the overall storage efficiency counting all indexing, metadata and memory fragmentation overhead.
 %Clearly, small 键值s cause lower memory utilization due to metadata overhead.
 %The optimal hash index ratio is chosen at initialization time according to workload to balance average access time and memory utilization.
 

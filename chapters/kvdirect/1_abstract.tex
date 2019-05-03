@@ -10,12 +10,12 @@ We develop several novel techniques to maximize the throughput and hide the late
 %To reduce the DMA request rounds through the PCIe bus, we adopt a novel FPGA friendly hash table and memory allocator design. To hide PCIe access latency and fully utilize the PCIe bandwidth, we design an out-of-order processing engine and a load-distribution component for host memory and on-board DRAM of our programmable 网卡.
 Combined, these mechanisms allow a single 网卡 \oursys{} to achieve up to 180~M key-value operations per second, equivalent to the throughput of tens of CPU cores. Compared with CPU based 键值存储 implementation, \oursys{} improves power efficiency by 3x, while keeping tail latency below 10~$\mu$s. Moreover, \oursys{} can achieve near linear scalability with multiple 网卡s. With 10 programmable 网卡 cards in a commodity server, we achieve 1.22 billion 键值 operations per second, which is almost an order-of-magnitude improvement over existing systems, setting a new milestone for a general-purpose in-memory key-value store.
 
-%This paper presents 键值-Direct, a high performance key-value store with programmable network interface card (网卡) which is deployed at scale in datacenters.
-%键值-Direct extends RDMA primitives from memory operations to key-value operations, moves 键值 processing to the programmable 网卡 on server, thus enabling remote direct key-value access.
+%This paper presents KV-Direct, a high performance key-value store with programmable network interface card (网卡) which is deployed at scale in datacenters.
+%KV-Direct extends RDMA primitives from memory operations to key-value operations, moves 键值 processing to the programmable 网卡 on server, thus enabling remote direct key-value access.
 %In order to fully utilize PCIe bandwidth, we specialize hash table and slab memory allocator to minimize PCIe DMA requests for both GET and PUT operations.
 %In order to hide PCIe latency, we design an out-of-order execution engine to issue independent 键值 operations while ensuring consistency.
-%键值-Direct also leverages the DRAM on the 网卡 for caching and load balancing.
-%A programmable 网卡 with 键值-Direct can process up to 160M key-value operations per second, whose throughput is equivalent to 32 CPU cores, power efficiency is 16x higher than CPU, and tail latency is 10x lower than CPU.
+%KV-Direct also leverages the DRAM on the 网卡 for caching and load balancing.
+%A programmable 网卡 with KV-Direct can process up to 160M key-value operations per second, whose throughput is equivalent to 32 CPU cores, power efficiency is 16x higher than CPU, and tail latency is 10x lower than CPU.
 
 %\oursys{} is an efficient in-memory key-value storage system based on \ournic{}.By offloading the 键值 operations to FPGA-based 网卡, \oursys{} achieves 160\MBs{} key-value operations, whose throughput is equivalent to 32 CPU cores, power efficiency is 16x higher than CPU, and tail latency is 10x lower than CPU, up to 5\mus{}. 
 %Besides, \oursys{} is in linear scale to multiple programmable 网卡s, achieving one billion 键值 op/s per-server, more than an order-of-magnitude improvement over existing systems, setting a new milestone for key-value storage system.
@@ -24,6 +24,6 @@ Combined, these mechanisms allow a single 网卡 \oursys{} to achieve up to 180~
 %In \oursys{}, we extend the RDMA primitives to key-value operations with consistency guarantee while keeping its CPU-bypass semantics. 
 %To optimize the new bottleneck in PCIe and reduce the DMA requests, we adopts a new FPGA friendly hash table and memory allocation design.
 %Furthermore, to guarantee the consistency and leverage FPGA parallism, we design an hardware based out-of-order engine and a load-balancing component for on-board cached DRAM and host memory.
-%Combined, these mechanisms allow 键值-Direct to achieve high throughput and low latency for both GET and PUT key-value operations. 
+%Combined, these mechanisms allow KV-Direct to achieve high throughput and low latency for both GET and PUT key-value operations. 
 
 \end{abstract}

@@ -115,12 +115,12 @@ Compared to GPGPU, FPGA is more power-efficient and has lower latency.
 
 In recent years, FPGA is becoming cost-effective and is getting deployed at scale in datacenters~\cite{putnam2014programmable, caulfield2016cloud}. Its programmability has been greatly improved~\cite{li2016clicknp}.
 Most existing work store the entire hash table inside the on-board DRAM, which is often quite limiting (typically on the order of 4\approx16~GiB), while the host DRAM is often large (on the order of 100\approx500~GiB).
-键值-Direct follows this line of work, while leveraging host DRAM for 键值 storage, as depicted in Figure~\ref{kvdirect:fig:memaccess-c}.
+KV-Direct follows this line of work, while leveraging host DRAM for 键值 storage, as depicted in Figure~\ref{kvdirect:fig:memaccess-c}.
 
-键值-Direct leverages a programmable 网卡 with large-scale deployments in datacenters.
+KV-Direct leverages a programmable 网卡 with large-scale deployments in datacenters.
 The programmable 网卡 is composed of two parts: a traditional RDMA 网卡 plus a field-programmable gate array (FPGA).
 There has been research on leveraging the reconfigurability of the 网卡 for network processing, \eg, network virtualization~\cite{greenberg2015sdn, vfp} and network functions~\cite{li2016clicknp}.
-键值-Direct extends the application of programmable 网卡s to a novel area: key-value stores.
+KV-Direct extends the application of programmable 网卡s to a novel area: key-value stores.
 }
 
 \subsection{键值存储 的工作负载变化}
@@ -242,8 +242,8 @@ RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或
 
 \end{figure}
 
-键值-Direct将键值处理从CPU移动到服务器中的可编程网卡（图\ref {kvdirect:fig:memaccess-c}）。
-与RDMA相同，键值-Direct 网卡通过PCIe访问主机内存。 PCIe是一种分组交换网络，具有大约500 ns的往返延迟和每Gen3 x8端点7.87~GB / s的理论带宽。
+KV-Direct将键值处理从CPU移动到服务器中的可编程网卡（图\ref {kvdirect:fig:memaccess-c}）。
+与RDMA相同，KV-Direct 网卡通过PCIe访问主机内存。 PCIe是一种分组交换网络，具有大约500 ns的往返延迟和每Gen3 x8端点7.87~GB / s的理论带宽。
 在延迟方面，对于我们的可编程网卡，由于FPGA中的额外处理延迟，缓存的PCIe DMA读取延迟为800~ns。
 对于随机非缓存DMA读取，由于DRAM访问，DRAM刷新和PCIe DMA引擎中的PCIe响应重新排序，存在额外的250~ns平均延迟（图\ref {kvdirect:fig:dma-lat}）。
 在吞吐量方面，每个DMA读或写操作都需要一个带有26字节头的PCIe传输层数据包（TLP）和用于64位寻址的填充。
@@ -280,4 +280,4 @@ RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或
 更期望在DRAM和主机存储器之间分配存储器访问以便利用它们的两个带宽。
 然而，与主机存储器（64~GiB）相比，板载DRAM很小（4~GiB），需要混合缓存和负载调度方法。
 
-在下文中，我们将介绍键值-Direct，这是一种基于FPGA的新型键值存储，可满足上述所有目标，并描述我们如何应对这些挑战。
+在下文中，我们将介绍KV-Direct，这是一种基于FPGA的新型键值存储，可满足上述所有目标，并描述我们如何应对这些挑战。
