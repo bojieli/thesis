@@ -26,12 +26,12 @@ Furthermore, the kernel network stack adds hundreds of microseconds latency~\cit
 and complicates latency-hiding programming of applications that require multiple round-trips to the 键值存储.
 
 Extensive research have been done to reduce network communication cost and improve end-to-end latency.
-One line of work proposes the 键值存储 server software communicate directly with NICs by polling while bypassing the kernel~\cite{rizzo2012netmap, intel2014data}; packets are processed by a lightweight network stack in user space~\cite{jeong2014mtcp, marinos2014network}.
+One line of work proposes the 键值存储 server software communicate directly with 网卡s by polling while bypassing the kernel~\cite{rizzo2012netmap, intel2014data}; packets are processed by a lightweight network stack in user space~\cite{jeong2014mtcp, marinos2014network}.
 Chronos~\cite{kapoor2012chronos}, RAMCloud~\cite{ousterhout2010case, ousterhout2015ramcloud} and MICA~\cite{lim2014mica,li2016full} leverage this approach to achieve high throughput (\approx5 million 键值 operations per second (op/s) per core) and low latency (microsecond-scale) by reducing networking overhead.
 
 The other line of work leverage two-sided RDMA~\cite{infiniband2000infiniband} as an RPC mechanism between 键值存储 client and server.
 RDMA is a hardware-based transport that almost completely removes the CPU overhead of networking.
-键值存储 systems such as HERD~\cite{kalia2014using, kalia2016design} achieve per-core throughput and end-to-end latency comparable or superior to the first line of work, but the overall throughput per server largely depends on the processing capacity of RDMA NIC~\cite{kalia2016design}.
+键值存储 systems such as HERD~\cite{kalia2014using, kalia2016design} achieve per-core throughput and end-to-end latency comparable or superior to the first line of work, but the overall throughput per server largely depends on the processing capacity of RDMA 网卡~\cite{kalia2016design}.
 
 \subsubsection{Throughput bottleneck of CPU}
 \label{kvdirect:sec:CPU-键值-Bottleneck}
@@ -85,22 +85,22 @@ Nowadays, CMOS feature-size reduction is getting more and more difficult, which 
 \egg{
 For computation, DSAs such as GPU, 
 FPGA~\cite{putnam2014programmable, caulfield2016cloud} and ASIC~\cite{liu2016cambricon, tpu} have been quickly accepted by the market.
-For networking, DSAs are also deployed at scale in datacenters, such as RDMA/RoCE NICs~\cite{mellanoxrdma}, programmable NICs~\cite{greenberg2015sdn, li2016clicknp} and programmable switches~\cite{bosshart2013forwarding}.
+For networking, DSAs are also deployed at scale in datacenters, such as RDMA/RoCE 网卡s~\cite{mellanoxrdma}, programmable 网卡s~\cite{greenberg2015sdn, li2016clicknp} and programmable switches~\cite{bosshart2013forwarding}.
 }
 
 \subsubsection{One-sided RDMA}
 
-Due to high overhead in CPU network processing, DSAs to accelerate networking, such as RDMA/RoCE NICs~\cite{mellanoxrdma}, are deployed at scale in datacenters. High performance 键值存储 systems can leverage RDMA capable hardware. One approach is to accelerate RPC with \textit{two-sided} verbs in RDMA/RoCE NICs (section \ref{kvdirect:sec:ReduceNetworkingOverhead}, Figure~\ref{kvdirect:fig:memaccess-a}).
+Due to high overhead in CPU network processing, DSAs to accelerate networking, such as RDMA/RoCE 网卡s~\cite{mellanoxrdma}, are deployed at scale in datacenters. High performance 键值存储 systems can leverage RDMA capable hardware. One approach is to accelerate RPC with \textit{two-sided} verbs in RDMA/RoCE 网卡s (section \ref{kvdirect:sec:ReduceNetworkingOverhead}, Figure~\ref{kvdirect:fig:memaccess-a}).
 By doing so, the 键值 performance is bounded by CPU (section \ref{kvdirect:sec:CPU-键值-Bottleneck}).
 
-A significantly different approach is to leverage \textit{one-sided} RDMA to access remote memory via the NIC on the client and bypass the CPU on the server, as shown in Figure~\ref{kvdirect:fig:memaccess-b}.
+A significantly different approach is to leverage \textit{one-sided} RDMA to access remote memory via the 网卡 on the client and bypass the CPU on the server, as shown in Figure~\ref{kvdirect:fig:memaccess-b}.
 In this approach, 键值 computation and synchronization are handled by the client CPU, therefore making the 键值 server very light-weight and high performance.
-Despite the high message rate (8M\approx150M~op/s~\cite{kalia2016design}) provided by RDMA NICs, it is challenging to find an efficient match between RDMA primitives and key-value operations.
+Despite the high message rate (8M\approx150M~op/s~\cite{kalia2016design}) provided by RDMA 网卡s, it is challenging to find an efficient match between RDMA primitives and key-value operations.
 For a write (PUT or atomic) operation, multiple network round-trips and memory accesses may be required to handle hash conflicts, memory allocation and fetch/save non-inline data.
 RDMA does not support transactions. Clients must synchronize with each other to ensure consistency by either using RDMA atomics or distributed atomic broadcast~\cite{szepesi2014designing}, both incurring communication overhead and synchronization latency~\cite{mitchell2013using, dragojevic2014farm}.
 As a consequence, most RDMA-based 键值存储, \eg, Pilaf~\cite{mitchell2013using}, FaRM~\cite{dragojevic2014farm} and HERD~\cite{kalia2014using} recommend using one-sided RDMA for GET operations only. For PUT operations, they fall back to two-sided RDMA as RPC and let the remote CPU do the actual work. Throughput of write-intensive workload is still bottlenecked by CPU cores.
 
-In addition to the mismatch between RDMA primitives and 键值 operations, implementation of commodity RDMA NICs also constrain 键值 throughput. For example, RDMA NICs hold a lock for atomic operations when a PCIe DMA to the same memory address is in flight, which bounds RDMA atomics throughput to \approx2M~op/s~\cite{kalia2016design}.
+In addition to the mismatch between RDMA primitives and 键值 operations, implementation of commodity RDMA 网卡s also constrain 键值 throughput. For example, RDMA 网卡s hold a lock for atomic operations when a PCIe DMA to the same memory address is in flight, which bounds RDMA atomics throughput to \approx2M~op/s~\cite{kalia2016design}.
 
 \subsubsection{Highly parallel architectures}
 
@@ -117,10 +117,10 @@ In recent years, FPGA is becoming cost-effective and is getting deployed at scal
 Most existing work store the entire hash table inside the on-board DRAM, which is often quite limiting (typically on the order of 4\approx16~GiB), while the host DRAM is often large (on the order of 100\approx500~GiB).
 键值-Direct follows this line of work, while leveraging host DRAM for 键值 storage, as depicted in Figure~\ref{kvdirect:fig:memaccess-c}.
 
-键值-Direct leverages a programmable NIC with large-scale deployments in datacenters.
-The programmable NIC is composed of two parts: a traditional RDMA NIC plus a field-programmable gate array (FPGA).
-There has been research on leveraging the reconfigurability of the NIC for network processing, \eg, network virtualization~\cite{greenberg2015sdn, vfp} and network functions~\cite{li2016clicknp}.
-键值-Direct extends the application of programmable NICs to a novel area: key-value stores.
+键值-Direct leverages a programmable 网卡 with large-scale deployments in datacenters.
+The programmable 网卡 is composed of two parts: a traditional RDMA 网卡 plus a field-programmable gate array (FPGA).
+There has been research on leveraging the reconfigurability of the 网卡 for network processing, \eg, network virtualization~\cite{greenberg2015sdn, vfp} and network functions~\cite{li2016clicknp}.
+键值-Direct extends the application of programmable 网卡s to a novel area: key-value stores.
 }
 
 \subsection{键值存储 的工作负载变化}
@@ -224,9 +224,9 @@ RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或
 %Millions of reconfigurable gates and thousands of small block RAMs (BRAMs) provide massive parallelism to build thousands of ``cores'' running simultaneously, and more importantly, customized interconnections among the ``cores'' and BRAMs specializing communication and synchronization for a certain application.
 %Consequently, for applications with sufficient bit-level and task-level parallelism, FPGAs provide not only high throughput and power efficiency, but also low and predictable latency.
 
-由于网络速度和CPU网络处理能力的不匹配日益增加，带有FPGA的可编程NIC \cite {vfp,greenberg2015sdn,li2016clicknp,caulfield2016cloud} 现在可以在数据中心进行大规模部署。
+由于网络速度和CPU网络处理能力的不匹配日益增加，带有FPGA的可编程网卡 \cite {vfp,greenberg2015sdn,li2016clicknp,caulfield2016cloud} 现在可以在数据中心进行大规模部署。
 如图\ref {kvdirect:fig:kvdirect-arch}所示，我们使用的可编程网卡的核心是FPGA，带有嵌入式网卡芯片以连接到网络。
-可编程NIC通常带有板载DRAM作为数据包缓冲区和用于NIC固件的运行时内存\cite {li2016clicknp}，但DRAM通常不足以容纳整个键值存储。
+可编程网卡通常带有板载DRAM作为数据包缓冲区和用于网卡固件的运行时内存\cite {li2016clicknp}，但DRAM通常不足以容纳整个键值存储。
 
 \subsection{远程直接键值访问面临的挑战}
 \label{kvdirect:sec:challenge}
@@ -242,12 +242,12 @@ RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或
 
 \end{figure}
 
-键值-Direct将键值处理从CPU移动到服务器中的可编程NIC（图\ref {kvdirect:fig:memaccess-c}）。
-与RDMA相同，键值-Direct NIC通过PCIe访问主机内存。 PCIe是一种分组交换网络，具有大约500 ns的往返延迟和每Gen3 x8端点7.87~GB / s的理论带宽。
-在延迟方面，对于我们的可编程NIC，由于FPGA中的额外处理延迟，缓存的PCIe DMA读取延迟为800~ns。
+键值-Direct将键值处理从CPU移动到服务器中的可编程网卡（图\ref {kvdirect:fig:memaccess-c}）。
+与RDMA相同，键值-Direct 网卡通过PCIe访问主机内存。 PCIe是一种分组交换网络，具有大约500 ns的往返延迟和每Gen3 x8端点7.87~GB / s的理论带宽。
+在延迟方面，对于我们的可编程网卡，由于FPGA中的额外处理延迟，缓存的PCIe DMA读取延迟为800~ns。
 对于随机非缓存DMA读取，由于DRAM访问，DRAM刷新和PCIe DMA引擎中的PCIe响应重新排序，存在额外的250~ns平均延迟（图\ref {kvdirect:fig:dma-lat}）。
 在吞吐量方面，每个DMA读或写操作都需要一个带有26字节头的PCIe传输层数据包（TLP）和用于64位寻址的填充。
-对于以64字节粒度访问主机内存的PCIe Gen3 x8 NIC，理论吞吐量因此为5.6~GB / s或87~Mops。
+对于以64字节粒度访问主机内存的PCIe Gen3 x8 网卡，理论吞吐量因此为5.6~GB / s或87~Mops。
 
 为了使用64字节DMA请求使PCIe Gen3 x8饱和，考虑到我们的1050~ns的延迟，需要92个并发DMA请求。
 实际上，有两个因素进一步限制了DMA请求的并发性。
@@ -255,7 +255,7 @@ RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或
 其次，DMA读取需要分配唯一的PCIe标记来识别可能无序的DMA响应。
 我们FPGA中的DMA引擎仅支持64个PCIe标签，进一步将我们的DMA读取并发限制为64个请求，这使得吞吐量达到60~Mops，如图\ref {kvdirect:fig:dma-tput}所示。
 另一方面，对于40~Gbps网络和64字节键值对，客户端批处理的吞吐量上限为78~Mops。
-为了通过GET操作使网络饱和，NIC上的键值存储必须充分利用PCIe带宽，并且每个GET实现接近一个平均内存访问。
+为了通过GET操作使网络饱和，网卡上的键值存储必须充分利用PCIe带宽，并且每个GET实现接近一个平均内存访问。
 这归结为三个挑战：
 
 \textbf {最小化每键值操作的DMA请求。}
@@ -268,15 +268,15 @@ RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或
 最小化每个键值操作的哈希表查找和每个内存分配的内存访问对于在写密集型小键值工作负载下匹配PCIe和网络吞吐量至关重要。
 
 \textbf {隐藏PCIe延迟，同时保持一致性。}
-NIC上的高效键值存储必须管理键值操作和DMA请求以隐藏PCIe延迟。
+网卡上的高效键值存储必须管理键值操作和DMA请求以隐藏PCIe延迟。
 但是，键值操作可能具有依赖性。
 在同一个键上的PUT之后的GET需要返回更新的值。
 两个相邻的原子添加操作需要在执行第二个之前等待第一个完成。
 这需要跟踪正在处理的键值操作并在数据危险时停止管道，或者更好地设计无序执行器以解决数据依赖性而不明确地停止管道。
 
 
-\textbf {在NIC DRAM和主机内存之间分配负载。}
-一个显而易见的想法是使用NIC上的DRAM作为主机内存的缓存，但在我们的NIC中，DRAM吞吐量（12.8~GB / s）与两个PCIe Gen3 x8端点的可实现吞吐量（13.2~GB / s）相当。 
+\textbf {在网卡 DRAM和主机内存之间分配负载。}
+一个显而易见的想法是使用网卡上的DRAM作为主机内存的缓存，但在我们的网卡中，DRAM吞吐量（12.8~GB / s）与两个PCIe Gen3 x8端点的可实现吞吐量（13.2~GB / s）相当。 
 更期望在DRAM和主机存储器之间分配存储器访问以便利用它们的两个带宽。
 然而，与主机存储器（64~GiB）相比，板载DRAM很小（4~GiB），需要混合缓存和负载调度方法。
 

@@ -69,7 +69,7 @@ SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它�
 %To maintain performance with many concurrent connections, rather than creating separate queues for each connection, we multiplex data from all connections through one queue.
 %In Sec.~\ref{socksdirect:subsec:multiplex-conn}, we present the design of multiplexed queue that avoids head-of-line blocking and supports fetching data from any multiplexed connections.
 
-%Inspired by Unikernels~\cite{madhavapeddy2013unikernels}, we move networking and IPC functions from the kernel to user space. Similar to existing works~\cite{peter2016arrakis,jeong2014mtcp,libvma}, we leverage multiple queues in modern NICs to enable user-space direct access to network. %The kernel is still responsible for process creation, scheduling, virtual memory and device management, but no longer on the critical path of performance.
+%Inspired by Unikernels~\cite{madhavapeddy2013unikernels}, we move networking and IPC functions from the kernel to user space. Similar to existing works~\cite{peter2016arrakis,jeong2014mtcp,libvma}, we leverage multiple queues in modern 网卡s to enable user-space direct access to network. %The kernel is still responsible for process creation, scheduling, virtual memory and device management, but no longer on the critical path of performance.
 %To maintain compatibility with existing Linux applications, we design a user-mode library \libipc as a drop-in replacement of the system call wrappers in the GNU C library (glibc). \libipc{} implements network socket functions in user mode, and adds a wrapper to other system calls to track process creation and memory allocation. \libipc{} is not considered a secure domain, as it shares memory space with the application. When \libipc{} is loaded, it creates a Linux native \textit{bootstrap socket} to the \textit{monitor} daemon, then creates a shared memory queue to the monitor.
 
 %Even though multiple threads in the same process share memory space, we still treat each thread as a separated process and use thread-specific storage to store states in \libipc. In the following text, unless explicitly mentioned, we use a ``process'' to refer to a regular process or a thread.
@@ -199,7 +199,7 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 现在我们需要共享连接到对等端的底层传输。
 SHM传输不需要特别小心，因为fork / exec之前创建的SHM仍然在fork / exec之后共享。
 但是，RDMA与fork / exec有问题，因为DMA内存区域不在SHM中。
-它们在fork之后变为写时复制，而NIC仍然从原始物理页面DMA，因此子进程不能使用现有的RDMA资源。
+它们在fork之后变为写时复制，而网卡仍然从原始物理页面DMA，因此子进程不能使用现有的RDMA资源。
 在exec之后，整个RDMA上下文被清除。
 我们的解决方案是让子进程在fork / exec之后重新初始化RDMA资源（PD，MR等）。
 当子进程使用在fork之前创建的套接字时，它会要求监视器与远程端点重新建立RDMA QP。

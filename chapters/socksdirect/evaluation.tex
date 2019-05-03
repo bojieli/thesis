@@ -87,7 +87,7 @@
 %	\label{socksdirect:fig:eval-fork-tput}
 %\end{figure}
 
-我们在三个组件中实现\sys :一个用户空间库\libipc {}和一个带有17K行C ++代码的监控守护进程，以及一个支持零拷贝的修改过的RDMA NIC驱动程序。 我们在以下方面评估\sys :
+我们在三个组件中实现\sys :一个用户空间库\libipc {}和一个带有17K行C ++代码的监控守护进程，以及一个支持零拷贝的修改过的RDMA 网卡驱动程序。 我们在以下方面评估\sys :
 
 \parab {有效地为主机内套接字使用共享内存。}
 对于8字节消息，\sys 实现0.3 $\mu$s RTT和每秒23~M消息的吞吐量。 对于大型消息，\sys 使用零拷贝来实现Linux的1/13延迟和26x吞吐量。
@@ -117,8 +117,8 @@
 每个线程都固定在CPU内核上。在收集数据之前，我们会进行足够的预热测试。
 对于延迟，我们构建一个乒乓应用程序并报告平均往返时间，误差条代表1％和99％百分位数。
 对于吞吐量，一方保持发送数据而另一方不断接收数据。
-我们将比较Linux，原始RDMA写动词，Rsocket~ \cite {rsockets}和LibVMA~ \cite {libvma}，这是针对Mellanox NIC优化的用户空间TCP / IP堆栈。
-我们没有评估mTCP~ \cite {jeong2014mtcp}，因为底层DPDK库对我们的NIC的支持有限。由于批处理，mTCP具有比RDMA高得多的延迟，报告的吞吐量为每秒1.7~M包~~ \cite {kalia2018datacenter}。
+我们将比较Linux，原始RDMA写动词，Rsocket~ \cite {rsockets}和LibVMA~ \cite {libvma}，这是针对Mellanox 网卡优化的用户空间TCP / IP堆栈。
+我们没有评估mTCP~ \cite {jeong2014mtcp}，因为底层DPDK库对我们的网卡的支持有限。由于批处理，mTCP具有比RDMA高得多的延迟，报告的吞吐量为每秒1.7~M包~~ \cite {kalia2018datacenter}。
 
 \subsection{微基准测试}
 \label{socksdirect:subsec:microbenchmark}
@@ -130,7 +130,7 @@
 图 \ref {socksdirect:fig:eval-msgsize-intra}显示了一对发送方和接收方线程之间的主机内套接字性能。
 对于8字节消息，\sys 实现0.3 $ \mu $ s往返延迟（Linux的1/35）和每秒23~M消息吞吐量（Linux的20倍）。
 相比之下，一个简单的SHM队列具有0.25 $ \mu $ s往返延迟和27~M吞吐量，表明\sys 增加了很少的开销。
-RSocket具有6x延迟和1/4吞吐量的\sys  {}，因为它使用NIC转发主机内数据包，这会导致PCIe延迟。
+RSocket具有6x延迟和1/4吞吐量的\sys  {}，因为它使用网卡转发主机内数据包，这会导致PCIe延迟。
 LibVMA只是将内核TCP套接字用于主机内部。
 \sys  {}的单向延迟为0.15 $ \mu $ s，甚至低于内核交叉（0.2 $ \mu $ s）。基于内核的套接字需要在发送方和接收方都进行内核交叉。
 
@@ -200,7 +200,7 @@ LibVMA只是将内核TCP套接字用于主机内部。
 %We establish connections between two processes before testing, then send and receive data from the connections in a round-robin order.
 %\sys  can support more than 100 million concurrent connections with 16~GiB of memory, and the throughput does not degrade under such high concurrency.
 %\sys  achieves connection stability by multiplexing connections via a single queue.
-%In comparison, the performance of RDMA, LibVMA and Linux drops quickly as the number of connections increase. There is a sharp performance drop with more than 512 RDMA connections, because the RDMA transport states saturate the NIC cache. Although LibVMA and Linux do not use RDMA as transport, they maintain per-FD buffers, which lead to CPU cache and TLB miss with thousands of connections. Furthermore, LibVMA installs flow steering rules to NIC for each connection, which also leads to NIC cache miss.
+%In comparison, the performance of RDMA, LibVMA and Linux drops quickly as the number of connections increase. There is a sharp performance drop with more than 512 RDMA connections, because the RDMA transport states saturate the 网卡 cache. Although LibVMA and Linux do not use RDMA as transport, they maintain per-FD buffers, which lead to CPU cache and TLB miss with thousands of connections. Furthermore, LibVMA installs flow steering rules to 网卡 for each connection, which also leads to 网卡 cache miss.
 
 
 
@@ -210,11 +210,11 @@ LibVMA只是将内核TCP套接字用于主机内部。
 LibVMA回退到Linux用于主机内套接字。
 使用RDMA作为主机间套接字，\sys 使用批处理以16个内核实现每秒276~M个消息的吞吐量，这是我们RDMA网卡的消息吞吐量的2.5倍。
 由于缓冲区管理的可扩展性有限，RSocket的主机内部为24~M，主机间为33~M。
-由于共享NIC队列上的锁争用，与单线程相比，LibVMA的吞吐量减少到两个线程的1/4，而三个和更多线程的1/10。
-Linux吞吐量从1到7个核心线性扩展，并在环回或具有更多核心的NIC队列上出现瓶颈。
+由于共享网卡队列上的锁争用，与单线程相比，LibVMA的吞吐量减少到两个线程的1/4，而三个和更多线程的1/10。
+Linux吞吐量从1到7个核心线性扩展，并在环回或具有更多核心的网卡队列上出现瓶颈。
 
 %The multi-thread scalability of \sys  attributes to the partitioning of states and removal of synchronization.
-%We can also see that shared memory communication has 5x throughput than RDMA.% Using RDMA NIC for intra-host socket would meet this bottleneck and thus not scalable.
+%We can also see that shared memory communication has 5x throughput than RDMA.% Using RDMA 网卡 for intra-host socket would meet this bottleneck and thus not scalable.
 
 %Figure~\ref{socksdirect:fig:eval-conn-setup-tput} shows the throughput of connection creation with different number of cores. Each core can create 1.4~M new connections per second, which is 20x of Linux and 2x of mTCP~\cite{jeong2014mtcp}. The upper bound is 5.3~M connections per second, where the monitor becomes a bottleneck.
 

@@ -3,9 +3,9 @@
 
 作为一种重要的基础设施，分布式键值存储系统的研究和开发受到性能的驱动。大量分布式键值存储基于CPU。为了降低计算成本，Masstree~ \cite {mao2012cache}，MemC3~ \cite {fan2013memc3}和libcuckoo~ \cite {li2014algorithmic}优化锁定，缓存，散列和内存分配算法，而 \oursys{} 带有新的哈希值专为FPGA设计的表和内存管理机制，以最大限度地减少PCIe流量。 MICA~ \cite {lim2014mica}将哈希表分区到每个核心，从而完全避免同步。然而，这种方法为偏移的工作负载引入了核心不平衡。
 
-为了摆脱操作系统内核的开销， \cite {rizzo2012netmap,intel2014data}直接轮询来自NIC的网络数据包，并且\cite {jeong2014mtcp,marinos2014network}使用用户空间轻量级网络堆栈处理它们。
+为了摆脱操作系统内核的开销， \cite {rizzo2012netmap,intel2014data}直接轮询来自网卡的网络数据包，并且\cite {jeong2014mtcp,marinos2014network}使用用户空间轻量级网络堆栈处理它们。
 键值存储系统 \cite {kapoor2012chronos,ousterhout2010case,ousterhout2015ramcloud,lim2014mica,li2016full}受益于这种高性能优化。
-作为朝着这个方向迈出的又一步，最近的作品\cite {infiniband2000infiniband,kalia2014using,kalia2016design,kalia2014using,kalia2016design}利用RDMA NIC的基于硬件的网络堆栈，使用双面RDMA作为键值存储客户端和服务器之间的RPC机制进一步提高每核吞吐量并减少延迟。尽管如此，这些系统仍受CPU限制（\S \ref {kvdirect:sec:state-of-the-art-kvs}）。
+作为朝着这个方向迈出的又一步，最近的作品\cite {infiniband2000infiniband,kalia2014using,kalia2016design,kalia2014using,kalia2016design}利用RDMA 网卡的基于硬件的网络堆栈，使用双面RDMA作为键值存储客户端和服务器之间的RPC机制进一步提高每核吞吐量并减少延迟。尽管如此，这些系统仍受CPU限制（\S \ref {kvdirect:sec:state-of-the-art-kvs}）。
 
 另一种不同的方法是利用单侧RDMA。 Pilaf~ \cite {mitchell2013using}和FaRM~ \cite {dragojevic2014farm}采用单向RDMA读取进行GET操作，FaRM实现了使网络饱和的吞吐量。 Nessie~ \cite {szepesi2014designing}，DrTM~ \cite {wei2015fast}，DrTM + R~ \cite {chen2016fast}和FaSST~ \cite {kalia2016fasst}利用分布式事务来实现单向RDMA的GET和PUT。但是，PUT操作的性能受到一致性保证的不可避免的同步开销的影响，受到RDMA原语的限制 \cite {kalia2016design}。此外，客户端CPU涉及键值处理，将每个核心的吞吐量限制在客户端的大约10~Mops。
 相比之下，\oursys{} 将RDMA原语扩展到键值操作，同时保证服务器端的一致性，使键值存储客户端完全透明，同时实现高吞吐量和低延迟，即使对于PUT操作也是如此。
@@ -13,8 +13,8 @@
 作为一种灵活且可定制的硬件，FPGA现已广泛部署在数据中心规模 \cite {putnam2014reconfigurable,caulfield2016cloud}中，并且针对可编程性进行了大幅改进 \cite {bacon2013fpga,li2016clicknp}。一些早期的工作已探索在FPGA上构建键值存储。但是其中一些是不实用的，限制片上数据存储（大约几MB内存） \cite {liang16fpl}或板载DRAM（通常是8GB内存） \cite {istvan2013flexible,chalamalasetti2013fpga,istvan2015hash}。
  \cite {blott2015scaling}专注于提高系统容量而不是吞吐量，并采用SSD作为板载DRAM的二级存储。
  \cite {liang16fpl,chalamalasetti2013fpga}限制它们在固定大小键值对中的使用，这只能用于特殊用途，而不是一般的键值存储。
-\cite {blott13hotcloud,lavasani2014fpga}使用主机DRAM存储哈希表，而\cite {tokusashi2016multilevel}使用NIC DRAM作为主机DRAM的缓存，但它们没有针对网络和PCIe DMA带宽进行优化，导致性能不佳。
-\oursys{} 充分利用了NIC DRAM和主机DRAM，使我们基于FPGA的键值存储系统通用，并且能够进行大规模部署。此外，我们精心的硬件和软件协同设计，以及对PCIe和网络的优化，将性能推向了物理限制，推进了最先进的解决方案。
+\cite {blott13hotcloud,lavasani2014fpga}使用主机DRAM存储哈希表，而\cite {tokusashi2016multilevel}使用网卡 DRAM作为主机DRAM的缓存，但它们没有针对网络和PCIe DMA带宽进行优化，导致性能不佳。
+\oursys{} 充分利用了网卡 DRAM和主机DRAM，使我们基于FPGA的键值存储系统通用，并且能够进行大规模部署。此外，我们精心的硬件和软件协同设计，以及对PCIe和网络的优化，将性能推向了物理限制，推进了最先进的解决方案。
 
 二级索引是通过其他键检索数据的重要功能
 比数据存储系统中的主键 \cite {escriva2012hyperdex,kejriwal2016slik}。 SLIK~ \cite {kejriwal2016slik}在键值存储系统中使用B +树算法支持多个二级密钥。探索如何支持二级索引以帮助 \oursys{} 迈向通用数据存储系统将会很有趣。 Switch键值~ \cite {li2016fast}利用基于内容的路由将请求路由到基于缓存密钥的后端节点，NetCache~ \cite {netcache-sosp17}进一步将键值缓存在交换机中。这种负载平衡和缓存也将使我们的系统受益。

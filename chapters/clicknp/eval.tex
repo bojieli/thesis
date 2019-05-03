@@ -467,9 +467,9 @@ Silo \cite{jang2015silo}
 
 \subsubsection{Timestamping}
 
-TIMELY \cite{mittal2015timely} measures RTT as the signal for congestion control. It requires both receive and send timestamping feature and hardware-generated ACK of recent NICs. Furthermore, since ACKs have already been sent by NIC hardware, OS networking stack needs modifications to avoid generating duplicate ACKs.
+TIMELY \cite{mittal2015timely} measures RTT as the signal for congestion control. It requires both receive and send timestamping feature and hardware-generated ACK of recent 网卡s. Furthermore, since ACKs have already been sent by 网卡 hardware, OS networking stack needs modifications to avoid generating duplicate ACKs.
 
-With ClickNP we can do the same latency measurement without using a NIC with timestamping feature, and does not require modification to the OS networking stack, as long as the FPGAs at sender and receiver have same clock frequency. The idea is to subtract the latency spent in receiver-side OS networking stack. Upon reception of a data packet, we subtract the timestamp and expects the OS to echo back the timestamp in the ACK packet. When the ACK packet is sent, we add the timestamp, as if we had shifted the initial timestamp by OS processing latency. Pseudo code:
+With ClickNP we can do the same latency measurement without using a 网卡 with timestamping feature, and does not require modification to the OS networking stack, as long as the FPGAs at sender and receiver have same clock frequency. The idea is to subtract the latency spent in receiver-side OS networking stack. Upon reception of a data packet, we subtract the timestamp and expects the OS to echo back the timestamp in the ACK packet. When the ACK packet is sent, we add the timestamp, as if we had shifted the initial timestamp by OS processing latency. Pseudo code:
 
 \begin{lstlisting}
 .element SendTimestamp {
@@ -533,7 +533,7 @@ Figure~\ref{clicknp:fig:trafficgen}(b) shows the capture performance in packet p
 \egg{
 In this section we evaluate throughput and latency of applications presented in section \ref{clicknp:sec:application}. All these application can achieve line-rate throughput and microsecond-scale latency for reasonable traffic patterns. Latency is averaged over $1000$ rounds, and error bars mark the $5\%$ and $95\%$ percentile.
 
-\textbf{Traffic generator.} We use our traffic generator to send packets to NIC, and use Windows Performance Monitor to measure the throughput. As shown in Figure \ref{clicknp:fig:trafficgen}, our generator is able to generate packets at 40Gbps line rate when the packet size is not less than 256 bytes. The small gap for 64-byte packets is due to lack of back-pressure in 40GbE MAC of FPGA shell.
+\textbf{Traffic generator.} We use our traffic generator to send packets to 网卡, and use Windows Performance Monitor to measure the throughput. As shown in Figure \ref{clicknp:fig:trafficgen}, our generator is able to generate packets at 40Gbps line rate when the packet size is not less than 256 bytes. The small gap for 64-byte packets is due to lack of back-pressure in 40GbE MAC of FPGA shell.
 
 \textbf{Traffic capture.} We evaluate the throughput of dumper and results are presented in \ref{clicknp:fig:dump}.
 Each host kernel runs on a separate core and traffic is split evenly to kernels by flow tuple hash.

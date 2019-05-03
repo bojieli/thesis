@@ -26,9 +26,9 @@
 	\caption{环缓冲数据结构。 阴影部分是包元数据，黑色部分是有效载荷。}
 \end{figure}
 
-传统上，网络堆栈使用环形缓冲区从NIC发送和接收数据包。
+传统上，网络堆栈使用环形缓冲区从网卡发送和接收数据包。
 如图 \ref {socksdirect:fig:ringbuffer-traditional}所示，它会导致缓冲区管理开销和内部碎片。
-传统的NIC支持有限数量的环形缓冲区，因此多个连接可以通过一个环形缓冲区进行复用，这种设计可以将有效负载移动到每个连接缓冲区而无需复制。
+传统的网卡支持有限数量的环形缓冲区，因此多个连接可以通过一个环形缓冲区进行复用，这种设计可以将有效负载移动到每个连接缓冲区而无需复制。
 幸运的是，RDMA编写动词开辟了新的设计可能性。
 我们的创新是拥有\emph {每个套接字连接一个环形缓冲区}并将数据包背靠背存储，如图 \ref {socksdirect:fig:ringbuffer-new}所示。
 发送方确定环形缓冲区和偏移量（即\emph {tail}指针），然后使用RDMA写动词将数据包写入远程端内存中的尾指针。
@@ -38,7 +38,7 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 
 要判断环形缓冲区是否已满，发送方将保持\textit {queue credits}计数，指示环形缓冲区中的空闲字节数。
 当发件人将数据包入队时，它会消耗信用。 当接收器使消息出列时，它会在本地递增计数器，并在计数器超过环形缓冲区大小的一半时在发送者的内存中写入\textit {credit return flag}。 发送者在检测到标志时重新获得队列信用。
-请注意，此机制与拥塞控制无关; 后者由NIC硬件处理 \cite {zhu2015congestion}。
+请注意，此机制与拥塞控制无关; 后者由网卡硬件处理 \cite {zhu2015congestion}。
 
 \textbf {发送和接收方的两个环形缓冲区副本。}
 上述机制仍然会在发送端引起缓冲区管理，因为发送方需要在缓冲区中构造RDMA消息。
@@ -57,7 +57,7 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 %For RDMA, the sender maintains a local copy of ring buffer, and we use one-sided RDMA write to synchronize updates from sender to receiver.
 %For RDMA, it is known that one-sided verbs has higher throughput than two-sided ones; short messages has lower throughput than large ones~\cite{kalia2014using,kaminsky2016design}.
 %In light of this, the inter-host queue has two identical copies in pinned sender and receiver memory, and we use one-sided RDMA write to synchronize updates from sender to receiver.
-%\libipc{} polls CQ to limit the number of in-flight (sent but not acknowledged) messages, which is not only required by RDMA NIC, but also enables \emph{adapative batching}~\cite{li2016clicknp,li2017kv}.
+%\libipc{} polls CQ to limit the number of in-flight (sent but not acknowledged) messages, which is not only required by RDMA 网卡, but also enables \emph{adapative batching}~\cite{li2016clicknp,li2017kv}.
 %When a message is enqueued to the ring buffer and the RDMA send queue is not full, it is immediately sent as an RDMA message.
 %When \libipc{} polls CQ and finds an empty slot in send queue, it sends all queued but unsent data in queue as an RDMA message, because the messages are stored back-to-back in the queue.
 
@@ -65,12 +65,12 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 \textbf {有效载荷和元数据之间的一致性。}
 对于SHM，英特尔和AMD的X86处理器提供了整体商店订购 \cite {sewell2010x86,intel-manual}，这意味着其他内核按照与编写时相同的顺序观察到两次写入。一个8字节的\texttt {MOV}指令是原子的，所以写一个标题是原子的。由于发送方在有效负载之后写入标头，因此接收方将读取一致的消息因此，不需要存储器栅栏指令。
 
-因为RDMA不能确保消息中的写入顺序 \cite {infiniband2000infiniband}，我们确实需要确保消息完全到达。虽然在使用go-back-0或go-back-N loss recovery~ \cite {dragojevic2014farm}的RDMA网卡中观察到消息写入顺序，但对于具有选择性重传的更高级NIC，情况并非如此 \cite {mprdma,mittal2018revisiting} 。在\libipc {}中，发送方使用\textit {RDMA write with immediate}动词在接收方生成完成。接收器轮询RDMA \emph {完成队列}而不是环形缓冲区。 RDMA确保接收器上的高速缓存一致性，并且在将数据写入\libipc {}环形缓冲区 \cite {infiniband2000infiniband}之后保证完成消息。
+因为RDMA不能确保消息中的写入顺序 \cite {infiniband2000infiniband}，我们确实需要确保消息完全到达。虽然在使用go-back-0或go-back-N loss recovery~ \cite {dragojevic2014farm}的RDMA网卡中观察到消息写入顺序，但对于具有选择性重传的更高级网卡，情况并非如此 \cite {mprdma,mittal2018revisiting} 。在\libipc {}中，发送方使用\textit {RDMA write with immediate}动词在接收方生成完成。接收器轮询RDMA \emph {完成队列}而不是环形缓冲区。 RDMA确保接收器上的高速缓存一致性，并且在将数据写入\libipc {}环形缓冲区 \cite {infiniband2000infiniband}之后保证完成消息。
 
 
 \textbf {平摊轮询开销。}
 当不经常使用套接字时，轮询环缓冲区会浪费接收器的CPU周期。我们使用两种技术分摊轮询开销。
-首先，对于RDMA队列，我们​​利用RDMA NIC将事件通知复用到单个队列中。
+首先，对于RDMA队列，我们​​利用RDMA 网卡将事件通知复用到单个队列中。
 每个线程对所有RDMA QP使用\emph {共享完成队列}，因此它只需要轮询一个队列而不是所有每个套接字队列。
 
 其次，每个队列可以在\textit {polling}和\textit {interrupt}模式之间切换。监视器的队列始终处于轮询模式。每个队列的接收者维护一个连续空轮询的计数器。当它超过阈值时，接收器向发送器发送消息，通知队列正在进入中断模式，并在短时间后停止轮询。当发送方以中断模式写入队列时，它还会通知监视器，监视器将通知接收方恢复轮询。
@@ -112,7 +112,7 @@ Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数
 % so we can remap virtual address of a buffer to another physical page if the data occupies entire 4~KiB pages.
 
 
-要启用零拷贝，我们需要修改NIC驱动程序以公开与页面重新映射相关的几个内核函数。
+要启用零拷贝，我们需要修改网卡驱动程序以公开与页面重新映射相关的几个内核函数。
 为了分摊页面重新映射成本，我们仅对\texttt {send}或\texttt {recv}使用零拷贝，且有效载荷至少为16~KiB。
 而是复制较小的消息。
 
@@ -144,7 +144,7 @@ Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数
 \textbf {通过SHM安全发送页面地址。}
 对于主机内部套接字，我们在用户空间队列中的消息中发送物理页面地址，如图 \ref {socksdirect:fig:zerocopy-intra}中的步骤2所示。
 我们必须防止未经请求重新映射任意页面。
-为此，\libipc {}调用修改后的NIC驱动程序
+为此，\libipc {}调用修改后的网卡驱动程序
 获取发送缓冲区的模糊物理页面地址，并通过共享内存队列将地址发送给接收方。
 在接收端，\libipc {}调用内核将模糊的物理页面重新映射到应用程序提供的接收缓冲区虚拟地址。
 
@@ -152,7 +152,7 @@ Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数
 \libipc {}初始化接收器上的固定页面池，并将页面的物理地址发送给发送者。
 发件人管理池。
 在发送方上，\libipc {}将发送缓冲区固定，从远程接收器页面池中分配页面以确定RDMA写入的远程地址，如图 \ref {socksdirect:fig:zerocopy-inter}中的步骤2所示。
-在接收器上，当调用\texttt {recv}时，\libipc 调用NIC驱动程序将池中的页面映射到应用程序缓冲区虚拟地址。
+在接收器上，当调用\texttt {recv}时，\libipc 调用网卡驱动程序将池中的页面映射到应用程序缓冲区虚拟地址。
 在重新映射的页面被释放后（例如被另一个\texttt {recv}覆盖），\libipc {}将它们返回给发送方中的池管理器（步骤6）。
 
 %If the OS runs out of memory, \libipc{} unpins pages to reclaim memory.
@@ -161,11 +161,11 @@ Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数
 %\subsubsection{Zero Copy TCP}
 %\label{socksdirect:subsec:zero-copy-tcp}
 %
-%For TCP connections, we optimize the user-space TCP/IP stack to remove memory copy between \libipc{} and NIC.
-%Because the payloads of sent and received packets need to align at 4~KiB page boundary, we leverage scatter-gather support in modern NICs~\cite{mellanox} to separate packet header from application payload.
+%For TCP connections, we optimize the user-space TCP/IP stack to remove memory copy between \libipc{} and 网卡.
+%Because the payloads of sent and received packets need to align at 4~KiB page boundary, we leverage scatter-gather support in modern 网卡s~\cite{mellanox} to separate packet header from application payload.
 %%During initialization, \libipc{} queries IP and Ethernet MAC address from the kernel and constructs a packet header template.
-%For \texttt{send}, \libipc{} constructs a packet header to a NIC send work request, then fills in the payload buffer address from application. 
-%For receiving data, in background, \libipc{} issues NIC receive work requests with a 54-byte buffer to store Ethernet, IPv4 and TCP headers, followed by a page-aligned buffer to store payload.
+%For \texttt{send}, \libipc{} constructs a packet header to a 网卡 send work request, then fills in the payload buffer address from application. 
+%For receiving data, in background, \libipc{} issues 网卡 receive work requests with a 54-byte buffer to store Ethernet, IPv4 and TCP headers, followed by a page-aligned buffer to store payload.
 %%In corner cases where the received header length is not 54 bytes, \libipc{} reassembles the packet.
 %Upon \texttt{recv}, the payload buffer is remapped to application.
 

@@ -145,10 +145,10 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 
 从概念上讲，Linux网络堆栈由三层组成。首先，VFS层为应用程序提供套接字API（例如\emph {connect}，\emph {send}，\emph {epoll}）。套接字连接是双向，可靠且有序的管道，由整数\emph {文件描述符}（FD）标识。
 其次，传统的TCP / IP传输层提供I / O复用，拥塞控制，丢失恢复，路由和QoS功能。
-第三，NIC层与NIC硬件（或用于主机内套接字的虚拟环回接口）通信以发送和接收分组。
+第三，网卡层与网卡硬件（或用于主机内套接字的虚拟环回接口）通信以发送和接收分组。
 众所周知，VFS层贡献了很大一部分成本 \cite {clark1989analysis,boyd2010analysis}。
 这可以通过一个简单的实验来验证:主机中两个进程之间的Linux TCP套接字的延迟和吞吐量只比管道，FIFO和Unix域套接字差一点（表 \ref {socksdirect:tab:operation-performance} ）。
-管道，FIFO和UNIX域套接字绕过传输层和NIC层，但它们的性能仍然不尽如人意。
+管道，FIFO和UNIX域套接字绕过传输层和网卡层，但它们的性能仍然不尽如人意。
 
 在下文中，我们将套接字开销分为四种类型:每个操作，每个数据包，每个字节和每个连接。
 
@@ -209,11 +209,11 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 我们的目标是通过优化常见情况并删除常用套接字操作中的同步来最小化同步开销。
 
 %\parab{Intra-host communication.}
-%Most existing approaches for intra-host socket either use kernel network stack or NIC loopback.
+%Most existing approaches for intra-host socket either use kernel network stack or 网卡 loopback.
 %The kernel network stack has evolved to become quite complicated over the years~\cite{yasukata2016stackmap}, which is an overkill for intra-host communication. % may not need many TCP features, e.g., congestion control and loss recovery.
 
-%Arrakis uses the NIC to forward packets from one application to another.
-%As shown in Table~\ref{socksdirect:tab:operation-performance}, the hairpin latency from CPU to NIC is still 25x higher than inter-core cache migration delay ($\sim$30 ns). The throughput is also limited by Memory-Mapped I/O (MMIO) doorbell latency and PCIe bandwidth~\cite{neugebauer2018understanding,li2017kv}.
+%Arrakis uses the 网卡 to forward packets from one application to another.
+%As shown in Table~\ref{socksdirect:tab:operation-performance}, the hairpin latency from CPU to 网卡 is still 25x higher than inter-core cache migration delay ($\sim$30 ns). The throughput is also limited by Memory-Mapped I/O (MMIO) doorbell latency and PCIe bandwidth~\cite{neugebauer2018understanding,li2017kv}.
 
 %We aim to leverage user-space shared memory for intra-host socket communication.
 
@@ -232,9 +232,9 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 %\parab{Many concurrent connections.}
 %Internet facing applications often need to serve millions of concurrent connections efficiently~\cite{jeong2014mtcp,lin2016scalable,belay2017ix}.
 %%In addition, because a socket connection provides a FIFO abstraction and the OS offers event multiplexing, 
-%Moreover, it is also common for two backend applications to create large number of connections between them, where each connection handles a concurrent task~\cite{ihm2011towards,jang2011sslshader,nishtala2013scaling}. In Linux, a socket connection has dedicated send and receive buffers, each is at least one page (4~KB) in size~\cite{davidskbs}. With millions of concurrent connections, the socket buffers can consume gigabytes of memory, most of which is empty. Random accesses to a large number of buffers also cause CPU cache misses and TLB misses. Similar issue exists in RDMA NICs with limited on-chip memory for caching connection states~\cite{mprdma,kaminsky2016design}.
+%Moreover, it is also common for two backend applications to create large number of connections between them, where each connection handles a concurrent task~\cite{ihm2011towards,jang2011sslshader,nishtala2013scaling}. In Linux, a socket connection has dedicated send and receive buffers, each is at least one page (4~KB) in size~\cite{davidskbs}. With millions of concurrent connections, the socket buffers can consume gigabytes of memory, most of which is empty. Random accesses to a large number of buffers also cause CPU cache misses and TLB misses. Similar issue exists in RDMA 网卡s with limited on-chip memory for caching connection states~\cite{mprdma,kaminsky2016design}.
 %%, which is slower than sequential access to a single buffer~\cite{li2017kv}. 
-%%This problem is exaggerated in RDMA. RDMA NIC caches connection states in limited on-board memory. Just over a few hundred active RDMA connections could cause cache misses and degrade performance~\cite{mprdma,kaminsky2016design}. 
+%%This problem is exaggerated in RDMA. RDMA 网卡 caches connection states in limited on-board memory. Just over a few hundred active RDMA connections could cause cache misses and degrade performance~\cite{mprdma,kaminsky2016design}. 
 %%Moreover, event-driven applications use \texttt{epoll} to detect which connections are ready for send or receive. If the event queue is separated from data queues, each \texttt{recv} operation involves two cache migrations for event and data~\cite{yasukata2016stackmap}. 
 %
 %We aim to minimize memory cache misses per data transmission by multiplexing socket connections.
@@ -273,7 +273,7 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 			\hline
 			Map one page (4~KiB) & 0.78 & 1.3 \\
 			\hline
-			NIC hairpin within a host & 0.95 & 1.0 \\
+			网卡 hairpin within a host & 0.95 & 1.0 \\
 			\hline
 			Atomic shared memory queue & 1.0 & 6.1 \\
 			\hline
@@ -316,29 +316,29 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 TCP / IP协议处理，拥塞控制和丢失恢复在每个发送和接收的数据包上消耗CPU。
 此外，丢失检测，基于速率的拥塞控制和TCP状态机使用定时器，这很难实现微秒级粒度和低开销 \cite{jeong2014mtcp}。
 幸运的是，近年来在许多数据中心见证了RDMA的大规模部署 \cite {guo2016rdma,zhu2015congestion,mittal2015timely}。
-RDMA提供与TCP / IP相当的基于硬件的传输，因此需要将传输协议卸载到RDMA NIC。
+RDMA提供与TCP / IP相当的基于硬件的传输，因此需要将传输协议卸载到RDMA 网卡。
 对于主机内套接字，我们的目标是完全绕过传输协议。 Linux \emph {pipe}的％。
 
 \parab {缓冲管理。}
-传统上，CPU通过\emph {ring buffers}从NIC发送和接收数据包。
+传统上，CPU通过\emph {ring buffers}从网卡发送和接收数据包。
 环形缓冲区由固定数量的固定长度的元数据条目组成。
 每个条目都指向一个存储数据包有效负载的缓冲区。
 要发送或接收数据包，需要分配和释放缓冲区。
 成本显示在表 \ref {socksdirect:tab:operation-performance}中。
 此外，为了确保可以接收MTU大小的分组，每个接收缓冲区应该具有至少一个MTU的大小。
 但是，许多数据包小于MTU~ \cite {thompson1997wide}，因此内部碎片会降低内存利用率和位置。
-虽然现代NIC支持LSO和LRO~ \cite {lsolro}在缓冲区中批量处理多个数据包，但我们的目标是完全消除开销。
+虽然现代网卡支持LSO和LRO~ \cite {lsolro}在缓冲区中批量处理多个数据包，但我们的目标是完全消除开销。
 
 \parab {I / O多路复用。}
-对于传统的NIC，接收到的不同连接的数据包通常在环形缓冲区中混合，因此网络堆栈需要将数据包分类到相应的套接字缓冲区中。
-现代NIC支持接收数据包转向 \cite {mellanox}，它可以将特定连接映射到专用环形缓冲区，该缓冲区由高性能套接字系统使用 \cite {jeong2014mtcp,lin2016scalable,libvma}。
+对于传统的网卡，接收到的不同连接的数据包通常在环形缓冲区中混合，因此网络堆栈需要将数据包分类到相应的套接字缓冲区中。
+现代网卡支持接收数据包转向 \cite {mellanox}，它可以将特定连接映射到专用环形缓冲区，该缓冲区由高性能套接字系统使用 \cite {jeong2014mtcp,lin2016scalable,libvma}。
 我们利用RDMA网卡中的类似功能，将接收到的数据包解复用到QP。
 
 \parab {中断处理。}
 Linux网络堆栈分为系统调用和中断上下文，因为它处理来自应用程序和硬件设备的事件。
 TCP拥塞控制中的ACK时钟 \cite {mprdma}要求及时响应收到的数据包。
 中断上下文不一定与应用程序在同一核心上，导致核心位置不佳和核心间同步。
-但是，对于RDMA NIC，需要精确计时的数据包处理由NIC硬件处理。
+但是，对于RDMA 网卡，需要精确计时的数据包处理由网卡硬件处理。
 因此，\libipc {}运行每个套接字操作完成并使用轮询等待阻塞操作。
 
 \begin{sidewaystable*}[t]
@@ -349,7 +349,7 @@ TCP拥塞控制中的ACK时钟 \cite {mprdma}要求及时响应收到的数据�
 			& FastSocket & MegaPipe / StackMap & IX & Arrakis & SandStorm / mTCP & LibVMA & OpenOnload & Rsocket / SDP & FreeFlow & SocksDirect \\
 			\hline
 			\hline
-			Category & \multicolumn{2}{c|}{Kernel optimization} & \multicolumn{5}{c|}{User-space TCP/IP stack} & \multicolumn{3}{c|}{Offloading to RDMA NICs} \\
+			Category & \multicolumn{2}{c|}{Kernel optimization} & \multicolumn{5}{c|}{User-space TCP/IP stack} & \multicolumn{3}{c|}{Offloading to RDMA 网卡s} \\
 			%\hline
 			%Changes needed for deployment & New kernel & New kernel & New kernel & New kernel & Lib+driver & Lib+driver & Lib+driver & Lib+driver & Lib+driver +daemon & Lib+driver +daemon \\
 			\hline
@@ -379,7 +379,7 @@ TCP拥塞控制中的ACK时钟 \cite {mprdma}要求及时响应收到的数据�
 			\hline
 			Isolation among containers (VMs) & \yes & & \yes & \yes & & & & \yes & \yes & \yes \\
 			\hline
-			QoS (performance isolation) & Kernel & Kernel & Kernel & NIC & NIC & NIC & NIC & NIC & Daemon & NIC \\
+			QoS (performance isolation) & Kernel & Kernel & Kernel & 网卡 & 网卡 & 网卡 & 网卡 & 网卡 & Daemon & 网卡 \\
 			\hline
 			\hline
 			\multicolumn{11}{c|}{Removed Performance Overheads} \\
@@ -424,7 +424,7 @@ Linux的答案是肯定的，唤醒睡眠过程需要3到5 $\mu$s，如表 \ref 
 
 \parab {容器网络。}
 许多容器部署使用隔离的网络命名空间用于容器，这些容器通过虚拟覆盖网络进行通信。
-在Linux中，虚拟交换机 \cite {pfaff2015design}在主机NIC和容器中的虚拟NIC之间转发数据包。
+在Linux中，虚拟交换机 \cite {pfaff2015design}在主机网卡和容器中的虚拟网卡之间转发数据包。
 这种架构会在每个数据包上产生多个上下文切换和内存副本的开销，虚拟交换机成为瓶颈 \cite {pfefferle2015hybrid}。
 Slim~ \cite {slim}将三次内核往返减少到一次。
 几个工作 \cite {martins2014clickos,roghanchi2017ffwd,huang2017high,nsdi19freeflow}将所有操作委托给作为守护进程运行的虚拟交换机，因此它增加了数据路径上的延迟和CPU成本。
@@ -438,7 +438,7 @@ Slim~ \cite {slim}将三次内核往返减少到一次。
 \parab {内容（payload）复制。}
 在大多数套接字系统中，\texttt {send}和\texttt {recv}的语义会导致应用程序和网络堆栈之间的内存复制。 对于非阻塞\texttt {send}，系统需要将数据复制出缓冲区，因为应用程序可能会在\texttt {send}返回后立即覆盖缓冲区。 简单地删除副本可能会违反应用程序的正确性。
 零拷贝\texttt {recv}甚至比\texttt {send}更难。
-Linux提供了基于准备就绪的事件模型，即应用程序知道传入的数据（例如通过\texttt {epoll}）然后调用\texttt {recv}，因此NIC接收但未传递给应用程序的数据必须 存储在系统缓冲区中。
+Linux提供了基于准备就绪的事件模型，即应用程序知道传入的数据（例如通过\texttt {epoll}）然后调用\texttt {recv}，因此网卡接收但未传递给应用程序的数据必须 存储在系统缓冲区中。
 因为\texttt {recv}允许应用程序提供任何缓冲区作为数据目标，所以系统需要将数据从系统复制到应用程序缓冲区。
 我们的目标是在标准套接字应用程序中为大型传输提供零拷贝。
 
@@ -496,12 +496,12 @@ MegaPipe~ \cite {han2012megapipe}和StackMap~ \cite {yasukata2016stackmap}提出
 支持零拷贝的挑战是套接字语义。
 
 \parab {用户空间TCP / IP堆栈:}第二类工作完全绕过内核TCP / IP堆栈并在用户空间中实现TCP / IP。
-在这个类别中，IX~ \cite {belay2017ix}和Arrakis~\cite {peter2016arrakis}是新的操作系统架构，它使用虚拟化来确保安全性和隔离性。 IX利用LwIP~ \cite {dunkels2001design}在用户空间中实现TCP / IP，同时使用内核转发每个数据包以实现性能隔离和QoS。相比之下，Arrakis将QoS卸载到NIC，因此绕过数据平面的内核。
-他们使用NIC在同一主机中的应用程序之间转发数据包。
-如表 \ref {socksdirect:tab:operation-performance}所示，从CPU到NIC的发夹延迟远远高于核心间缓存迁移延迟。
+在这个类别中，IX~ \cite {belay2017ix}和Arrakis~\cite {peter2016arrakis}是新的操作系统架构，它使用虚拟化来确保安全性和隔离性。 IX利用LwIP~ \cite {dunkels2001design}在用户空间中实现TCP / IP，同时使用内核转发每个数据包以实现性能隔离和QoS。相比之下，Arrakis将QoS卸载到网卡，因此绕过数据平面的内核。
+他们使用网卡在同一主机中的应用程序之间转发数据包。
+如表 \ref {socksdirect:tab:operation-performance}所示，从CPU到网卡的发夹延迟远远高于核心间缓存迁移延迟。
 吞吐量也受到内存映射I / O（MMIO）门铃延迟和PCIe带宽的限制 \cite {neugebauer2018understanding,li2017kv}。
 
-除了这些新的OS体系结构外，许多用户空间套接字在Linux上使用高性能数据包I / O框架，例如Netmap~ \cite {rizzo2012netmap}，Intel DPDK~ \cite {dpdk}和PF\_RING \cite {pf-ring}，以便直接访问用户空间中的NIC队列。
+除了这些新的OS体系结构外，许多用户空间套接字在Linux上使用高性能数据包I / O框架，例如Netmap~ \cite {rizzo2012netmap}，Intel DPDK~ \cite {dpdk}和PF\_RING \cite {pf-ring}，以便直接访问用户空间中的网卡队列。
 SandStorm~ \cite {marinos2014network}，mTCP~ \cite {jeong2014mtcp}，Seastar~ \cite {seastar}和F-Stack~ \cite {fstack}提出了新的API，因此需要修改应用程序。
 大多数API更改旨在支持零拷贝，标准API仍然会复制数据。
 FaSST~ \cite {kalia2016fasst}和eRPC~ \cite {kalia2018datacenter}提供RPC API而不是套接字。
@@ -523,15 +523,15 @@ LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS
 应用程序在套接字操作中承担竞争条件的风险，或者每次操作必须采用套接字FD锁定。
 后一种方法保证了正确性，但即使没有争用，锁定也会损害性能。
 
-\parab {卸载到NIC的传输:}
-第三类工作将套接字系统的一部分卸载到NIC硬件上。
-TCP卸载引擎（TOE） \cite {tcp-chimney-offload}将部分或完整的TCP / IP堆栈卸载到NIC，但它们仅在专用领域（例如iSCSI HBA~ \cite {iscsi-hba}）和无状态卸载（例如校验和，流动转向和LSO / LRO~ \cite {lsolro}）中获得了商业成功。
+\parab {卸载到网卡的传输:}
+第三类工作将套接字系统的一部分卸载到网卡硬件上。
+TCP卸载引擎（TOE） \cite {tcp-chimney-offload}将部分或完整的TCP / IP堆栈卸载到网卡，但它们仅在专用领域（例如iSCSI HBA~ \cite {iscsi-hba}）和无状态卸载（例如校验和，流动转向和LSO / LRO~ \cite {lsolro}）中获得了商业成功。
 由于数据中心的硬件趋势和应用需求，\emph {stateful}卸载的故事近年来有所不同 \cite {chuanxiong-rdma-keynote}。
 因此，RDMA~ \cite {infiniband2000infiniband}在生产数据中心中广泛使用 \cite {guo2016rdma}。
 与基于软件的TCP / IP网络堆栈相比，RDMA使用硬件卸载来提供超低延迟和接近零的CPU开销。
 要使套接字应用程序能够使用RDMA，RSocket~ \cite {rsockets}，SDP~ \cite {socketsdirect}和UNH EXS~ \cite {russell2008extended}将套接字操作转换为RDMA谓词。
 它们具有相似的设计，而RSocket是最活跃的设计。
-FreeFlow~ \cite {nsdi19freeflow}虚拟化容器覆盖网络的RDMA NIC，它利用SHM进行主机内部和RDMA进行主机间通信。
+FreeFlow~ \cite {nsdi19freeflow}虚拟化容器覆盖网络的RDMA 网卡，它利用SHM进行主机内部和RDMA进行主机间通信。
 FreeFlow使用RSocket将套接字转换为RDMA。
 
 但是，由于RDMA和套接字的抽象不匹配，这些工作有局限性。
@@ -543,10 +543,10 @@ FreeFlow使用RSocket将套接字转换为RDMA。
 我们的目标是透明地检测远程端是否支持Rsocket，如果没有则回退到TCP / IP。
 在性能方面，他们无法删除有效负载副本，套接字FD锁，缓冲区管理，进程唤醒和每个连接开销。
 例如，RSocket在发送方和接收方分配缓冲区并复制有效负载。
-与Arrakis类似，RSocket使用NIC进行主机内通信，从而导致性能瓶颈。
+与Arrakis类似，RSocket使用网卡进行主机内通信，从而导致性能瓶颈。
 
 %In addition, they use two-sided RDMA \texttt{send} and \texttt{recv}, but one-sided RDMA \texttt{write} has higher throughput due to lower CPU cost on receive side (Table~\ref{socksdirect:tab:operation-performance}).
-%However, such simple translations suffer from throughput degradation with a large number of concurrent connections. This is because RDMA NIC keeps per-connection states using a $\approx$2~MB~\cite{kalia2018datacenter} on-NIC memory as cache. With hundreds of concurrent connections, we will suffer from frequent cache misses, resulting in serious throughput degradation~\cite{mprdma,kaminsky2016design}. 
+%However, such simple translations suffer from throughput degradation with a large number of concurrent connections. This is because RDMA 网卡 keeps per-connection states using a $\approx$2~MB~\cite{kalia2018datacenter} on-网卡 memory as cache. With hundreds of concurrent connections, we will suffer from frequent cache misses, resulting in serious throughput degradation~\cite{mprdma,kaminsky2016design}. 
 
 
 %Spinlock in kernel is implemented with Compare-And-Swap (CAS) instruction, which costs $100\sim200$~ns per acquire and release. In comparison, shared memory message passing only needs one cache migration~\cite{roghanchi2017ffwd} (30~ns).
@@ -555,7 +555,7 @@ FreeFlow使用RSocket将套接字转换为RDMA。
 %For example, socket provides \texttt{SO\_REUSEPORT} option. When this option is enabled, multiple processes on one host can \texttt{bind} to the same port and incoming connections are dispatched to the listeners. During connection setup, coordination is required to allocate file descriptors and port numbers, load balance connections and allocate buffers. In addition, a socket may be shared by multiple processes and threads in a same process share socket connections. When a process forks, the parent and child processes also share the sockets created before fork.
 
 
-%For inter-server data transmission, Linux kernel copies data four times: on the send side, from application to kernel socket buffer, then to NIC ring buffer; the receive side is similar. For intra-server, data is copied three times: from application to kernel send buffer, then to kernel receive buffer via loopback interface, and finally to another application. Each CPU core can copy $\approx$5~GiB data per second~\cite{panda2016netbricks}, that's why a kernel TCP connection is hard to saturate an 100~Gbps NIC.
+%For inter-server data transmission, Linux kernel copies data four times: on the send side, from application to kernel socket buffer, then to 网卡 ring buffer; the receive side is similar. For intra-server, data is copied three times: from application to kernel send buffer, then to kernel receive buffer via loopback interface, and finally to another application. Each CPU core can copy $\approx$5~GiB data per second~\cite{panda2016netbricks}, that's why a kernel TCP connection is hard to saturate an 100~Gbps 网卡.
 %Historically, \texttt{send} was designed as a blocking operation, and the send buffer may be overwritten by the application after \texttt{send} function call.
 %In a non-blocking \texttt{send}, the process could overwrite the send buffer after \texttt{send} function call returns. To avoid race condition on the data buffer, network stack needs to copy data to an internal buffer. %before \texttt{send} returns, and then send the copied data in background.
 %For the \texttt{recv} operation, application provides a buffer and read the data after \texttt{recv}.
@@ -606,7 +606,7 @@ FreeFlow使用RSocket将套接字转换为RDMA。
 			Zero Copy & & \yes & & \yes & \yes & \yes & & & \yes \\
 			\hline
 			\hline
-			NIC-bypass IPC & \yes & & \yes & \yes & & \yes & \yes & & \yes \\
+			网卡-bypass IPC & \yes & & \yes & \yes & & \yes & \yes & & \yes \\
 			\hline
 			RDMA as Transport & & & & & & \yes & & & \yes \\
 			\hline

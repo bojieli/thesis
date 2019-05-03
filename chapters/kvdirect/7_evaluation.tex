@@ -16,7 +16,7 @@
 
 我们在8台服务器和1台Arista DCS-7060CX-32S交换机的测试台上评估键值-Direct。
 每台服务器配备两个禁用超线程的8核Xeon E5-2650 v2 CPU，形成两个通过QPI Link连接的NUMA节点。每个NUMA节点都装有8个DIMM 8~GiB三星DDR3-1333 ECC RAM，每台服务器上总共有128~GiB的主机内存。
-可编程NIC~ \cite {caulfield2016cloud}连接到CPU 0的PCIe根联合体，其40~Gbps以太网端口连接到交换机。可编程NIC在分叉的Gen3 x16物理连接器中有两个PCIe Gen3 x8链路。
+可编程网卡~ \cite {caulfield2016cloud}连接到CPU 0的PCIe根联合体，其40~Gbps以太网端口连接到交换机。可编程网卡在分叉的Gen3 x16物理连接器中有两个PCIe Gen3 x8链路。
 经过测试的服务器配备SuperMicro X9DRG-QF主板和一个运行Archlinux的120~GB SATA SSD（内核版本4.11.9-1）。
 
 对于系统基准测试，我们使用YCSB工作负载 \cite {cooper2010benchmarking}。
@@ -86,8 +86,8 @@
 \subsubsection{Slab 内存分配器}
 \label{kvdirect:sec:slab-eval}
 
-slab内存分配器的通信开销来自NIC访问主机内存中的可用slab队列。
-为了维持每秒180M操作的最大吞吐量，在最坏的情况下，需要传输180M平板插槽，消耗720 MB / s PCIe吞吐量，即我们NIC的总PCIe吞吐量的5％。
+slab内存分配器的通信开销来自网卡访问主机内存中的可用slab队列。
+为了维持每秒180M操作的最大吞吐量，在最坏的情况下，需要传输180M平板插槽，消耗720 MB / s PCIe吞吐量，即我们网卡的总PCIe吞吐量的5％。
 
 slab内存分配器的计算开销来自主机CPU上的slab拆分和合并。
 幸运的是，它们并不经常被调用。
@@ -117,9 +117,9 @@ slab内存分配器的计算开销来自主机CPU上的slab拆分和合并。
 
 我们通过比较吞吐量和在原子和长尾工作负载下使关键冲突管道停滞的简单方法来评估乱序执行的有效性。单面RDMA和双面RDMA \cite {kalia2016design}吞吐量也显示为基线。
 
-如果没有此引擎，原子操作需要等待NIC中的PCIe延迟和处理延迟，在此期间无法执行对同一密钥的后续原子操作。
-这使得单键原子吞吐量在图 \ref{kvdirect:fig:ooo-atomic} 中为0.94~Mops，与从RDMA NIC测量的2.24~Mops一致 \cite {kalia2016design}。
-RDMA NIC的更高吞吐量可归因于其更高的时钟频率和更低的处理延迟。
+如果没有此引擎，原子操作需要等待网卡中的PCIe延迟和处理延迟，在此期间无法执行对同一密钥的后续原子操作。
+这使得单键原子吞吐量在图 \ref{kvdirect:fig:ooo-atomic} 中为0.94~Mops，与从RDMA 网卡测量的2.24~Mops一致 \cite {kalia2016design}。
+RDMA 网卡的更高吞吐量可归因于其更高的时钟频率和更低的处理延迟。
 对于无序执行，键值-Direct中的单键原子操作可以在峰值吞吐量下处理，即每个时钟周期一次操作。
 在MICA \cite {lim2014mica} 中，单键原子吞吐量无法扩展到单个核心之外。
 原子提取和添加可以扩展到 \cite {kalia2016design} 中的多个核心，但它依赖于原子之间的可交换性，因此不适用于非交换原子，如比较和交换。
@@ -195,7 +195,7 @@ RDMA NIC的更高吞吐量可归因于其更高的时钟频率和更低的处理
 
 We evaluate the efficiency of congestion avoidance using the 键值 size distribution of the USR pool in Facebook memcached workload~\cite{atikoglu2012workload}.
 As shown in Figure~\ref{kvdirect:fig:congestion-avoidance}, without congestion avoidance, about 70\% 键值 operations complete with close to one PCIe RTT latency, while remaining 30\% operations have inflated completion times due to explicit and implicit queuing in the 键值 processor.
-With congestion avoidance, the rate for the programmable NIC to accept 键值 operations from clients is dynamically adjusted, therefore $>$~90\% 键值 operations complete with close to one PCIe RTT latency.
+With congestion avoidance, the rate for the programmable 网卡 to accept 键值 operations from clients is dynamically adjusted, therefore $>$~90\% 键值 operations complete with close to one PCIe RTT latency.
 The remaining few percent of operations have intrinsic higher processing delay due to their larger 键值 sizes.
 }
 
@@ -228,15 +228,15 @@ The remaining few percent of operations have intrinsic higher processing delay d
 Memcached~\cite{fitzpatrick2004distributed} & Traditional & Core synchronization & 1.5 & 1.5 & \approx5 & \approx5 & \approx50 & \approx50 \\
 MemC3~\cite{fan2013memc3} & Traditional & OS network stack & 4.3 & 4.3 & \approx14 & \approx14 & \approx50 & \approx50 \\
 RAMCloud~\cite{ousterhout2015ramcloud} & Kernel bypass & Dispatch thread & 6 & 1 & \approx20 & \approx3.3 & 5 & 14 \\
-MICA~\cite{lim2014mica} & Kernel bypass, 24 cores, 12 NIC ports & CPU 键值 processing & 137 & 135 & 342 & 337 & 81 & 81 \\
-FaRM~\cite{dragojevic2014farm} & One-sided RDMA for GET & RDMA NIC & 6 & 3 & \approx30 (261) & \approx15 & 4.5 & \approx10 \\
-DrTM-键值~\cite{wei2015fast} & One-sided RDMA and HTM & RDMA NIC & 115.2 & 14.3 & \approx500 (3972) & \approx60 & 3.4 & 6.3 \\
+MICA~\cite{lim2014mica} & Kernel bypass, 24 cores, 12 网卡 ports & CPU 键值 processing & 137 & 135 & 342 & 337 & 81 & 81 \\
+FaRM~\cite{dragojevic2014farm} & One-sided RDMA for GET & RDMA 网卡 & 6 & 3 & \approx30 (261) & \approx15 & 4.5 & \approx10 \\
+DrTM-键值~\cite{wei2015fast} & One-sided RDMA and HTM & RDMA 网卡 & 115.2 & 14.3 & \approx500 (3972) & \approx60 & 3.4 & 6.3 \\
 HERD'16~\cite{kalia2016design} & Two-sided RDMA, 12 cores & PCIe & 98.3 & \approx60 & \approx490 & \approx300 & 5 & 5 \\
 Xilinx'13~\cite{blott13hotcloud} & FPGA (with host) & Network & 13 & 13 & 106 & 106 & 3.5 & 4.5 \\
 Mega-键值~\cite{zhang2015mega} & GPU (4~GiB on-board RAM) & GPU 键值 processing & 166 & 80 & \approx330 & \approx160 & 280 & 280 \\
 \midrule
-\textbf{键值-Direct (1 NIC)} & Programmable NIC, two Gen3 x8 & PCIe \& DRAM & 180 & 114 & 1487 (5454) & 942 (3454) & 4.3 & 5.4 \\
-\textbf{键值-Direct (10 NICs)} & Programmable NIC, one Gen3 x8 each & PCIe \& DRAM & 1220 & 610 & 3417 (4518) & 1708 (2259) & 4.3 & 5.4 \\
+\textbf{键值-Direct (1 网卡)} & Programmable 网卡, two Gen3 x8 & PCIe \& DRAM & 180 & 114 & 1487 (5454) & 942 (3454) & 4.3 & 5.4 \\
+\textbf{键值-Direct (10 网卡s)} & Programmable 网卡, one Gen3 x8 each & PCIe \& DRAM & 1220 & 610 & 3417 (4518) & 1708 (2259) & 4.3 & 5.4 \\
 \bottomrule
 \end{tabular}
 \caption{键值-Direct 与其他键值存储系统在长尾（倾斜  Zipf）负载和 10 字节小键下的比较。对于相关工作未报告的性能数字，我们使用相似的硬件来模拟这些系统，并报告我们粗略的测量结果。对于 CPU 绕过的系统，括号内的数字报告峰值负载和空闲情况下的功耗差异。}
@@ -264,11 +264,11 @@ Mega-键值~\cite{zhang2015mega} & GPU (4~GiB on-board RAM) & GPU 键值 process
 62B和更大的键值没有内联，因此它们需要额外的内存访问。
 长尾工作负载比统一工作负载具有更高的吞吐量，并且能够在读密集工作负载下达到180~Mops的时钟频率范围，或达到$ \geq $ 62B 键值大小的网络吞吐量。
 在长尾工作负载下，无序执行引擎在最流行的密钥上合并到大约15％的操作，并且板载DRAM在60％负载分配比率下具有大约60％的高速缓存命中率，这可以统一导致高达2倍的吞吐量作为统一的工作量。
-如表 \ref {kvdirect:tab:kvs-compare} 所示，键值-Direct NIC的吞吐量与具有数十个CPU核心的最先进的键值存储服务器相当。
+如表 \ref {kvdirect:tab:kvs-compare} 所示，键值-Direct 网卡的吞吐量与具有数十个CPU核心的最先进的键值存储服务器相当。
 
 \subsubsection{能耗效率}
 
-插入键值-Direct NIC可为空闲服务器增加10.6 W的功率。
+插入键值-Direct 网卡可为空闲服务器增加10.6 W的功率。
 当键值-Direct服务器处于峰值吞吐量时，系统功率为121.4瓦（在墙上测量）。
 与表 \ref {kvdirect:tab:kvs-compare} 中最先进的键值存储系统相比，键值-Direct的功率效率是其他系统的3倍，是第一个达到100万的通用键值存储系统 商用服务器上每瓦特的键值操作。
 
@@ -325,7 +325,7 @@ Mega-键值~\cite{zhang2015mega} & GPU (4~GiB on-board RAM) & GPU 键值 process
 \end{table}
 
 键值-Direct旨在绕过服务器CPU，仅使用一部分主机内存用于键值存储。 因此，CPU仍然可以运行其他应用程序。
-当单个NIC 键值-Direct处于峰值负载时，我们的测量结果对服务器上的其他工作负载的影响最小。
+当单个网卡 键值-Direct处于峰值负载时，我们的测量结果对服务器上的其他工作负载的影响最小。
 表 \ref {kvdirect:tab:cpu-impact} 量化了键值-Direct峰值吞吐量的影响。
 除了CPU 0的顺序吞吐量以访问其自己的NUMA内存（以粗体标记的行）之外，CPU内存访问的延迟和吞吐量大多不受影响。
 这是因为8个主机存储器通道可以提供比所有CPU核心消耗的更高的随机访问吞吐量，而CPU确实可以强调DRAM通道的顺序吞吐量。

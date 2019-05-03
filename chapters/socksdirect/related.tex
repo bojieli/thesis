@@ -15,8 +15,8 @@
 %Moreover, if the application and monitor share a network namespace, the monitor can send the kernel FD to the application via Unix domain socket, then \libipc{} can use the FD without delegation to the monitor.
 
 %\textbf{Connecting to many RDMA capable hosts.}
-%With a lot of hosts, the NIC still suffer from performance degradation due to large number of connections.
-%In contrast, user-space networking stack alleviates this problem because the NIC is stateless.
+%With a lot of hosts, the 网卡 still suffer from performance degradation due to large number of connections.
+%In contrast, user-space networking stack alleviates this problem because the 网卡 is stateless.
 %We provide a socket option to enable applications to delegate operations to the monitor and use user-space networking stack even if the peer supports RDMA.
 %An application can choose to use RDMA for latency sensitive and throughput demanding connections, and user-space networking stack for others.
 
@@ -27,13 +27,13 @@
 由于主机内的进程数量有限，因此SHM连接的数量可能不会很大。
 但是，一台主机可能连接到许多其他主机，RDMA的可扩展性成为一个问题。
 这归结为两个问题。
-首先，RDMA NIC使用NIC内存作为缓存来保持每个连接状态。有数千个并发连接，性能受到频繁缓存未命中的影响 \cite {mprdma,kaminsky2016design,kalia2018datacenter}。
-但是，NIC配备了小内存，因为RDMA传统上部署在中小型集群中。
-随着近年来大规模的RDMA部署 \cite {guo2016rdma}，商品网卡拥有更大的内存来存储数千个连接 \cite {kalia2018datacenter}而SmartNIC拥有千兆字节的DRAM~ \cite {mellanox-innova,mellanox-bluefield,smartnic}。
-我们相信未来的数据中心不会担心NIC缓存未命中问题。
-第二个问题是在我们的测试平台中建立RDMA连接需要大约 $30 \mu s$，这对于短连接很重要。但是，此过程仅涉及本地CPU和NIC之间的通信，我们希望未来的工作能够得到改进。
+首先，RDMA 网卡使用网卡内存作为缓存来保持每个连接状态。有数千个并发连接，性能受到频繁缓存未命中的影响 \cite {mprdma,kaminsky2016design,kalia2018datacenter}。
+但是，网卡配备了小内存，因为RDMA传统上部署在中小型集群中。
+随着近年来大规模的RDMA部署 \cite {guo2016rdma}，商品网卡拥有更大的内存来存储数千个连接 \cite {kalia2018datacenter}而Smart网卡拥有千兆字节的DRAM~ \cite {mellanox-innova,mellanox-bluefield,smartnic}。
+我们相信未来的数据中心不会担心网卡缓存未命中问题。
+第二个问题是在我们的测试平台中建立RDMA连接需要大约 $30 \mu s$，这对于短连接很重要。但是，此过程仅涉及本地CPU和网卡之间的通信，我们希望未来的工作能够得到改进。
 
-%Another promising direction to solve the RDMA concurrency issue is to implement the reliable transport in CPU, and the NIC remains stateless. However, RDMA UD does not support one-sided write, so the ring buffer in Sec.~\ref{socksdirect:subsec:lockless-queue} will not work. Existing software RDMA~\cite{soft-roce} has low performance. It would be interesting to co-design software and NIC.
+%Another promising direction to solve the RDMA concurrency issue is to implement the reliable transport in CPU, and the 网卡 remains stateless. However, RDMA UD does not support one-sided write, so the ring buffer in Sec.~\ref{socksdirect:subsec:lockless-queue} will not work. Existing software RDMA~\cite{soft-roce} has low performance. It would be interesting to co-design software and 网卡.
 
 \textbf {RDMA的QoS。}
 我们将数据平面性能隔离和拥塞控制卸载到RDMA网卡上，遵循新的工作方式 \cite {peter2016arrakis,zhu2015congestion,lu2017memory,mprdma,mittal2018revisiting}这个方向，因为数据中心的网卡正变得越来越可编程  \cite{smartnic,cavium,kaufmann2015flexnic,mellanox-innova,mellanox-bluefield}，公有云已经在虚拟机之外的网络功能中提供QoS了\cite {li2016clicknp,panda2016netbricks,floem-osdi18}。
@@ -57,15 +57,15 @@ In addition, they fail to remove cache miss and transport overheads.
 
 \parab{New OS stacks.}
 Another line of research proposes new OS stacks with modified socket interface, mostly aiming at zero copy and fast event notification. Existing socket applications need modifications to use the new interfaces.
-For intra-server connections, Arrakis~\cite{peter2016arrakis} and IX~\cite{belay2017ix} use the NIC to forward packets from one process to another. The hairpin latency from CPU to NIC is at least two PCIe delays, which is one order of magnitude higher than inter-core cache migration delay. In addition, the data plane switching throughput of a NIC is constrained by PCIe bandwidth (Figure~\ref{socksdirect:fig:eval-corenum-tput}).
+For intra-server connections, Arrakis~\cite{peter2016arrakis} and IX~\cite{belay2017ix} use the 网卡 to forward packets from one process to another. The hairpin latency from CPU to 网卡 is at least two PCIe delays, which is one order of magnitude higher than inter-core cache migration delay. In addition, the data plane switching throughput of a 网卡 is constrained by PCIe bandwidth (Figure~\ref{socksdirect:fig:eval-corenum-tput}).
 
 For inter-server connections, most OS stacks implement transport in software. IX~\cite{belay2017ix} and Stackmap~\cite{yasukata2016stackmap} run in the kernel to enforce QoS policy or preserve protocol compatibility with Linux, while Arrakis~\cite{peter2016arrakis} and SandStorm~\cite{marinos2014network} run in user mode to maximize performance.
 RDMA and transport virtualization~\cite{tsai2017lite,niu2017network} also enforce QoS in the hypervisor.
 Due to the additional level of indirection, kernel stacks cannot remove kernel crossing, while batched syscalls add latency.
 Further, large-scale deployment of kernel-based stacks is more complicated than user-space libraries~\cite{andromeda}.
-\sys offloads transport and QoS to NIC hardware.
+\sys offloads transport and QoS to 网卡 hardware.
 RDMA transport has been deployed in many data centers~\cite{guo2016rdma}, and an emerging line of work~\cite{zhu2015congestion,lu2017memory,mprdma} improves congestion control and QoS in large-scale RDMA deployments.
-For flexibility, programmable NICs are being adopted in data centers~\cite{smartnic,cavium}, as they are more efficient than general-purpose CPUs for network processing~\cite{kaufmann2015flexnic,li2016clicknp}.
+For flexibility, programmable 网卡s are being adopted in data centers~\cite{smartnic,cavium}, as they are more efficient than general-purpose CPUs for network processing~\cite{kaufmann2015flexnic,li2016clicknp}.
 
 
 
@@ -73,7 +73,7 @@ For flexibility, programmable NICs are being adopted in data centers~\cite{smart
 A third line of research runs socket in user space.
 mTCP~\cite{jeong2014mtcp}, Seastar~\cite{seastar}, 
 F-stack~\cite{fstack} and LOS~\cite{huang2017high} use a high performance packet I/O framework (\textit{e.g.} netmap~\cite{rizzo2012netmap}, DPDK~\cite{dpdk} and PF\_RING~\cite{pf-ring}) and achieves compatibility with most Linux socket functions and scalability with number of cores and sockets.
-LibVMA~\cite{libvma}, OpenOnload~\cite{openonload} and DBL~\cite{dbl} are fully compatible with existing applications. However, they use vendor-specific NIC features and do not scale to multiple threads or connections.
+LibVMA~\cite{libvma}, OpenOnload~\cite{openonload} and DBL~\cite{dbl} are fully compatible with existing applications. However, they use vendor-specific 网卡 features and do not scale to multiple threads or connections.
 In addition, user-space sockets do not support zero copy or efficient multitasking.
 
 Most user-space sockets focus on inter-server and do not optimize for intra-server connections.
@@ -82,7 +82,7 @@ Existing socket to RDMA translation approaches, \textit{e.g.} SDP~\cite{socketsd
 
 
 %\parab{RDMA.}
-%First, RDMA is not suitable for WAN. Second, RDMA has scalability issue when one server connects to many servers. Software transport in CPU access connection states in host memory, while hardware RDMA transport caches connection states in NIC and swaps out to host memory when cache overflows. First, CPU cache miss costs less than 0.1$\mu$s, while NIC cache miss costs 0.5$\mu$s~\cite{kaminsky2016design}. Second, CPU memory bandwidth is an order of magnitude larger than NIC PCIe bandwidth. In light of this, a host should switch to software transport when it actively communicates with a large number of hosts. Fortunately, Modern NICs has an increasing size of memory and supports more active connections without performance degradation~\cite{kaminsky2016design}.
+%First, RDMA is not suitable for WAN. Second, RDMA has scalability issue when one server connects to many servers. Software transport in CPU access connection states in host memory, while hardware RDMA transport caches connection states in 网卡 and swaps out to host memory when cache overflows. First, CPU cache miss costs less than 0.1$\mu$s, while 网卡 cache miss costs 0.5$\mu$s~\cite{kaminsky2016design}. Second, CPU memory bandwidth is an order of magnitude larger than 网卡 PCIe bandwidth. In light of this, a host should switch to software transport when it actively communicates with a large number of hosts. Fortunately, Modern 网卡s has an increasing size of memory and supports more active connections without performance degradation~\cite{kaminsky2016design}.
 \fi
 
 
