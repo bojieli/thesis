@@ -4,7 +4,9 @@
 
 \subsection{\name 工具链和硬件实现}
 
+\iffalse
 \textbf{图：编译生成的 OpenCL 代码示例，（1）只包含顺序和选择结构，不包含分支结构，（2）非阻塞（每个流水级有最坏时钟周期数的保证）。可以避免 handler 阻塞 signal。}
+\fi
 
 我们构建了一个\name 编译器，它作为\name 工具链的前端（\S \ref {clicknp:subsec:toolchain}）。
 对于宿主程序，我们使用Visual C++作为后端。我们进一步集成了Altera OpenCL SDK（v15.1）\cite {aoc}和Xilinx Vivado HLS（v2015.4）\cite {vivado}作为FPGA程序的后端。
@@ -14,7 +16,9 @@
 元素也可以编译为CPU二进制文件，管理器线程将为每个主机元素创建一个工作线程。
 主机和FPGA元素之间的每个连接都映射到PCIe I / O通道的\textit {插槽}（\S \ref {clicknp:subsec:pcie}）。
 
+\iffalse
 \textbf{图：ClickNP element，channel，signal 菊花链，command hub 的示例}
+\fi
 
 我们的硬件平台基于Altera Stratix V FPGA和Catapult shell \cite {putnam2014reconfigurable}。
 Catapult shell还包含一个OpenCL特定的运行时，因此\name role可以通过此运行时层与shell通信。

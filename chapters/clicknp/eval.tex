@@ -160,8 +160,8 @@ L4LB需要一次访问DDR内存。因此处理速度降低到11Mpps。
 
 图 \ref {clicknp:fig:l4}（b）显示了不同负载条件下的延迟。
 在这个实验中，我们将并发流的数量修复为100万。
-我们可以看到L4LB实现了4美元/秒的非常低的延迟。
-然而，LVS会导致约50美元的延迟。
+我们可以看到L4LB实现了4 $\mu$s 的非常低的延迟。
+然而，LVS会导致约50 $\mu$s 的延迟。
 当提供的负载高于100Kpps时，这种延迟会迅速上升，超过LVS的容量。
 
 最后，图 \ref {clicknp:fig:l4}（c）比较L4LB和LVS接受新流的能力。
@@ -170,7 +170,7 @@ L4LB需要一次访问DDR内存。因此处理速度降低到11Mpps。
 由于单个PCIe插槽每秒可以传输16.5M的传输，因此瓶颈仍然是DDR访问。
 我们的 \textit {DIPAlloc} 元素只是以循环方式分配DIP。
 对于复杂的分配算法，\textit {DIPAlloc} 的CPU核心将成为瓶颈，并且可以通过在更多CPU核心上复制 \textit {DIPAlloc} 元素来提高性能。
-对于LVS，由于数据包处理能力有限，它每秒最多只能接受75K新流量。
+对于LVS，由于数据包处理能力有限，它每秒最多只能接受75K个新连接。
 
 
 \textbf {A5. pFabric 验证。}
@@ -250,8 +250,7 @@ Next we tested the performance with adversary traffic to thest the worst case pe
 		L4 load balancer & 860 & 13 & 36\% & 38\% \\
 		pFabric scheduler & 584 & 7 & 11\% & 15\% \\
 		\bottomrule
-		\multicolumn{5}{l}{$^\dagger$ Total line of code of all element declarations and} \\
-		\multicolumn{5}{l}{configuration files.}
+		\multicolumn{5}{l}{$^\dagger$ 所有元件描述语言的代码行数与配置文件的行数之和。}
 	\end{tabular}
 	
 \end{table}
