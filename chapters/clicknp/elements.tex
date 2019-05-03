@@ -142,7 +142,7 @@ HashTCAM also imposes a limitation on number of bit-mask patterns. For each uniq
 
 Longest Prefix Match (\textit{LPM}) is essentially the \textit{IP\_Lookup} example in section \ref{clicknp:subsec:elementdef}.
 
-HashTable, TCAM, HashTCAM and LPM tables all match metadata, while deep packet inspection requires matching packet content. Content matching is much more resource hungry than matching a fixed offset in packet. \textit{StringMatch} works by comparing all offsets of a flit with the pattern byte-by-byte in parallel. \textit{RegexMatch} compiles multiple regexes into one NFA (nondeterministic finite automaton) and build a 32-level pipeline to process next byte and update NFA's active states every stage, similar to the \textit{IP\_Lookup} example. Due to logic resource constraint, current implementation of \textit{RegexMatch} compiles the NFA into FPGA image and does not allow on-the-fly regex reconfiguration.
+HashTable, TCAM, HashTCAM and LPM tables all match metadata, while deep packet inspection requires matching packet content. Content matching is much more resource hungry than matching a fixed offset in packet. \textit{StringMatch} works by comparing all offsets of a flit with the pattern byte-by-byte in parallel. \textit{RegexMatch} compiles multiple regexes into one 网络功能A (nondeterministic finite automaton) and build a 32-level pipeline to process next byte and update 网络功能A's active states every stage, similar to the \textit{IP\_Lookup} example. Due to logic resource constraint, current implementation of \textit{RegexMatch} compiles the 网络功能A into FPGA image and does not allow on-the-fly regex reconfiguration.
 
 \begin{table}[h!]
 	\centering

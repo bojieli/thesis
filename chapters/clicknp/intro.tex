@@ -21,14 +21,14 @@
 
 现代多租户数据中心提供共享基础设施，以低成本托管来自不同客户（即租户）的许多不同类型的服务。
 为确保安全性和性能隔离，每个租户都部署在\textit{虚拟化网络}环境中。
-数据中心运营商需要灵活的网络功能（Network Function，NF）来实施隔离
+数据中心运营商需要灵活的网络功能（Network Function，网络功能）来实施隔离
 同时保证服务水平协议（Service Level Aggrement，SLA）。
 
 传统的基于硬件的网络设备不灵活，因此几乎所有现有的云提供商，例如Microsoft，Amazon和VMWare，已经在服务器上的管理程序软件中实现了\textit{虚拟化}网络功能，以最大限度地提高灵活性，包括负载均衡、流量整形和防火墙等。
 
-但是，软件NF有两个基本限制 - 都源于软件包处理的性质。
+但是，软件网络功能有两个基本限制 - 都源于软件包处理的性质。
 首先，用软件处理数据包的容量有限。
-现有的软件NF通常需要多个内核来实现10~Gbps的速率~\cite{comb,martins2014clickos}。
+现有的软件网络功能通常需要多个内核来实现10~Gbps的速率~\cite{comb,martins2014clickos}。
 但最新的网络链接已经扩大到40至100~Gbps~\cite{mellanox-100g}。
 虽然可以在服务器中添加更多内核，但这样做会增加成本，不仅在资本支出方面，而且在运营费用增加时会产生更多的能源。
 %
@@ -37,18 +37,18 @@
 对于许多低延迟应用（例如，股票交易），这种增加的延迟是不可接受的。
 
 % hardware accelerating
-为了克服软件包处理的局限性同时保持灵活性，最近的工作已经提出使用图形处理单元（GPU）~\cite{packetshader}，网络处理器（NP）~\cite {cavium,netronome}或可重新配置的硬件（现场可编程门阵列，即FPGA）来加速NF~\cite{netfpga,smartnic,rubow2010chimpp}。
+为了克服软件包处理的局限性同时保持灵活性，最近的工作已经提出使用图形处理单元（GPU）~\cite{packetshader}，网络处理器（NP）~\cite {cavium,netronome}或可重新配置的硬件（现场可编程门阵列，即FPGA）来加速网络功能~\cite{netfpga,smartnic,rubow2010chimpp}。
 与GPU相比，FPGA更节能~\cite {fpga-vs-gpu,fpga-vs-gpu2}。
 与专用NP相比，FPGA更具\emph{灵活性}，因为它可以使用任何服务的任何硬件逻辑进行虚拟重新配置。
 最后，FPGA价格低廉，并且已经在数据中心大规模部署~\cite {smartnic,putnam2014reconfigurable}。
 
-在这项工作中，我们探索了使用FPGA加速数据中心软件NF的机会。
+在这项工作中，我们探索了使用FPGA加速数据中心软件网络功能的机会。
 使用FPGA作为加速器的主要挑战是\textit{可编程性}。
 传统上，FPGA用硬件描述语言（HDL）编程，例如Verilog和VHDL，它们仅暴露低级构建块，如门，寄存器，多路复用器和时钟。
 虽然程序员可以手动调整逻辑以实现最大性能，但编程复杂性很高，导致生产率低和调试困难。
 实际上，FPGA的可编程性缺乏使得软件程序员的大型社区多年来远离这种技术~\cite{bacon2013fpga}。
 
-本文介绍\name{}，这是一个FPGA加速平台，用于在商用服务器上进行高度灵活和高性能的NF处理。
+本文介绍\name{}，这是一个FPGA加速平台，用于在商用服务器上进行高度灵活和高性能的网络功能处理。
 \name{}通过三个步骤解决FPGA的编程挑战。
 首先，提供了一个模块化架构，类似于众所周知的Click模型\cite {kohler2000click}，其中复杂的网络功能是使用简单明确的元素组成的。
 \footnote{这也是我们的系统名称\textit{Click Network Processor}的来源。}
@@ -65,31 +65,31 @@
 此外，我们开发了\textit {延迟写入}和\textit {内存散射}技术来解决读写依赖性和伪内存依赖性，现有的HLS工具无法解决这些问题。
 最后，我们在不同阶段仔细平衡操作并匹配其处理速度，以便最大化管道的总体吞吐量。
 通过所有这些优化，\name{}实现了高数据包处理吞吐量
-每秒高达2亿个数据包\footnote {\name{} NF的实际吞吐量可能受以太网端口数据速率限制。}，具有超低延迟（大多数数据包大小$ 2 \mu$s））。
-与具有GPU加速的CPU和CPU上最先进的软件NF相比，这大约是10倍和2.5倍的吞吐量增益~\cite {packetshader}，
+每秒高达2亿个数据包\footnote {\name{} 网络功能的实际吞吐量可能受以太网端口数据速率限制。}，具有超低延迟（大多数数据包大小$ 2 \mu$s））。
+与具有GPU加速的CPU和CPU上最先进的软件网络功能相比，这大约是10倍和2.5倍的吞吐量增益~\cite {packetshader}，
 同时将延迟分别降低10倍和100倍。
 
 我们已经实现了\ name \ tool-chain，它可以与各种商业HLS工具集成〜\cite {vivado,aoc}，包括Intel FPGA OpenCL SDK，Xilinx Vivado和SDAccel。
 我们已经实现了大约100个常用元素，其中20％是从Click直接重新计算的。
-我们使用这些元素构建五个演示NF：
+我们使用这些元素构建五个演示网络功能：
 （1）高速交通捕获和发电机，
 （2）支持精确匹配和通配符匹配的防火墙，
 （3）IPSec网关，
 （4）一个可以处理3200万个并发流的第4层负载均衡器，
 （5）pFabric调度器\cite {pfabric}执行严格优先级流程调度，具有40亿个优先级。
 我们在戴尔服务器和Altera Stratix V FPGA板的测试平台上评估这些网络功能\cite {putnam2014reconfigurable}。
-我们的结果表明，所有这些NF都可以通过FPGA大大加速，并且可以在任何数据包大小下使40Gbps的线速饱和，同时具有极低的延迟和可忽略的CPU开销。
+我们的结果表明，所有这些网络功能都可以通过FPGA大大加速，并且可以在任何数据包大小下使40Gbps的线速饱和，同时具有极低的延迟和可忽略的CPU开销。
 
 总之，本文的贡献是：
 （1）\name 语言和工具链的设计与实现;
 （2）在FPGA上高效运行的高性能数据包处理模块的设计和实现;
-（3）五个FPGA加速NF的设计和评估。
+（3）五个FPGA加速网络功能的设计和评估。
 据我们所知，\name 是第一个用于通用网络功能的FPGA加速数据包处理平台，完全用高级语言编写，实现40~Gbps的线速。
 \egg{
 \smalltitle{Roadmap.} The roadmap of the paper is as follows: \S\ref{clicknp:sec:background} discuss the background.
 \S\ref{clicknp:sec:architecture} presents the \name\ architecture and design. 
 Our optimizations for FPGA is explained in \S\ref{clicknp:sec:optimization}.
-\S\ref{clicknp:sec:impl} presents the implementation details and \name\ NFs are discribed in \S\ref{clicknp:sec:application}.
+\S\ref{clicknp:sec:impl} presents the implementation details and \name\ 网络功能s are discribed in \S\ref{clicknp:sec:application}.
 We evaluate \name\ in \S\ref{clicknp:sec:eval}.
 Related work is discussed in \S\ref{clicknp:sec:related} and 
 we conclude in \S\ref{clicknp:sec:conclusion} .

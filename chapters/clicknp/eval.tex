@@ -6,17 +6,17 @@
 
 我们在16台Dell R720服务器的测试台中评估\name。
 对于每个FPGA板，两个以太网端口都连接到架顶式（ToR）Dell S6000交换机\cite {dells6000}。
-所有\name NF都在Windows Server 2012 R2上运行。
-我们将\name 与其他最先进的软件NF进行比较。
-对于在Linux上运行的那些NF，我们使用内核版本为3.10的CentOS 7.2。
+所有\name 网络功能都在Windows Server 2012 R2上运行。
+我们将\name 与其他最先进的软件网络功能进行比较。
+对于在Linux上运行的那些网络功能，我们使用内核版本为3.10的CentOS 7.2。
 在我们的测试中，我们使用PktGen发包工具以不同的速率生成具有不同数据包大小的测试流量（64B 数据包，最高吞吐量为 56.4 Mpps）。
-为了测量NF处理延迟，我们在每个测试数据包中嵌入了一个生成时间戳。
-当数据包通过NF时，它们被循环回到PktCap抓包工具，该PktCap与PktGen位于同一FPGA中。
+为了测量网络功能处理延迟，我们在每个测试数据包中嵌入了一个生成时间戳。
+当数据包通过网络功能时，它们被循环回到PktCap抓包工具，该PktCap与PktGen位于同一FPGA中。
 然后我们可以通过从数据包的接收时间中减去生成时间戳来确定延迟。
-由PktGen和PktCap引起的延迟通过直接环回（无NF）进行预校准，并从我们的数据中删除。
+由PktGen和PktCap引起的延迟通过直接环回（无网络功能）进行预校准，并从我们的数据中删除。
 
 \egg{
-To measure NF processing latency, we forward packets to an \textit{Echo} server using the second port. 
+To measure 网络功能 processing latency, we forward packets to an \textit{Echo} server using the second port. 
 The Echo server runs an \textit{Echo} function in its FPGA, which simply bounces all packets back to the source. 
 %
 Then, we can compare the difference between the timestamps of a packet 
@@ -79,7 +79,7 @@ The wire loopback RTT of TrafficGen is 0.85$\mu$s for 64B packets and 1.39$\mu$s
 
 \subsection{吞吐量和延迟}
 
-%In this subsection, we benchmark the throughput and latency of \name\ NFs.
+%In this subsection, we benchmark the throughput and latency of \name\ 网络功能s.
 
 \textbf {A2. OpenFlow防火墙。}
 在本实验中，我们将OpenFlow防火墙与Linux防火墙以及Click + DPDK~ \cite {barbette2015fast}进行比较。
@@ -286,10 +286,10 @@ Next we tested the performance with adversary traffic to thest the worst case pe
 \end{table}
 
 
-在本小节中，我们评估\name NFs的资源利用率。
+在本小节中，我们评估\name 网络功能s的资源利用率。
 表 \ref {clicknp:tab:applications}总结了结果。
-除了使用大多数BRAM来保存编码书的IPSec网关之外，所有其他NF仅使用中等资源（5 至 50 ％）。
-仍有空间容纳更复杂的NF。
+除了使用大多数BRAM来保存编码书的IPSec网关之外，所有其他网络功能仅使用中等资源（5 至 50 ％）。
+仍有空间容纳更复杂的网络功能。
 
 接下来，我们研究了\name 的细粒度模块化的开销。
 由于每个元素都将生成逻辑块边界并仅使用FIFO缓冲区与其他块进行通信，因此应该存在开销。
@@ -312,7 +312,7 @@ Next we tested the performance with adversary traffic to thest the worst case pe
 这是因为所有的HLS工具都会产生一个固定的开销，占据微小模块的面积成本。
 
 
-总之，\name 可以为FPGA生成高效的RTL，只需要适度的面积成本，可以构建实用的NF。
+总之，\name 可以为FPGA生成高效的RTL，只需要适度的面积成本，可以构建实用的网络功能。
 展望未来，FPGA技术仍在迅速发展。 例如，Altera的下一代FPGA Arria 10的容量将比我们目前使用的芯片多2.5倍。
 因此，我们认为HLS的面积成本将来不会受到关注。
 

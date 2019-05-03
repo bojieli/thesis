@@ -4,23 +4,23 @@
 
 \subsection{软件网络功能的性能挑战}
 
-软件NF具有极大的灵活性和可扩展性。
+软件网络功能具有极大的灵活性和可扩展性。
 早期研究主要集中在基于软件的数据包转发 \cite {routebricks,Egi:2008:THP:1544012.1544032}。
 他们表明，多核x86 CPU可以以每服务器10Gbps的速度转发数据包，并且可以通过集群更多服务器来扩展容量。
-最近，许多系统被设计用于实现各种类型的NF \cite {comb,Greenhalgh:2009:FPR:1517480.1517484,martins2014clickos}。
+最近，许多系统被设计用于实现各种类型的网络功能 \cite {comb,Greenhalgh:2009:FPR:1517480.1517484,martins2014clickos}。
 同样，所有这些系统都利用CPU中的多核并行性来实现每台机器接近10Gbps的吞吐量，并在需要更高容量时向外扩展以使用更多机器。
 Ananta \cite {ananta}是一个部署在Microsoft数据中心的软件负载均衡器，用于提供云规模的负载均衡服务。
-虽然软件NF可以扩展以提供更多容量，但这样做会在CAPEX和OPEX中增加相当大的成本 \cite {ananta,duet}。
+虽然软件网络功能可以扩展以提供更多容量，但这样做会在CAPEX和OPEX中增加相当大的成本 \cite {ananta,duet}。
 
 为了加速软件包处理，以前的工作已经提出使用GPU \cite {packetshader}，专用网络处理器（NP）\cite {cavium,netronome} 和硬件交换机 \cite {duet}。
 GPU主要用于图形处理，最近扩展到具有海量数据并行性的其他应用程序。 GPU更适合批量操作。 PacketShader \cite {packetshader}，表明使用GPU可以实现40Gbps的分组交换速度。
 但是，批量操作会导致高延迟。
 例如，\cite {packetshader}中报告的转发延迟约为$200 \mu{}s$，比 \name{} 大两个数量级。
-与GPU相比，FPGA更灵活，可以重新配置以捕获数据和流水线并行，这两者在NF中非常常见。
+与GPU相比，FPGA更灵活，可以重新配置以捕获数据和流水线并行，这两者在网络功能中非常常见。
 网络处理器专门用于处理网络流量并且具有许多硬连线（hard-wired）的网络加速器。
 NP-Click \cite{shah2004np} 在网络处理器上实现了 Click 编程框架。
 相比之下，FPGA是一种通用计算平台。
-除了NF之外，FPGA在数据中心还有许多其他应用，使其更具吸引力
+除了网络功能之外，FPGA在数据中心还有许多其他应用，使其更具吸引力
 大规模部署 \cite {putnam2014reconfigurable}。
 硬件交换机功能有限，其应用受到很大限制 \cite {duet}。
 
@@ -47,9 +47,9 @@ NP-Click \cite{shah2004np} 在网络处理器上实现了 Click 编程框架。
 开发人员使用高级抽象和熟悉的工具编程，并具有类似的编程经验，就像在多核处理器上编程一样。
 我们相信这是使大多数软件程序员可以使用FPGA的必要条件。
 
-\textbf {模块化。} 我们应该支持\textit {模块化架构}进行数据包处理。以前关于虚拟化NF的经验表明，正确的模块化架构可以很好地捕获数据包处理中的许多常见功能~\cite {kohler2000click,martins2014clickos}，使它们易于在各种NF中重用。
+\textbf {模块化。} 我们应该支持\textit {模块化架构}进行数据包处理。以前关于虚拟化网络功能的经验表明，正确的模块化架构可以很好地捕获数据包处理中的许多常见功能~\cite {kohler2000click,martins2014clickos}，使它们易于在各种网络功能中重用。
 
-\textbf {高性能和低延迟。} 数据中心的NF应该以40 / 100~Gbps的线路速率处理大量数据包，具有超低延迟。以前的工作已经显示~\cite {rollback-mb}，即使NF添加的几百微秒的延迟也会对服务体验产生负面影响。
+\textbf {高性能和低延迟。} 数据中心的网络功能应该以40 / 100~Gbps的线路速率处理大量数据包，具有超低延迟。以前的工作已经显示~\cite {rollback-mb}，即使网络功能添加的几百微秒的延迟也会对服务体验产生负面影响。
 
 \textbf {支持联合CPU / FPGA数据包处理。} FPGA 不是灵丹妙药。
 正如第 2 章所讨论的，并非所有任务都适用于FPGA。例如，自然顺序的算法和具有非常大的内存占用和低局部性的处理应该在CPU中处理得更好。
@@ -69,14 +69,14 @@ NP-Click \cite{shah2004np} 在网络处理器上实现了 Click 编程框架。
 首先，主机程序和FPGA内核之间的通信必须始终通过板载DDR内存。 这增加了非平凡的延迟，并且还导致板载内存成为瓶颈。
 其次，OpenCL内核函数需要宿主机上的软件程序显式\textit {调用}。
 在内核终止之前，主机程序无法控制内核行为，例如设置新参数，也不能读取任何内核状态。
-但是NF面临着连续的数据包流，应该始终在运行。
+但是网络功能面临着连续的数据包流，应该始终在运行。
 
 FPGA是一项成熟的技术，最近已经部署用于加速数据中心服务，包括网络功能 \cite {putnam2014reconfigurable,smartnic,rubow2010chimpp,lavasani2012compiling}。
 众所周知，FPGA的可编程性很低，有丰富的前人工作提供了高级编程抽象 \cite {bluespec,auerbach2010lime,bacon2013fpga,singh2011implementing,bachrach2012chisel,wester2015transformation}。
 Gorilla \cite {lavasani2012compiling} 为FPGA上的数据包交换提出了一种特定于域的高级语言。
 Cliff \cite{kulkarni2004mapping}、CUSP \cite{schelle2005cusp} 和 Chimpp \cite {rubow2010chimpp} 将Click模型引入硬件描述语言来开发模块化路由器。
 \name 沿此方向工作，与以前的工作互补。
-\name 致力于数据中心的NF，通过提供高度灵活的模块化架构和利用商业HLS工具解决可编程性问题。
+\name 致力于数据中心的网络功能，通过提供高度灵活的模块化架构和利用商业HLS工具解决可编程性问题。
 
 Click2NetFPGA~\cite {Click2NetFPGA}通过直接将Click模块化路由器 \cite {kohler2000click}程序编译到FPGA中来提供模块化架构。
 然而，\cite {Click2NetFPGA}的性能比我们在本文中报告的要低得多（两个数量级），因为它们的系统设计存在几个瓶颈（例如，内存和数据包I/O），它们也是错过几个重要的优化以确保完全流水线处理（如\S \ref {clicknp:sec:optimization}中所述）。
@@ -103,7 +103,7 @@ Fortunately, reconfigurable hardware is an architecture that provides both progr
 
 Despite FPGA's potential in network processing, the programmablity of FPGA is traditionally provided by hardware description languages (HDL) such as Verilog, which requires hardware knowledge and are much harder to program and debug than higher-level languages such as C/C++. Thus, existing FPGA-based network processors such as NetFPGA \cite{lockwood2007netfpga} are hard to program for software engineers.
 
-Many works, e.g. OpenFlow \cite{mckeown2008openflow}, P4 \cite{bosshart2014p4} and SDNet \cite{xilinxsdnet}, provides the programmability by abstracting a set of primitives in network processing and defining a high-level programming language to compose the primitives. This direction has proved effective, but the programmability is limited to a set of pre-defined actions, which could not keep pace with rapid development of data center network functions. Our work strive to make the primitives extensible for software engineers.
+Many works, e.g. OpenFlow \cite{mckeown2008openflow}, P4 \cite{bosshart2014p4} and 软件定义网络et \cite{xilinxsdnet}, provides the programmability by abstracting a set of primitives in network processing and defining a high-level programming language to compose the primitives. This direction has proved effective, but the programmability is limited to a set of pre-defined actions, which could not keep pace with rapid development of data center network functions. Our work strive to make the primitives extensible for software engineers.
 
 Fortunately, several frameworks have been proposed to provide abstractions for generic FPGA programming. Examples of such works include Xilinx Vivado HLS (High Level Synthesis) \cite{feist2012vivado} based on C/C++, Altera SDK for OpenCL \cite{czajkowski2012opencl} based on C-like OpenCL and IBM Lime \cite{auerbach2010lime} based on Java.
 
@@ -124,9 +124,9 @@ We highlight several design goals for our ClickNP framework to enable software e
 
 \smalltitle{Debugging support.} First, as HDL (e.g. Verilog) simulation and debugging is both time consuming and requires extensive hardware knowledge, the framework should be able to compile OpenCL-based ClickNP programs to native x86 code for emulation, and provide traffic generators and receivers to test functionality. Second, as CPU is neither capable of sending or receiving packets at 60 Mpps, we need a FPGA-based network benchmark suite to perform stress testing on the network processor.
 
-\smalltitle{Separation of control plane and data plane.} On one hand, our throughput requirement requires most network packets to be processed through the reconfigurable hardware without any CPU intervention. On the other hand, SDN and NFV applications are usually complicated and have external dependencies. Therefore a clear interface between the control plane and the data plane is mandatory, where data plane programs are written within ClickNP framework and target massive parallelism, and control plane programs need only slight modifications to call our host library and perform on-the-fly reconfigurations.
+\smalltitle{Separation of control plane and data plane.} On one hand, our throughput requirement requires most network packets to be processed through the reconfigurable hardware without any CPU intervention. On the other hand, 软件定义网络 and 网络功能虚拟化 applications are usually complicated and have external dependencies. Therefore a clear interface between the control plane and the data plane is mandatory, where data plane programs are written within ClickNP framework and target massive parallelism, and control plane programs need only slight modifications to call our host library and perform on-the-fly reconfigurations.
 
-\smalltitle{Host communication.} Network processors require low-latency and high-throughput interactions with the host machine. In SDN and NFV applications, FPGA needs to send unknown packets to the controller and request a new forwarding rule to be inserted into FPGA. The round-trip time should be as low as possible to reduce end-to-end flow establish time. In packet replay and capture applications, FPGA needs to receive or send Gigabytes of packets from or to the host machine without using the network adapter.
+\smalltitle{Host communication.} Network processors require low-latency and high-throughput interactions with the host machine. In 软件定义网络 and 网络功能虚拟化 applications, FPGA needs to send unknown packets to the controller and request a new forwarding rule to be inserted into FPGA. The round-trip time should be as low as possible to reduce end-to-end flow establish time. In packet replay and capture applications, FPGA needs to receive or send Gigabytes of packets from or to the host machine without using the network adapter.
 
 We design ClickNP to meet the above design goals with Catapult FPGA \cite{putnam2014reconfigurable} and Altera OpenCL \cite{singh2011implementing}. In the next section, we will describe the FPGA and OpenCL components, and how we build a toolchain that abstracts away hardware specific details.
 }
