@@ -133,7 +133,7 @@ To share a CPU core efficiently among multiple active threads, \sys uses \emph{c
 %As a result, we achieve zero copy for both shared memory, RDMA and TCP transport.
 
 \sys {}实现了与底层SHM队列和RDMA可实现的原始性能接近的延迟和吞吐量。
-在延迟方面，\sys {}实现了主机内套接字的0.3美元RTT，Linux的1/35，比裸机SHM队列高出0.05美元。对于主机间套接字，\sys {}在RDMA主机之间实现了1.7美元的RTT，几乎与原始RDMA写入和1/17的Linux相同。
+在延迟方面，\sys {}实现了主机内套接字的0.3微秒RTT，Linux的1/35，比裸机SHM队列高出0.05微秒。对于主机间套接字，\sys {}在RDMA主机之间实现了1.7微秒的RTT，几乎与原始RDMA写入和1/17的Linux相同。
 在吞吐量方面，单个线程可以每秒发送23~M个主机内消息（Linux的20倍）或18~M个主机间（15倍的Linux，1.4倍的原始RDMA写入）。
 对于大型消息，零拷贝，单个连接会使网卡带宽饱和。
 上述性能可根据内核数量进行扩展。
