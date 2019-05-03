@@ -32,7 +32,7 @@
 %As shown in Figure~\ref{socksdirect:fig:architecture}, the core component of \sys{} is a user-space library \libipc{}.
 
 为了简化部署和开发 \cite {andromeda}，以及删除内核交叉开销，我们在用户空间而不是内核中实现\sys。
-要使用\sys，应用程序通过设置\texttt {LD\_PRELOAD}环境变量来加载用户空间库\libipc {}。 \libipc {}拦截标准C库中与文件描述符（FD）操作相关的所有Linux API。它使用\emph {FD重映射表}来区分插槽FD与内核FD（例如文件和设备），在用户空间中实现套接字功能并将其他功能转发到内核。
+要使用\sys，应用程序通过设置\texttt {LD\_PRELOAD}环境变量来加载用户空间库\libipc {}。 \libipc {}拦截标准C库中与文件描述符（FD）操作相关的所有Linux API。它使用\emph {FD重映射表}来区分套接字FD与内核FD（例如文件和设备），在用户空间中实现套接字功能并将其他功能转发到内核。
 从安全的角度来看，因为\libipc {}驻留在应用程序地址空间中，我们无法信任它的行为。例如，如果恶意应用程序在\libipc {}中强制执行，则可能会绕过防火墙策略。此外，TCP端口是一个需要分配的全局资源 \cite {lin2016scalable,nsdi19freeflow}。因此，我们需要在\libipc {}之外的可信组件来强制实施访问控制和管理全局资源。
 
 为此，我们在每个主机上设计一个\emph {monitor}守护进程来协调控制平面操作，例如连接创建。监视器是系统服务。在每个主机中，所有加载\libipc {}的应用程序必须与主机的监视器守护程序建立共享内存（SHM）队列，从而形成控制平面。在数据平面上，应用程序构建对等队列以直接通信，从而减轻了监视器守护程序的负担。图 \ref {socksdirect:fig:architecture}显示了\sys {}的体系结构。
@@ -86,7 +86,7 @@ SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它�
 	\centering
 	\includegraphics[width=0.6\textwidth]{images/queue_arch}
 	
-	\caption{无锁套接字与两个发送器和两个接收器线程共享。 虚线箭头表示每个插槽的活动发送方和接收方。 每个线程跟踪其活动套接字并通过独占队列与监视器通信。}
+	\caption{无锁套接字与两个发送器和两个接收器线程共享。 虚线箭头表示每个套接字的活动发送方和接收方。 每个线程跟踪其活动套接字并通过独占队列与监视器通信。}
 	\label{socksdirect:fig:queue-arch}
 \end{figure}
 

@@ -138,7 +138,7 @@ while (true) { // main event loop
 
 
 Socket是应用程序，容器和主机之间的标准通信原语。
-现代数据中心网络具有微秒级基本延迟和数十Gbps吞吐量。 但是，传统的Linux套接字是在具有共享数据结构的操作系统内核空间中实现的，这使得套接字成为在多个主机上运行的通信密集型应用程序的众所周知的瓶颈 \cite {barroso2017attack}。 除了主机间通信之外，同一主机上的云应用程序和容器经常相互通信，使得主机内插槽通信在云时代变得越来越重要。 在压力测试下，Nginx~ \cite {reese2008nginx}，Memcached~ \cite {fitzpatrick2004distributed}和Redis~ \cite {carlson2013redis}等应用程序在内核中消耗50％到90％的CPU时间，主要处理TCP套接字操作 \cite{jeong2014mtcp}。
+现代数据中心网络具有微秒级基本延迟和数十Gbps吞吐量。 但是，传统的Linux套接字是在具有共享数据结构的操作系统内核空间中实现的，这使得套接字成为在多个主机上运行的通信密集型应用程序的众所周知的瓶颈 \cite {barroso2017attack}。 除了主机间通信之外，同一主机上的云应用程序和容器经常相互通信，使得主机内套接字通信在云时代变得越来越重要。 在压力测试下，Nginx~ \cite {reese2008nginx}，Memcached~ \cite {fitzpatrick2004distributed}和Redis~ \cite {carlson2013redis}等应用程序在内核中消耗50％到90％的CPU时间，主要处理TCP套接字操作 \cite{jeong2014mtcp}。
 
 要了解socket的成本，我们首先需要了解socket的功能。
 现代操作系统中的TCP套接字通常具有三个功能:（1）寻址，找到并连接到另一个应用程序；（2）提供可靠且有序的通信通道，由整数\emph {文件描述符}（FD）标识；（3）来自多个频道的多重事件，例如poll和epoll。 大多数Linux应用程序使用准备驱动的I / O多路复用模型。 操作系统告诉应用程序哪些FD已准备好接收或发送，然后应用程序可以准备缓冲区并发出接收或发送操作。
@@ -454,7 +454,7 @@ Linux提供了基于准备就绪的事件模型，即应用程序知道传入的
 用户空间中的Linux兼容套接字 \cite {libvma,rsockets}通常在内核中打开一个文件以获取每个套接字的虚拟FD，因此它们仍然需要内核FD分配。
 LOS~ \cite {huang2017high}将FD空间划分为用户和内核部分，但违反了Linux分配最小可用FD的属性。
 但是，许多应用程序，如Redis~ \cite {redis}和Memcached~ \cite {memcached}都依赖于此属性。
-我们的目标是在保持兼容性的同时绕过内核插槽FD分配。
+我们的目标是在保持兼容性的同时绕过内核套接字FD分配。
 
 \parab {TCB管理中的锁定。}
 在建立连接期间，Linux获取几个全局锁来分配TCB（TCP控制块）。
