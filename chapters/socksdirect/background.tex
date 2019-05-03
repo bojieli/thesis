@@ -137,10 +137,10 @@ while (true) { // main event loop
 \fi
 
 
-Socket是应用程序，容器和主机之间的标准通信原语。
+Socket（套接字）是应用程序，容器和主机之间的标准通信原语。
 现代数据中心网络具有微秒级基本延迟和数十Gbps吞吐量。 但是，传统的Linux套接字是在具有共享数据结构的操作系统内核空间中实现的，这使得套接字成为在多个主机上运行的通信密集型应用程序的众所周知的瓶颈 \cite {barroso2017attack}。 除了主机间通信之外，同一主机上的云应用程序和容器经常相互通信，使得主机内套接字通信在云时代变得越来越重要。 在压力测试下，Nginx~ \cite {reese2008nginx}，Memcached~ \cite {fitzpatrick2004distributed}和Redis~ \cite {carlson2013redis}等应用程序在内核中消耗50％到90％的CPU时间，主要处理TCP套接字操作 \cite{jeong2014mtcp}。
 
-要了解socket的成本，我们首先需要了解socket的功能。
+要了解套接字的成本，我们首先需要了解套接字的功能。
 现代操作系统中的TCP套接字通常具有三个功能:（1）寻址，找到并连接到另一个应用程序；（2）提供可靠且有序的通信通道，由整数\emph {文件描述符}（FD）标识；（3）来自多个频道的多重事件，例如poll和epoll。 大多数Linux应用程序使用准备驱动的I / O多路复用模型。 操作系统告诉应用程序哪些FD已准备好接收或发送，然后应用程序可以准备缓冲区并发出接收或发送操作。
 
 从概念上讲，Linux网络堆栈由三层组成。首先，VFS层为应用程序提供套接字API（例如\emph {connect}，\emph {send}，\emph {epoll}）。套接字连接是双向，可靠且有序的管道，由整数\emph {文件描述符}（FD）标识。
@@ -525,7 +525,7 @@ LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS
 
 \parab {卸载到NIC的传输:}
 第三类工作将套接字系统的一部分卸载到NIC硬件上。
-TCP卸载引擎（TOE） \cite {tcp-chimney-offload}将部分或完整的TCP / IP堆栈卸载到NIC，但它们仅在专用区域中起飞（例如iSCSI HBA~ \cite {iscsi-hba}）和无状态卸载（例如校验和，流动转向和LSO / LRO~ \cite {lsolro}）。
+TCP卸载引擎（TOE） \cite {tcp-chimney-offload}将部分或完整的TCP / IP堆栈卸载到NIC，但它们仅在专用领域（例如iSCSI HBA~ \cite {iscsi-hba}）和无状态卸载（例如校验和，流动转向和LSO / LRO~ \cite {lsolro}）中获得了商业成功。
 由于数据中心的硬件趋势和应用需求，\emph {stateful}卸载的故事近年来有所不同 \cite {chuanxiong-rdma-keynote}。
 因此，RDMA~ \cite {infiniband2000infiniband}在生产数据中心中广泛使用 \cite {guo2016rdma}。
 与基于软件的TCP / IP网络堆栈相比，RDMA使用硬件卸载来提供超低延迟和接近零的CPU开销。

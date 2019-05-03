@@ -44,19 +44,19 @@
 
 \end{figure}
 
-KV-Direct的主要用例是启用远程直接键值访问，而无需服务器上的CPU开销。
+键值-Direct的主要用例是启用远程直接键值访问，而无需服务器上的CPU开销。
 在某些情况下，可能需要构建一个具有每服务器最大吞吐量的专用键值存储。
-通过模拟，\cite {li2016full}显示了在具有四个（当前不可用的）60核CPU的单个服务器中实现十亿KV运行的可能性。
-如表 \ref{kvdirect:tab:kvs-compare}所示，在服务器上有10个KV-Direct NIC，使用商用服务器可以轻松实现10亿KV op / s性能。
+通过模拟，\cite {li2016full}显示了在具有四个（当前不可用的）60核CPU的单个服务器中实现十亿键值运行的可能性。
+如表 \ref{kvdirect:tab:kvs-compare}所示，在服务器上有10个键值-Direct NIC，使用商用服务器可以轻松实现10亿键值 op / s性能。
 服务器消耗357瓦的功率（在墙壁上测量）以达到1.22~Gop / s GET或0.61~Gop / s PUT。
 
 为了使两个Xeon E5 CPU的80个PCIe Gen3通道饱和，我们用带有10个PCIe Gen3 x8插槽的 SuperMicro X9DRX+-F 主板替换了基准测试服务器的主板（\S\ref {kvdirect:sec:eval}） 。
 我们使用PCIe x16到x8转换器连接每个插槽上的10个可编程网卡，每个网卡上只启用一个PCIe Gen3 x8链路，因此每个网卡的吞吐量低于图 \ref {kvdirect:fig:ycsb-tput}。
 每个NIC在主机内存中拥有一个独占内存区域，并提供不相交的密钥分区。
-多个NIC遇到与多核KVS实现相同的负载不平衡问题。
+多个NIC遇到与多核键值存储实现相同的负载不平衡问题。
 幸运的是，对于少量分区（\textit {例如10个}），负载不平衡并不重要 \cite {lim2014mica,li2016full}。在YCSB长尾工作负载下，负载最高的NIC的平均负载为1.5倍，非常流行的密钥所增加的负载由无序执行引擎提供（\S \ref {kvdirect:sec:ooo}）。
 相比之下，为了实现与240个CPU内核的匹配性能，最热芯的负载将是平均值的10倍。
-图\ref {kvdirect:fig:multiple-nics}显示KV-Direct吞吐量几乎与服务器上的NIC数量呈线性关系。
+图\ref {kvdirect:fig:multiple-nics}显示键值-Direct吞吐量几乎与服务器上的NIC数量呈线性关系。
 
 \iffalse
 \subsection{访问 SSD}
@@ -75,7 +75,7 @@ KV-Direct的主要用例是启用远程直接键值访问，而无需服务器�
 \subsection{不同容量的网卡硬件}
 \label{kvdirect:sec:different-nic}
 
-KV-Direct的目标是利用数据中心的现有硬件来卸载重要的工作负载（KV访问），而不是设计特殊的硬件来实现最大的KVS性能。 我们使用可编程NIC，它通常包含有限数量的DRAM用于缓冲和连接状态跟踪。 大型DRAM在芯片尺寸和功耗方面都很昂贵。
+键值-Direct的目标是利用数据中心的现有硬件来卸载重要的工作负载（键值访问），而不是设计特殊的硬件来实现最大的键值存储性能。 我们使用可编程NIC，它通常包含有限数量的DRAM用于缓冲和连接状态跟踪。 大型DRAM在芯片尺寸和功耗方面都很昂贵。
 
 \begin{table}[t]
 \centering
@@ -134,16 +134,16 @@ KV-Direct的目标是利用数据中心的现有硬件来卸载重要的工作�
 
 乱序执行引擎（\S \ref {kvdirect:sec:ooo}）可以应用于需要隐藏延迟的各种应用程序，我们希望未来的RDMA NIC能够支持原子的。
 
-在40~Gbps网络中，网络带宽限制了非批量KV吞吐量，因此我们使用客户端批处理（\S \ref {kvdirect:sec:implementation}）。通过更高的网络带宽，可以减少批量大小，从而减少延迟。在200~Gbps网络中，KV-Direct网卡无需批量即可达到180~Mop / s。
+在40~Gbps网络中，网络带宽限制了非批量键值吞吐量，因此我们使用客户端批处理（\S \ref {kvdirect:sec:implementation}）。通过更高的网络带宽，可以减少批量大小，从而减少延迟。在200~Gbps网络中，键值-Direct网卡无需批量即可达到180~Mop / s。
 
-KV-Direct利用广泛部署的可编程NIC和FPGA实现 \cite{putnam2014reconfigurable,caulfield2016cloud}。 FlexNIC \cite {kaufmann2015flexnic,kaufmann2016krishnamurthy} 是另一种具有可重构匹配行动表（RMT） \cite {bosshart2013forwarding} 的可编程NIC的有前途的架构。
-NetCache \cite {netcache-sosp17} 在基于RMT的可编程交换机中实现KV缓存，显示了在基于RMT的NIC中构建KV-Direct的潜力。
+键值-Direct利用广泛部署的可编程NIC和FPGA实现 \cite{putnam2014reconfigurable,caulfield2016cloud}。 FlexNIC \cite {kaufmann2015flexnic,kaufmann2016krishnamurthy} 是另一种具有可重构匹配行动表（RMT） \cite {bosshart2013forwarding} 的可编程NIC的有前途的架构。
+NetCache \cite {netcache-sosp17} 在基于RMT的可编程交换机中实现键值缓存，显示了在基于RMT的NIC中构建键值-Direct的潜力。
 
 \subsection{对现实世界应用的影响}
 
-当KV-Direct应用于端到端应用程序时，后台计算显示了潜在的性能提升。 在PageRank \cite {page1999pagerank}中，由于每次边缘遍历都可以通过一次KV操作实现，因此KV-Direct在具有10个可编程NIC的服务器上支持1.22G TEPS。 相比之下，GRAM \cite {wu2015g}支持每台服务器250M TEPS，受交错计算和随机内存访问的约束。
+当键值-Direct应用于端到端应用程序时，后台计算显示了潜在的性能提升。 在PageRank \cite {page1999pagerank}中，由于每次边缘遍历都可以通过一次键值操作实现，因此键值-Direct在具有10个可编程NIC的服务器上支持1.22G TEPS。 相比之下，GRAM \cite {wu2015g}支持每台服务器250M TEPS，受交错计算和随机内存访问的约束。
 
-KV-Direct支持用户定义的函数和向量操作（表 \ref {kvdirect:tab:kv-operations}），可以通过将客户端计算卸载到硬件来进一步优化PageRank。 类似的参数适用于参数server \cite {li2014scaling}。 我们希望未来的工作可以利用硬件加速的键值存储来提高分布式应用程序的性能。
+键值-Direct支持用户定义的函数和向量操作（表 \ref {kvdirect:tab:kv-operations}），可以通过将客户端计算卸载到硬件来进一步优化PageRank。 类似的参数适用于参数server \cite {li2014scaling}。 我们希望未来的工作可以利用硬件加速的键值存储来提高分布式应用程序的性能。
 
 \iffalse
 \subsection{键值映射以外的其他数据结构}

@@ -1,29 +1,29 @@
 \begin{abstract}
 
-%This paper presents \oursys{}, a high-performance distributed in-memory key-value store (KVS). 
-Performance of in-memory key-value store (KVS) continues to be of great importance as modern KVS goes beyond the traditional object-caching workload and becomes a key infrastructure to support distributed main-memory computation in data centers. 
+%This paper presents \oursys{}, a high-performance distributed in-memory key-value store (键值存储). 
+Performance of in-memory key-value store (键值存储) continues to be of great importance as modern 键值存储 goes beyond the traditional object-caching workload and becomes a key infrastructure to support distributed main-memory computation in data centers. 
 %By leveraging FPGA based programmable network interface card (NIC) with several novel hardware and software designs innovations, \oursys{} aims to achieve performances that is close to the physical limit of the underlying hardware in terms of both throughput and latency.
-Recent years have witnessed a rapid increase of network bandwidth in data centers, shifting the bottleneck of most KVS from the network to the CPU. RDMA-capable NIC partly alleviates the problem, but the primitives provided by RDMA abstraction are rather limited. Meanwhile, programmable NICs become available in data centers, enabling in-network processing. In this paper, we present \oursys{}, a high performance KVS that leverages programmable NIC to extend RDMA primitives and enable remote direct key-value access to the main host memory. 
+Recent years have witnessed a rapid increase of network bandwidth in data centers, shifting the bottleneck of most 键值存储 from the network to the CPU. RDMA-capable NIC partly alleviates the problem, but the primitives provided by RDMA abstraction are rather limited. Meanwhile, programmable NICs become available in data centers, enabling in-network processing. In this paper, we present \oursys{}, a high performance 键值存储 that leverages programmable NIC to extend RDMA primitives and enable remote direct key-value access to the main host memory. 
 
 %In order to achieve performance that is close to the physical limits of the underlying hardware,
 We develop several novel techniques to maximize the throughput and hide the latency of the PCIe connection between the NIC and the host memory, which becomes the new bottleneck. 
 %To reduce the DMA request rounds through the PCIe bus, we adopt a novel FPGA friendly hash table and memory allocator design. To hide PCIe access latency and fully utilize the PCIe bandwidth, we design an out-of-order processing engine and a load-distribution component for host memory and on-board DRAM of our programmable NIC.
-Combined, these mechanisms allow a single NIC \oursys{} to achieve up to 180~M key-value operations per second, equivalent to the throughput of tens of CPU cores. Compared with CPU based KVS implementation, \oursys{} improves power efficiency by 3x, while keeping tail latency below 10~$\mu$s. Moreover, \oursys{} can achieve near linear scalability with multiple NICs. With 10 programmable NIC cards in a commodity server, we achieve 1.22 billion KV operations per second, which is almost an order-of-magnitude improvement over existing systems, setting a new milestone for a general-purpose in-memory key-value store.
+Combined, these mechanisms allow a single NIC \oursys{} to achieve up to 180~M key-value operations per second, equivalent to the throughput of tens of CPU cores. Compared with CPU based 键值存储 implementation, \oursys{} improves power efficiency by 3x, while keeping tail latency below 10~$\mu$s. Moreover, \oursys{} can achieve near linear scalability with multiple NICs. With 10 programmable NIC cards in a commodity server, we achieve 1.22 billion 键值 operations per second, which is almost an order-of-magnitude improvement over existing systems, setting a new milestone for a general-purpose in-memory key-value store.
 
-%This paper presents KV-Direct, a high performance key-value store with programmable network interface card (NIC) which is deployed at scale in datacenters.
-%KV-Direct extends RDMA primitives from memory operations to key-value operations, moves KV processing to the programmable NIC on server, thus enabling remote direct key-value access.
+%This paper presents 键值-Direct, a high performance key-value store with programmable network interface card (NIC) which is deployed at scale in datacenters.
+%键值-Direct extends RDMA primitives from memory operations to key-value operations, moves 键值 processing to the programmable NIC on server, thus enabling remote direct key-value access.
 %In order to fully utilize PCIe bandwidth, we specialize hash table and slab memory allocator to minimize PCIe DMA requests for both GET and PUT operations.
-%In order to hide PCIe latency, we design an out-of-order execution engine to issue independent KV operations while ensuring consistency.
-%KV-Direct also leverages the DRAM on the NIC for caching and load balancing.
-%A programmable NIC with KV-Direct can process up to 160M key-value operations per second, whose throughput is equivalent to 32 CPU cores, power efficiency is 16x higher than CPU, and tail latency is 10x lower than CPU.
+%In order to hide PCIe latency, we design an out-of-order execution engine to issue independent 键值 operations while ensuring consistency.
+%键值-Direct also leverages the DRAM on the NIC for caching and load balancing.
+%A programmable NIC with 键值-Direct can process up to 160M key-value operations per second, whose throughput is equivalent to 32 CPU cores, power efficiency is 16x higher than CPU, and tail latency is 10x lower than CPU.
 
-%\oursys{} is an efficient in-memory key-value storage system based on \ournic{}.By offloading the KV operations to FPGA-based NIC, \oursys{} achieves 160\MBs{} key-value operations, whose throughput is equivalent to 32 CPU cores, power efficiency is 16x higher than CPU, and tail latency is 10x lower than CPU, up to 5\mus{}. 
-%Besides, \oursys{} is in linear scale to multiple programmable NICs, achieving one billion KV op/s per-server, more than an order-of-magnitude improvement over existing systems, setting a new milestone for key-value storage system.
+%\oursys{} is an efficient in-memory key-value storage system based on \ournic{}.By offloading the 键值 operations to FPGA-based NIC, \oursys{} achieves 160\MBs{} key-value operations, whose throughput is equivalent to 32 CPU cores, power efficiency is 16x higher than CPU, and tail latency is 10x lower than CPU, up to 5\mus{}. 
+%Besides, \oursys{} is in linear scale to multiple programmable NICs, achieving one billion 键值 op/s per-server, more than an order-of-magnitude improvement over existing systems, setting a new milestone for key-value storage system.
 
 %Recent years we witness the trend of the end of processor frequency scaling and multi-core scaling, as well as the widely deployment of \ournic{} in datacenter, which offers the great opportunity for us to redesign the key-value system. 
 %In \oursys{}, we extend the RDMA primitives to key-value operations with consistency guarantee while keeping its CPU-bypass semantics. 
 %To optimize the new bottleneck in PCIe and reduce the DMA requests, we adopts a new FPGA friendly hash table and memory allocation design.
 %Furthermore, to guarantee the consistency and leverage FPGA parallism, we design an hardware based out-of-order engine and a load-balancing component for on-board cached DRAM and host memory.
-%Combined, these mechanisms allow KV-Direct to achieve high throughput and low latency for both GET and PUT key-value operations. 
+%Combined, these mechanisms allow 键值-Direct to achieve high throughput and low latency for both GET and PUT key-value operations. 
 
 \end{abstract}
