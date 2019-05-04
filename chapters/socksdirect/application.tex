@@ -17,6 +17,13 @@ Nginx和响应生成器位于同一主机中，而请求生成器位于不同的
 对于较小的HTTP响应大小，与Linux相比，\sys {}可将延迟减少5.5倍。
 对于大型响应，由于零拷贝，\sys {}可将延迟降低多达20倍。
 
+\begin{figure}[htbp]
+	\centering \includegraphics[width=0.5\textwidth]{eval/web/msgsize-clocal-lat.pdf}
+	
+	\caption{Nginx HTTP 请求端到端延迟。}
+	\label{socksdirect:fig:eval-nginx}
+\end{figure}
+
 
 %In Figure B, to test the how Nginx throughput scales with multiple cores, we run Nginx with a fixed number of worker threads and response size 1KB.
 %The request generator sends multiple HTTP requests in parallel, and we use a sufficient number of generator threads to saturate Nginx throughput.
@@ -54,6 +61,30 @@ Nginx和响应生成器位于同一主机中，而请求生成器位于不同的
 对于Linux，我们使用\emph {pipe}和\emph {TCP socket}来连接主机内的NF进程。
 图 \ref {socksdirect:fig:eval-tun-tput}表明\sys {}的吞吐量分别是Linux管道和TCP套接字的15倍和20倍。
 它甚至接近最先进的NF框架，NetBricks~ \cite {panda2016netbricks}。
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.5\textwidth]{eval/microbenchmark/nfv-tun-tput.pdf}
+	
+	\caption{网络功能流水线的吞吐量。}
+	\label{socksdirect:fig:eval-tun-tput}
+	%\includegraphics[width=\textwidth]{eval/microbenchmark/nginx-short-tput.pdf}
+	%
+	%\label{socksdirect:fig:eval-nginx-short}
+	%\caption{Nginx throughput.}
+	
+	%\centering \includegraphics[width=\textwidth]{eval/microbenchmark/nginx-multiround-tput.pdf}
+	%
+	%\caption{End-to-end HTTP request latency of a web service.}
+	%\label{socksdirect:fig:eval-nginx-multiround}
+	
+	%\centering
+	%\includegraphics[width=\textwidth]{eval/microbenchmark/corenum-http-tput.pdf}
+	%
+	%\caption{Multi-core scalability of HTTP backend service throughput.}
+	%\label{socksdirect:fig:eval-http-tput}
+\end{figure}
+
 
 %\subsubsection{GraphX on Spark}
 %\quad

@@ -1,84 +1,6 @@
 \section{评估}
 \label{socksdirect:sec:evaluation}
 
-\begin{figure*}[htbp]
-		\centering
-		\subfloat[单机内吞吐量。]{                    
-			%\begin{minipage}{0.4\textwidth}
-			\centering
-			\includegraphics[width=0.5\textwidth]{eval/microbenchmark/msgsize-ipc-tput.pdf}
-			\label{socksdirect:fig:eval-msgsize-ipc-tput}
-			%\end{minipage}
-		}
-		\subfloat[单机内延迟。]{
-			%\begin{minipage}{0.4\textwidth}
-			\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/msgsize-ipc-lat.pdf}
-			\label{socksdirect:fig:eval-msgsize-ipc-lat}
-			%\end{minipage}
-		}
-		
-		\caption{不同消息大小下的单机内通信单核消息性能。}
-		\label{socksdirect:fig:eval-msgsize-intra}
-\end{figure*}
-
-
-\begin{figure*}[htbp]
-		\centering
-		\subfloat[跨主机吞吐量。]{
-			%\begin{minipage}{0.4\textwidth}
-			\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/msgsize-network-tput.pdf}
-			\label{socksdirect:fig:eval-msgsize-network-tput}
-			%\end{minipage}
-		}
-		\subfloat[跨主机延迟。]{
-			%\begin{minipage}{0.4\textwidth}
-			\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/msgsize-network-lat.pdf}
-			\label{socksdirect:fig:eval-msgsize-network-lat}
-			%\end{minipage}
-		}
-		
-		\caption{不同消息大小下的跨主机通信单核消息性能。}
-		\label{socksdirect:fig:eval-msgsize-inter}
-\end{figure*}
-
-\begin{figure*}[htbp]
-		\subfloat[单机内吞吐量。]{                    
-			%\begin{minipage}{0.4\textwidth}
-			\centering
-			\includegraphics[width=0.5\textwidth]{eval/microbenchmark/corenum-IPC-tput.pdf}
-			\label{socksdirect:fig:eval-cornum-ipc}
-			%\end{minipage}
-		}
-		\subfloat[跨主机吞吐量。]{
-			%\begin{minipage}{0.4\textwidth}
-			\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/corenum-network-tput.pdf}
-			\label{socksdirect:fig:eval-cornum-network}
-			%\end{minipage}
-		}
-		
-		\caption{不同 CPU 核数下的 8 字节消息吞吐量。}
-		\label{socksdirect:fig:eval-corenum-tput}
-\end{figure*}
-
-\begin{figure*}[htbp]
-		\centering
-		\subfloat[单机内吞吐量。]{                    
-			%\begin{minipage}{0.4\textwidth}
-			\centering
-			\includegraphics[width=0.5\textwidth]{eval/microbenchmark/connnum-ipc-tput.pdf}
-			\label{socksdirect:fig:eval-connnum-ipc-tput}
-			%\end{minipage}
-		}
-		\subfloat[跨主机吞吐量。]{
-			%\begin{minipage}{0.4\textwidth}
-			\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/connnum-network-tput.pdf}
-			\label{socksdirect:fig:eval-connnum-network-tput}
-			%\end{minipage}
-		}
-		
-		\caption{不同并发连接数量下的单核吞吐量。}
-		\label{socksdirect:fig:eval-connnum-tput}
-\end{figure*}
 
 %\begin{figure}[htpb]
 %	\centering
@@ -134,9 +56,32 @@ RSocket具有6x延迟和1/4吞吐量的\sys  {}，因为它使用网卡转发主
 LibVMA只是将内核TCP套接字用于主机内部。
 \sys  {}的单向延迟为0.15 $ \mu $ s，甚至低于内核交叉（0.2 $ \mu $ s）。基于内核的套接字需要在发送方和接收方都进行内核交叉。
 
+
 由于内存复制，对于8~KiB消息，\sys 的吞吐量仅比Linux高60％，延迟低4倍。对于大小至少为16~KiB的消息，\sys 使用页面重映射来实现零拷贝。
 对于1~miB消息，\sys 比Linux具有1/13延迟和26x吞吐量。
 由于事件通知延迟，RSocket的延迟不稳定，在某些情况下甚至可能比Linux大。
+
+
+
+\begin{figure*}[htbp]
+	\centering
+	\subfloat[单机内吞吐量。]{                    
+		%\begin{minipage}{0.4\textwidth}
+		\centering
+		\includegraphics[width=0.5\textwidth]{eval/microbenchmark/msgsize-ipc-tput.pdf}
+		\label{socksdirect:fig:eval-msgsize-ipc-tput}
+		%\end{minipage}
+	}
+	\subfloat[单机内延迟。]{
+		%\begin{minipage}{0.4\textwidth}
+		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/msgsize-ipc-lat.pdf}
+		\label{socksdirect:fig:eval-msgsize-ipc-lat}
+		%\end{minipage}
+	}
+	
+	\caption{不同消息大小下的单机内通信单核消息性能。}
+	\label{socksdirect:fig:eval-msgsize-intra}
+\end{figure*}
 
 
 图 \ref {socksdirect:fig:eval-msgsize-inter}显示了一对线程之间的主机间套接字性能。
@@ -149,49 +94,26 @@ LibVMA只是将内核TCP套接字用于主机内部。
 对于零拷贝消息（$\ge$ 16 KiB），\sys  {}使网络带宽饱和，其具有所有比较工作的3.5倍吞吐量和RSocket的72％延迟。
 
 
-
-\begin{figure}[htbp]
-		%\centering
-		%\includegraphics[width=\textwidth]{eval/microbenchmark/conn-setup-tput.pdf}
-		%
-		%\caption{Connection creation throughput with number of cores.}
-		%\label{socksdirect:fig:eval-conn-setup-tput}
-		
+\begin{figure*}[htbp]
+	\centering
+	\subfloat[跨主机吞吐量。]{
 		%\begin{minipage}{0.4\textwidth}
-		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/sharecore-lat.pdf}
-		
-		\caption{多进程共享 CPU 核的消息处理延迟。}
-		\label{socksdirect:fig:eval-context-switch}
+		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/msgsize-network-tput.pdf}
+		\label{socksdirect:fig:eval-msgsize-network-tput}
 		%\end{minipage}
-\end{figure}
-\begin{figure}[htbp]
-				\centering \includegraphics[width=0.5\textwidth]{eval/web/msgsize-clocal-lat.pdf}
-		
-		\caption{Nginx HTTP 请求端到端延迟。}
-		\label{socksdirect:fig:eval-nginx}
-\end{figure}
-\begin{figure}[htbp]
-		\centering
-		\includegraphics[width=0.5\textwidth]{eval/microbenchmark/nfv-tun-tput.pdf}
-		
-		\caption{网络功能流水线的吞吐量。}
-		\label{socksdirect:fig:eval-tun-tput}
-		%\includegraphics[width=\textwidth]{eval/microbenchmark/nginx-short-tput.pdf}
-		%
-		%\label{socksdirect:fig:eval-nginx-short}
-		%\caption{Nginx throughput.}
-		
-		%\centering \includegraphics[width=\textwidth]{eval/microbenchmark/nginx-multiround-tput.pdf}
-		%
-		%\caption{End-to-end HTTP request latency of a web service.}
-		%\label{socksdirect:fig:eval-nginx-multiround}
-		
-		%\centering
-		%\includegraphics[width=\textwidth]{eval/microbenchmark/corenum-http-tput.pdf}
-		%
-		%\caption{Multi-core scalability of HTTP backend service throughput.}
-		%\label{socksdirect:fig:eval-http-tput}
-\end{figure}
+	}
+	\subfloat[跨主机延迟。]{
+		%\begin{minipage}{0.4\textwidth}
+		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/msgsize-network-lat.pdf}
+		\label{socksdirect:fig:eval-msgsize-network-lat}
+		%\end{minipage}
+	}
+	
+	\caption{不同消息大小下的跨主机通信单核消息性能。}
+	\label{socksdirect:fig:eval-msgsize-inter}
+\end{figure*}
+
+
 
 
 \subsubsection{多核可扩放性}
@@ -213,6 +135,27 @@ LibVMA回退到Linux用于主机内套接字。
 由于共享网卡队列上的锁争用，与单线程相比，LibVMA的吞吐量减少到两个线程的1/4，而三个和更多线程的1/10。
 Linux吞吐量从1到7个核心线性扩展，并在环回或具有更多核心的网卡队列上出现瓶颈。
 
+
+\begin{figure*}[htbp]
+	\subfloat[单机内吞吐量。]{                    
+		%\begin{minipage}{0.4\textwidth}
+		\centering
+		\includegraphics[width=0.5\textwidth]{eval/microbenchmark/corenum-IPC-tput.pdf}
+		\label{socksdirect:fig:eval-cornum-ipc}
+		%\end{minipage}
+	}
+	\subfloat[跨主机吞吐量。]{
+		%\begin{minipage}{0.4\textwidth}
+		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/corenum-network-tput.pdf}
+		\label{socksdirect:fig:eval-cornum-network}
+		%\end{minipage}
+	}
+	
+	\caption{不同 CPU 核数下的 8 字节消息吞吐量。}
+	\label{socksdirect:fig:eval-corenum-tput}
+\end{figure*}
+
+
 %The multi-thread scalability of \sys  attributes to the partitioning of states and removal of synchronization.
 %We can also see that shared memory communication has 5x throughput than RDMA.% Using RDMA 网卡 for intra-host socket would meet this bottleneck and thus not scalable.
 
@@ -222,5 +165,41 @@ Linux吞吐量从1到7个核心线性扩展，并在环回或具有更多核心�
 如图 \ref {socksdirect:fig:eval-context-switch}所示，尽管消息处理延迟几乎与活动进程的数量呈线性增长，但它仍然是Linux的1/20到1/30。
 
 
+\begin{figure}[htbp]
+	%\centering
+	%\includegraphics[width=\textwidth]{eval/microbenchmark/conn-setup-tput.pdf}
+	%
+	%\caption{Connection creation throughput with number of cores.}
+	%\label{socksdirect:fig:eval-conn-setup-tput}
+	
+	%\begin{minipage}{0.4\textwidth}
+	\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/sharecore-lat.pdf}
+	
+	\caption{多进程共享 CPU 核的消息处理延迟。}
+	\label{socksdirect:fig:eval-context-switch}
+	%\end{minipage}
+\end{figure}
+
+\iffalse
+\begin{figure*}[htbp]
+	\centering
+	\subfloat[单机内吞吐量。]{                    
+		%\begin{minipage}{0.4\textwidth}
+		\centering
+		\includegraphics[width=0.5\textwidth]{eval/microbenchmark/connnum-ipc-tput.pdf}
+		\label{socksdirect:fig:eval-connnum-ipc-tput}
+		%\end{minipage}
+	}
+	\subfloat[跨主机吞吐量。]{
+		%\begin{minipage}{0.4\textwidth}
+		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/connnum-network-tput.pdf}
+		\label{socksdirect:fig:eval-connnum-network-tput}
+		%\end{minipage}
+	}
+	
+	\caption{不同并发连接数量下的单核吞吐量。}
+	\label{socksdirect:fig:eval-connnum-tput}
+\end{figure*}
+\fi
 
 %Finally, we benchmark the throughput and latency after \texttt{fork} and other corner-case operations. Initially, there is only one pair of sender and receiver. At time $T_0$, receiver forks, and the parent process keeps receiving. At time $T_1$, the child process begins to receives takes over the socket. At time $T_2$, sender forks, and only the parent sends. At time $T_3$, the child sender also starts sending. We find that both throughput and latency resume to initial maximal performance within 1~ms after each event.

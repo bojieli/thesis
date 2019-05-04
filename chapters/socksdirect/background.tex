@@ -157,12 +157,13 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 
 \begin{table}[t]
 	\centering
+	\scalebox{0.9}{
 		\begin{tabularx}{1\textwidth}{l|X|X}
 			\hline
-			Type & Overhead & Our Solution \\
+			类型 & 开销 & 我们的解决方案 \\
 			\hline
 			\hline
-			Per op & Kernel crossing (syscall) & User space library (\S\ref{socksdirect:sec:architecture}) \\
+			每操作 & 内核穿越（系统调用） & User space library (\S\ref{socksdirect:sec:architecture}) \\
 			\hline
 			Per op & Socket 文件描述符 locks for concurrent threads \& processes & Lock-free socket sharing (\S\ref{socksdirect:subsec:fork}) \\
 			\hline
@@ -188,6 +189,7 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 			Per conn. & New connection dispatch & Monitor daemon (\S\ref{socksdirect:subsec:connection-management}) \\
 			\hline
 		\end{tabularx}
+	}
 	\caption{Linux 套接字的开销。}
 	\label{socksdirect:tab:overhead}
 	
@@ -242,62 +244,62 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 
 \begin{table}[t]
 	\centering
-	\scalebox{0.8}{
+	\scalebox{0.9}{
 		\begin{tabular}{l|l|l|}
 			\hline
-			Operation	& Latency  & Throughput  \\
-			& ($\mu$s) & (M~op/s) \\
+			操作	& 延迟  & 吞吐量  \\
+			& ($\mu$s) & (M 次操作每秒) \\
 			\hline
 			\hline
-			Inter-core cache migration	& 0.03 & 50 \\
+			核间缓存迁移	& 0.03 & 50 \\
 			\hline
-			Poll 32 empty queues & 0.04 & 24 \\
+			轮询 32 个空队列 & 0.04 & 24 \\
 			\hline
-			System call (before KPTI) & 0.05 & 21 \\
+			系统调用（KPTI 前） & 0.05 & 21 \\
 			\hline
-			Spinlock (no contention) & 0.10 & 10 \\
+			自旋锁（无竞争） & 0.10 & 10 \\
 			\hline
-			Allocate and deallocate a buffer & 0.13 & 7.7 \\
+			分配和释放缓冲区 & 0.13 & 7.7 \\
 			\hline
-			Spinlock (contended) & 0.20 & 5 \\
+			自旋锁（有竞争） & 0.20 & 5 \\
 			\hline
-			Lockless shared memory queue & 0.25 & 27 \\
+			无锁共享内存队列 & 0.25 & 27 \\
 			\hline
-			\textbf{Intra-host \sys} & 0.30 & 22 \\
+			\textbf{主机内 \sys} & 0.30 & 22 \\
 			\hline
-			System call (after KPTI) & 0.20 & 5.0 \\
+			系统调用（KPTI 后） & 0.20 & 5.0 \\
 			\hline
-			Copy one page (4~KiB) & 0.40 & 5.0 \\
+			复制 1 个内存页（4~KiB） & 0.40 & 5.0 \\
 			\hline
-			Cooperative context switch & 0.52 & 2.0 \\
+			协作式上下文切换 & 0.52 & 2.0 \\
 			\hline
-			Map one page (4~KiB) & 0.78 & 1.3 \\
+			映射一个内存页（4~KiB） & 0.78 & 1.3 \\
 			\hline
-			网卡 hairpin within a host & 0.95 & 1.0 \\
+			主机内通过网卡通信 & 0.95 & 1.0 \\
 			\hline
-			Atomic shared memory queue & 1.0 & 6.1 \\
+			原子共享内存队列 & 1.0 & 6.1 \\
 			\hline
-			Map 32 pages (128~KiB) & 1.2 & 0.8 \\
+			映射 32 个内存页（128~KiB） & 1.2 & 0.8 \\
 			\hline
-			Open a socket 文件描述符 & 1.6 & 0.6 \\
+			打开套接字文件描述符 & 1.6 & 0.6 \\
 			\hline
-			One-sided RDMA write & 1.6 & 13 \\
+			单边 RDMA 写操作 & 1.6 & 13 \\
 			\hline
-			Two-sided RDMA send / recv & 1.6 & 8 \\
+			双边 RDMA 发送 / 接收操作 & 1.6 & 8 \\
 			\hline
-			\textbf{Inter-host \sys} & 1.7 & 8 \\
+			\textbf{主机间 \sys} & 1.7 & 8 \\
 			\hline
-			Process wakeup & 2.8$\sim$5.5 & 0.2$\sim$0.4 \\
+			进程唤醒 & 2.8$\sim$5.5 & 0.2$\sim$0.4 \\
 			\hline
-			Linux pipe / FIFO & 8 & 1.2 \\
+			Linux 管道 / FIFO & 8 & 1.2 \\
 			\hline
-			Unix domain socket in Linux & 9 & 0.9 \\
+			Linux 中的 Unix 域套接字 & 9 & 0.9 \\
 			\hline
-			Intra-host Linux TCP socket & 11 & 0.9 \\
+			主机间 Linux TCP 套接字 & 11 & 0.9 \\
 			\hline
-			Copy 32 pages (128~KiB) & 13 & 0.08 \\
+			复制 32 个内存页（128~KiB） & 13 & 0.08 \\
 			\hline
-			Inter-host Linux TCP socket & 30 & 0.3 \\
+			主机间 Linux TCP 套接字 & 30 & 0.3 \\
 			\hline
 		\end{tabular}
 	}
@@ -349,59 +351,59 @@ TCP拥塞控制中的ACK时钟 \cite {mprdma}要求及时响应收到的数据�
 			& FastSocket & MegaPipe / StackMap & IX & Arrakis & SandStorm / mTCP & LibVMA & OpenOnload & Rsocket / SDP & FreeFlow & SocksDirect \\
 			\hline
 			\hline
-			Category & \multicolumn{2}{c|}{Kernel optimization} & \multicolumn{5}{c|}{User-space TCP/IP stack} & \multicolumn{3}{c|}{Offloading to RDMA 网卡s} \\
+			类别 & \multicolumn{2}{c|}{内核优化} & \multicolumn{5}{c|}{用户态 TCP/IP 协议栈} & \multicolumn{3}{c|}{卸载到 RDMA 网卡} \\
 			%\hline
 			%Changes needed for deployment & New kernel & New kernel & New kernel & New kernel & Lib+driver & Lib+driver & Lib+driver & Lib+driver & Lib+driver +daemon & Lib+driver +daemon \\
 			\hline
 			\hline
-			\multicolumn{11}{c|}{Compatibility} \\
+			\multicolumn{11}{c|}{兼容性} \\
 			\hline
 			\hline
-			Transparent to existing applications & \yes &   & \yes & \yes &   & \yes & \yes & \yes & \yes & \yes \\
+			对现有应用程序透明 & \yes &   & \yes & \yes &   & \yes & \yes & \yes & \yes & \yes \\
 			\hline
-			\texttt{epoll} (Nginx, Memcached etc.) & \yes & \yes & \yes & \yes & \yes & \yes & \yes & & & \yes \\
+			\texttt{epoll} (Nginx, Memcached 等) & \yes & \yes & \yes & \yes & \yes & \yes & \yes & & & \yes \\
 			\hline
-			Compatible with regular TCP peers &	\yes & \yes & \yes & \yes & \yes & \yes & \yes & & & \yes \\
+			与普通 TCP/IP 对端兼容 &	\yes & \yes & \yes & \yes & \yes & \yes & \yes & & & \yes \\
 			\hline
-			Intra-host communication & \yes & \yes & & \yes & & & & & \yes & \yes \\
+			主机内通信 & \yes & \yes & & \yes & & & & & \yes & \yes \\
 			\hline
-			Multiple applications listen a port & \yes & \yes & & & & & & \yes & \yes & \yes \\
+			多个应用程序监听同一端口 & \yes & \yes & & & & & & \yes & \yes & \yes \\
 			\hline
-			Full fork support & \yes & \yes & & & & & \yes & & & \yes \\
+			完整的 fork 支持 & \yes & \yes & & & & & \yes & & & \yes \\
 			\hline
-			Container live migration & \yes & \yes & & & & & & & & \yes \\
-			\hline
-			\hline
-			\multicolumn{11}{c|}{Isolation} \\
+			容器热迁移 & \yes & \yes & & & & & & & & \yes \\
 			\hline
 			\hline
-			Access control policy & Kernel & & Kernel & Kernel & & & & Kernel & Daemon & Daemon \\
-			\hline
-			Isolation among containers (VMs) & \yes & & \yes & \yes & & & & \yes & \yes & \yes \\
-			\hline
-			QoS (performance isolation) & Kernel & Kernel & Kernel & 网卡 & 网卡 & 网卡 & 网卡 & 网卡 & Daemon & 网卡 \\
+			\multicolumn{11}{c|}{隔离性} \\
 			\hline
 			\hline
-			\multicolumn{11}{c|}{Removed Performance Overheads} \\
+			访问控制策略 & 内核 & & 内核 & 内核 & & & & 内核 & 守护进程 & 守护进程 \\
+			\hline
+			容器 / 虚拟机间的隔离 & \yes & & \yes & \yes & & & & \yes & \yes & \yes \\
+			\hline
+			QoS（性能隔离） & 内核 & 内核 & 内核 & 网卡 & 网卡 & 网卡 & 网卡 & 网卡 & 守护进程 & 网卡 \\
 			\hline
 			\hline
-			Kernel crossing on data plane & & & Batched & \yes & Batched & \yes & \yes & \yes & \yes & $<$16KB msg \\
+			\multicolumn{11}{c|}{消除性能开销} \\
 			\hline
-			Socket 文件描述符 locks & & & & & & & & & & \yes \\
 			\hline
-			Transport protocol & & & & & & & & \yes & \yes & \yes \\
+			数据面上的系统调用 & & & 批处理 & \yes & 批处理 & \yes & \yes & \yes & \yes & $<$16KB 消息 \\
 			\hline
-			Buffer management & & & & & & & & & & \yes \\
+			套接字文件描述符锁 & & & & & & & & & & \yes \\
 			\hline
-			I/O multiplexing \& Interrupt handling & & Improved & \yes & \yes & Improved & \yes & \yes & \yes & \yes & \yes \\
+			传输协议 & & & & & & & & \yes & \yes & \yes \\
 			\hline
-			Process wakeup & & & & & & & & & & \yes \\
+			缓冲区管理 & & & & & & & & & & \yes \\
 			\hline
-			Payload copy & & \yes & & & \yes & & & & & $\ge$16KB msg \\
+			I/O 多路复用与中断处理 & & 改进 & \yes & \yes & 改进 & \yes & \yes & \yes & \yes & \yes \\
 			\hline
-			Kernel 文件描述符 allocation & & \yes &  &  & \yes & & & & & \yes \\
+			进程唤醒 & & & & & & & & & & \yes \\
 			\hline
-			TCB mgmt \& Connection dispatch & \yes & \yes & \yes & \yes & \yes & & & & & \yes \\
+			数据复制 & & \yes & & & \yes & & & & & $\ge$16KB 消息 \\
+			\hline
+			内核文件描述符分配 & & \yes &  &  & \yes & & & & & \yes \\
+			\hline
+			TCB 管理与连接分派 & \yes & \yes & \yes & \yes & \yes & & & & & \yes \\
 			\hline
 		\end{tabularx}
 	}
@@ -410,7 +412,7 @@ TCP拥塞控制中的ACK时钟 \cite {mprdma}要求及时响应收到的数据�
 	
 \end{sidewaystable*}
 
-
+ 
 
 
 \parab {进程唤醒。}
