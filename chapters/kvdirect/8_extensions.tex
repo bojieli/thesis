@@ -48,14 +48,22 @@ KV-Direct的主要用例是启用远程直接键值访问，而无需服务器�
 在某些情况下，可能需要构建一个具有每服务器最大吞吐量的专用键值存储。
 通过模拟，\cite {li2016full}显示了在具有四个（当前不可用的）60核CPU的单个服务器中实现十亿键值运行的可能性。
 如表 \ref{kvdirect:tab:kvs-compare}所示，在服务器上有10个KV-Direct 网卡，使用商用服务器可以轻松实现10亿键值 op / s性能。
-服务器消耗357瓦的功率（在墙壁上测量）以达到1.22~Gop / s GET或0.61~Gop / s PUT。
+如图 \ref{kvdirect:fig:photo}，服务器消耗357瓦的功率（在墙壁上测量）以达到1.22~Gop / s GET或0.61~Gop / s PUT 的性能。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{figure/kvdirect_photo.jpg}
+	\caption{以 357 瓦功耗实现 12.2 亿次 键值 操作每秒的 10 卡 KV-Direct 系统。}
+	\label{kvdirect:fig:photo}
+\end{figure}
 
 为了使两个Xeon E5 CPU的80个PCIe Gen3通道饱和，我们用带有10个PCIe Gen3 x8插槽的 SuperMicro X9DRX+-F 主板替换了基准测试服务器的主板（\S\ref {kvdirect:sec:eval}） 。
 我们使用PCIe x16到x8转换器连接每个插槽上的10个可编程网卡，每个网卡上只启用一个PCIe Gen3 x8链路，因此每个网卡的吞吐量低于图 \ref {kvdirect:fig:ycsb-tput}。
 每个网卡在主机内存中拥有一个独占内存区域，并提供不相交的密钥分区。
 多个网卡遇到与多核键值存储实现相同的负载不平衡问题。
 幸运的是，对于少量分区（\textit {例如10个}），负载不平衡并不重要 \cite {lim2014mica,li2016full}。在YCSB长尾工作负载下，负载最高的网卡的平均负载为1.5倍，非常流行的密钥所增加的负载由无序执行引擎提供（\S \ref {kvdirect:sec:ooo}）。
-相比之下，为了实现与240个CPU内核的匹配性能，最热芯的负载将是平均值的10倍。
+相比之下，为了实现与240个CPU内核的匹配性能，最热 CPU 核心的负载将是平均值的10倍。
 图\ref {kvdirect:fig:multiple-nics}显示KV-Direct吞吐量几乎与服务器上的网卡数量呈线性关系。
 
 \iffalse
