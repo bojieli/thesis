@@ -48,8 +48,7 @@
 
 \end{figure}
 
-\textbf {Slab 内存分配器。}
-
+\subsection{Slab 内存分配器}
 如图\ref {kvdirect:fig:slab}所示，对于每个slab大小，网卡上的slab缓存使用两个双端堆栈与主机DRAM同步。
 对于网卡端双端堆栈（图\ref {kvdirect:fig:slab}中的左侧），左端由分配器和解除分配器弹出并推送，右端与左端同步通过DMA对应的​​主机端堆栈。
 网卡监视网卡堆栈的大小，并根据高水位线和低水位线与主机堆栈同步。
@@ -59,7 +58,7 @@
 在我们的实现中，每个slab条目是5个字节，DMA粒度是64个字节，因此每个slab操作的摊销DMA开销是$ 5/64 $。此外，当后续分配重新使用新释放的slab槽时，使用网卡上的堆栈而不是DMA。
 
 
-\textbf{DRAM 负载均衡器。}
+\subsection{DRAM 负载均衡器}
 
 一个技术挑战是在DRAM高速缓存中存储元数据，这需要额外的4个地址位和每64字节高速缓存行一个脏标志。
 不需要缓存有效位，因为所有键值存储存储都由网卡专门访问。
@@ -78,7 +77,7 @@ ECC DRAM通常每64位数据具有8个ECC位。
 %To avoid head-of-line blocking, 键值 operations are processed out-of-order, so the client may receive 键值 completions in a different order from requests.
 %The client could match the completions with requests by the key, because completions with a same key are guaranteed to be in request order.
 
-\textbf{向量操作译码器。}
+\subsection{向量操作译码器}
 在整个键值处理器设计中，我们将批处理视为在一个存储桶中获取多个散列槽，使自由slab队列与主机内存同步，懒惰拆分和slab槽合并以及依赖键值操作的数据转发的通用原则。
 批处理通过将控制平面开销分摊到多个数据平面有效负载来提高性能。
 与PCIe相比，网络是一种更加稀缺的资源，具有更低的带宽（5~GB / s）和更高的延迟（2~$\mu$s）。
