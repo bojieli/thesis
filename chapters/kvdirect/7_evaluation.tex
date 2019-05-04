@@ -1,14 +1,6 @@
 \section{评估}
 \label{kvdirect:sec:eval}
 
-\begin{figure}[t]
-\subfloat[固定内存利用率 0.5。\label{kvdirect:fig:optimize_fix_mem}]
-{\includegraphics[width=.5\textwidth,page=1]{fix_mem.pdf}}
-\subfloat[固定哈希索引率 0.5。\label{kvdirect:fig:optimize_fix_ratio}]
-{\includegraphics[width=.5\textwidth,page=1]{fix_ratio.pdf}}
-\caption{不同内存利用率或哈希索引率下的内存占用。}
-\label{kvdirect:fig:memory-access-count}
-\end{figure}
 
 \label{kvdirect:sec:evaluation}
 在本节中，我们首先采用简化视角来支持我们的设计选择，使用关键组件的微基准，然后切换到整体方法，以演示系统基准中\oursys {}的整体性能。
@@ -16,7 +8,7 @@
 
 我们在8台服务器和1台Arista DCS-7060CX-32S交换机的测试台上评估KV-Direct。
 每台服务器配备两个禁用超线程的8核Xeon E5-2650 v2 CPU，形成两个通过QPI Link连接的NUMA节点。每个NUMA节点都装有8个DIMM 8~GiB三星DDR3-1333 ECC RAM，每台服务器上总共有128~GiB的主机内存。
-可编程网卡~ \cite {caulfield2016cloud}连接到CPU 0的PCIe根联合体，其40~Gbps以太网端口连接到交换机。可编程网卡在分叉的Gen3 x16物理连接器中有两个PCIe Gen3 x8链路。
+可编程网卡~ \cite {caulfield2016cloud}连接到CPU 0的PCIe root complex，其40~Gbps以太网端口连接到交换机。可编程网卡在分叉的Gen3 x16物理连接器中有两个PCIe Gen3 x8链路。
 经过测试的服务器配备SuperMicro X9DRG-QF主板和一个运行Archlinux的120~GB SATA SSD（内核版本4.11.9-1）。
 
 对于系统基准测试，我们使用YCSB工作负载 \cite {cooper2010benchmarking}。
@@ -26,13 +18,6 @@
 \label{kvdirect:sec:microbenchmarks}
 
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.6\textwidth,page=1]{optimize.png}
-\caption{如何在给定内存利用率需求和 键值 大小的情况下决定最优哈希索引率。}
-\label{kvdirect:fig:hashline-ratio}
-
-\end{figure}
 
 \subsubsection{哈希表}
 \label{kvdirect:sec:hashtable-eval}
@@ -44,28 +29,46 @@
 因此，为了在给定的存储器大小中容纳整个语料库，哈希索引比率具有上限。
 我们选择此上限并获得最小的平均内存访问时间，如图\ref {kvdirect:fig:hashline-ratio}中的虚线所示。
 
+
 \begin{figure}[t]
-\centering
-\subfloat[10B GET.\label{kvdirect:fig:mem-access-10-get}]
-{\includegraphics[width=.5\textwidth,page=1]{10B_get.pdf}}
-\subfloat[10B PUT.\label{kvdirect:fig:mem-access-10-put}]
-{\includegraphics[width=.5\textwidth,page=1]{10B_put.pdf}}
+	\subfloat[固定内存利用率 0.5。\label{kvdirect:fig:optimize_fix_mem}]
+	{\includegraphics[width=.5\textwidth,page=1]{fix_mem.pdf}}
+	\subfloat[固定哈希索引率 0.5。\label{kvdirect:fig:optimize_fix_ratio}]
+	{\includegraphics[width=.5\textwidth,page=1]{fix_ratio.pdf}}
+	\caption{不同内存利用率或哈希索引率下的内存占用。}
+	\label{kvdirect:fig:memory-access-count}
+\end{figure}
 
-\vfill
-
-\subfloat[254B GET.\label{kvdirect:fig:mem-access-254-get}]
-{\includegraphics[width=.5\textwidth,page=1]{254B_get.pdf}}
-\subfloat[254B PUT.\label{kvdirect:fig:mem-access-254-put}]
-{\includegraphics[width=.5\textwidth,page=1]{254B_put.pdf}}
-\caption{每个 键值 操作的内存访问次数。}
-\label{kvdirect:fig:mem-access-tput}
-
+\begin{figure}[t]
+	\centering
+	\includegraphics[width=0.6\textwidth,page=1]{optimize.png}
+	\caption{如何在给定内存利用率需求和 键值 大小的情况下决定最优哈希索引率。}
+	\label{kvdirect:fig:hashline-ratio}
 \end{figure}
 
 在图\ref {kvdirect:fig:mem-access-tput}中，我们绘制了三种可能的哈希表设计的每个GET和PUT操作的内存访问次数：在KV-Direct中链接，MemC3中的桶式布谷鸟哈希（bucketized Cuckoo Hash）\cite {fan2013memc3}和FaRM \cite {dragojevic2014farm}中的链式关联（chain associative）跳房子散列（Hopscotch Hash）。
 对于KV-Direct，我们针对给定的键值大小和内存利用率要求，为内联阈值和哈希索引比率做出最佳选择。
 对于布谷鸟和跳房子散列，我们假设键是内联的并且可以并行比较，而值存储在动态分配的板中。
 由于MemC3和FaRM的哈希表不能支持10B 键值大小超过55％的内存利用率，图\ref {kvdirect:fig:mem-access-10-get}和图\ref {kvdirect:fig:mem-access-10-put}仅显示KV-Direct的性能。
+
+
+\begin{figure}[t]
+	\centering
+	\subfloat[10B GET.\label{kvdirect:fig:mem-access-10-get}]
+	{\includegraphics[width=.5\textwidth,page=1]{10B_get.pdf}}
+	\subfloat[10B PUT.\label{kvdirect:fig:mem-access-10-put}]
+	{\includegraphics[width=.5\textwidth,page=1]{10B_put.pdf}}
+	
+	\vfill
+	
+	\subfloat[254B GET.\label{kvdirect:fig:mem-access-254-get}]
+	{\includegraphics[width=.5\textwidth,page=1]{254B_get.pdf}}
+	\subfloat[254B PUT.\label{kvdirect:fig:mem-access-254-put}]
+	{\includegraphics[width=.5\textwidth,page=1]{254B_put.pdf}}
+	\caption{每个键值操作的内存访问次数。}
+	\label{kvdirect:fig:mem-access-tput}
+\end{figure}
+
 
 对于内联键值，KV-Direct在每个GET上接近1个内存访问，在非极端内存利用率下每个PUT接近2个内存访问。
 非内联键值的GET和PUT有一个额外的内存访问。
@@ -74,14 +77,6 @@
 布谷鸟散列需要在GET上访问最多两个散列槽，因此在大多数内存利用率下，KV-Direct具有更多的内存访问。
 在高内存利用率下，布谷鸟散列会导致每个PUT的内存访问时间出现大幅波动。
 
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.6\textwidth]{slab-gc.pdf}
-\caption{合并 40 亿个 slab 槽位的时间开销。}
-\label{kvdirect:fig:slab-garbage-collection}
-
-\end{figure}
 
 \subsubsection{Slab 内存分配器}
 \label{kvdirect:sec:slab-eval}
@@ -100,16 +95,15 @@ slab内存分配器的计算开销来自主机CPU上的slab拆分和合并。
 如图\ref {kvdirect:fig:slab-garbage-collection} 所示，将16 GiB向量中的所有40亿个空闲 slab 槽位合并在一个内核上需要30秒，或者在32个内核上使用基数排序仅需1.8秒 \cite{satish2010fast}。
 虽然垃圾收集空闲 slab 槽位需要几秒钟，但它在后台运行而不会停止 slab 分配器，并且实际上仅在工作负载从小键值转换到大键值时触发。
 
-\begin{figure}[t]
-\centering
-\subfloat[原子操作。\label{kvdirect:fig:ooo-atomic}]
-{\includegraphics[width=.5\textwidth,page=1]{ooo_atomic.pdf}}
-\subfloat[长尾负载。\label{kvdirect:fig:ooo-longtail}]
-{\includegraphics[width=.5\textwidth,page=1]{ooo_long-tail.pdf}}
-\caption{乱序执行引擎的效率。}
-\label{kvdirect:fig:ooo-eval}
 
+\begin{figure}[t]
+	\centering
+	\includegraphics[width=0.6\textwidth]{slab-gc.pdf}
+	\caption{合并 40 亿个 slab 槽位的时间开销。}
+	\label{kvdirect:fig:slab-garbage-collection}
 \end{figure}
+
+
 
 
 \subsubsection{乱序执行引擎}
@@ -134,11 +128,13 @@ RDMA 网卡的更高吞吐量可归因于其更高的时钟频率和更低的处
 
 
 \begin{figure}[t]
-\centering
-{\includegraphics[width=.5\textwidth,page=1]{load_balancer.pdf}}
-\caption{负载分派下的 DMA 吞吐量（固定负载分派比例为 0.5）。}
-\label{kvdirect:fig:cache-tput}
-
+	\centering
+	\subfloat[原子操作。\label{kvdirect:fig:ooo-atomic}]
+	{\includegraphics[width=.5\textwidth,page=1]{ooo_atomic.pdf}}
+	\subfloat[长尾负载。\label{kvdirect:fig:ooo-longtail}]
+	{\includegraphics[width=.5\textwidth,page=1]{ooo_long-tail.pdf}}
+	\caption{乱序执行引擎的效率。}
+	\label{kvdirect:fig:ooo-eval}
 \end{figure}
 
 \subsubsection{DRAM 负载分配器}
@@ -149,25 +145,18 @@ RDMA 网卡的更高吞吐量可归因于其更高的时钟频率和更低的处
 在长尾工作负载下，大约30％的内存访问由DRAM缓存提供。 总的来说，95％和100％GET的内存访问吞吐量实现了180 Mops的时钟频率限制。
 但是，如果简单地将DRAM用作高速缓存，则吞吐量将受到不利影响，因为DRAM吞吐量低于PCIe吞吐量。
 
+
+\begin{figure}[t]
+	\centering
+	{\includegraphics[width=.5\textwidth,page=1]{load_balancer.pdf}}
+	\caption{负载分派下的 DMA 吞吐量（固定负载分派比例为 0.5）。}
+	\label{kvdirect:fig:cache-tput}
+\end{figure}
+
+
 \subsubsection{向量操作译码器}
 \label{kvdirect:network-eval}
 
-\begin{table}[]
-\centering
-\scalebox{0.8}{
-\begin{tabular}{|l|r|r|r|r|r|}
-\hline
-向量大小 (字节)              & 64    & 128   & 256   & 512   & 1024  \\ \hline
-向量更新（有返回）    & 11.52 & 11.52 & 11.52 & 11.52 & 11.52 \\ \hline
-向量更新（无返回） & 4.37  & 4.53  & 4.62  & 4.66  & 4.68  \\ \hline
-每个元素一个键         & 2.09  & 2.09  & 2.09  & 2.09  & 2.09  \\ \hline
-取回客户端处理             & 0.03  & 0.06  & 0.12  & 0.24  & 0.46  \\ \hline
-\end{tabular}
-}
-\caption{向量操作的吞吐量 (GB/s)。}
-\label{kvdirect:tab:vec_throughput}
-
-\end{table}
 
 为了评估KV-Direct中矢量操作的效率，
 表 \ref {kvdirect:tab:vec_throughput}将原子矢量增量的吞吐量与两种替代方法进行比较：
@@ -175,19 +164,39 @@ RDMA 网卡的更高吞吐量可归因于其更高的时钟频率和更低的处
 （2）如果向量存储为大的不透明值，则向客户端检索向量也会使网络瘫痪。
 此外，表 \ref {kvdirect:tab:vec_throughput} 中的两个备选方案不能确保向量内的一致性。 添加同步会产生进一步的开销。
 
-\begin{figure}[t]
-\centering
-\subfloat[吞吐量。\label{kvdirect:fig:network-batching-bw}]
-{\includegraphics[width=.5\textwidth,page=1]{net_batching_bw.pdf}}
-\subfloat[延迟。\label{kvdirect:fig:network-batching-bw}]
-{\includegraphics[width=.5\textwidth,page=1]{net_batching_lat.pdf}}
-\caption{网络批量化的效率。}
-\label{kvdirect:fig:eval-network-batching}
 
-\end{figure}
+\begin{table}[]
+	\centering
+	\scalebox{0.9}{
+		\begin{tabular}{|l|r|r|r|r|r|}
+			\hline
+			向量大小 (字节)              & 64    & 128   & 256   & 512   & 1024  \\ \hline
+			向量更新（有返回）    & 11.52 & 11.52 & 11.52 & 11.52 & 11.52 \\ \hline
+			向量更新（无返回） & 4.37  & 4.53  & 4.62  & 4.66  & 4.68  \\ \hline
+			每个元素一个键         & 2.09  & 2.09  & 2.09  & 2.09  & 2.09  \\ \hline
+			取回客户端处理             & 0.03  & 0.06  & 0.12  & 0.24  & 0.46  \\ \hline
+		\end{tabular}
+	}
+	\caption{向量操作的吞吐量 (GB/s)。}
+	\label{kvdirect:tab:vec_throughput}
+\end{table}
+
+
+
 
 KV-Direct客户端在网络数据包中打包键值操作，以减轻数据包报头开销。
-图 \ref {kvdirect:fig:eval-network-batching} 表明，网络批处理可将网络吞吐量提高4倍，同时保持网络延迟低于3.5~ $ mu $ s。
+图 \ref {kvdirect:fig:eval-network-batching} 表明，网络批处理可将网络吞吐量提高4倍，同时保持网络延迟低于3.5 $\mu$s。
+
+
+\begin{figure}[t]
+	\centering
+	\subfloat[吞吐量。\label{kvdirect:fig:network-batching-bw}]
+	{\includegraphics[width=.5\textwidth,page=1]{net_batching_bw.pdf}}
+	\subfloat[延迟。\label{kvdirect:fig:network-batching-lat}]
+	{\includegraphics[width=.5\textwidth,page=1]{net_batching_lat.pdf}}
+	\caption{网络批量化的效率。}
+	\label{kvdirect:fig:eval-network-batching}
+\end{figure}
 
 \egg{
 \subsubsection{Congestion Avoidance}

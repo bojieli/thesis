@@ -36,7 +36,7 @@ NP-Click \cite{shah2004np} 在网络处理器上实现了 Click 编程框架。
 传统上，FPGA使用诸如Verilog和V硬件描述语言之类的硬件描述语言进行编程。
 这些语言水平太低，难以学习，编程也很复杂。
 因此，大型软件程序员社区已经远离FPGA多年了~\cite {bacon2013fpga}。
-为了简化这一点，许多高级综合（HLS）工具/系统已经在工业界和学术界开发，试图将高级语言（主要是C）的程序转换为硬件描述语言。
+为了简化这一点，许多高级综合（高层次综合）工具/系统已经在工业界和学术界开发，试图将高级语言（主要是C）的程序转换为硬件描述语言。
 但是，正如我们将在下一小节中所示，它们都不适合网络功能处理，这是本工作的重点。
 
 \subsection{基于 FPGA 的网络功能编程}
@@ -60,7 +60,7 @@ NP-Click \cite{shah2004np} 在网络处理器上实现了 Click 编程框架。
 
 
 现有的FPGA高级编程工具都不能满足上述所有要求。
-大多数HLS工具，例如 Vivado HLS~\cite{vivado}，只是硬件描述语言工具链的辅助工具。
+大多数高层次综合（High Level Synthesis，HLS）工具，例如 Vivado HLS~\cite{vivado}，只是硬件描述语言工具链的辅助工具。
 这些工具不是直接将程序编译成FPGA映像，而是仅生成硬件模块，即IP核，必须手动嵌入在硬件描述语言项目和连接到其它硬件描述语言模块，这是大多数软件程序员无法完成的任务。
 
 但是，Altera OpenCL可以直接将OpenCL程序编译为FPGA~ \cite {aoc}。
@@ -76,7 +76,7 @@ FPGA是一项成熟的技术，最近已经部署用于加速数据中心服务�
 Gorilla \cite {lavasani2012compiling} 为FPGA上的数据包交换提出了一种特定于域的高级语言。
 Cliff \cite{kulkarni2004mapping}、CUSP \cite{schelle2005cusp} 和 Chimpp \cite {rubow2010chimpp} 将Click模型引入硬件描述语言来开发模块化路由器。
 \name 沿此方向工作，与以前的工作互补。
-\name 致力于数据中心的网络功能，通过提供高度灵活的模块化架构和利用商业HLS工具解决可编程性问题。
+\name 致力于数据中心的网络功能，通过提供高度灵活的模块化架构和利用商业高层次综合工具解决可编程性问题。
 
 Click2NetFPGA~\cite {Click2NetFPGA}通过直接将Click模块化路由器 \cite {kohler2000click}程序编译到FPGA中来提供模块化架构。
 然而，\cite {Click2NetFPGA}的性能比我们在本文中报告的要低得多（两个数量级），因为它们的系统设计存在几个瓶颈（例如，内存和数据包I/O），它们也是错过几个重要的优化以确保完全流水线处理（如\S \ref {clicknp:sec:optimization}中所述）。
@@ -105,9 +105,9 @@ Despite FPGA's potential in network processing, the programmablity of FPGA is tr
 
 Many works, e.g. OpenFlow \cite{mckeown2008openflow}, P4 \cite{bosshart2014p4} and 软件定义网络et \cite{xilinxsdnet}, provides the programmability by abstracting a set of primitives in network processing and defining a high-level programming language to compose the primitives. This direction has proved effective, but the programmability is limited to a set of pre-defined actions, which could not keep pace with rapid development of data center network functions. Our work strive to make the primitives extensible for software engineers.
 
-Fortunately, several frameworks have been proposed to provide abstractions for generic FPGA programming. Examples of such works include Xilinx Vivado HLS (High Level Synthesis) \cite{feist2012vivado} based on C/C++, Altera SDK for OpenCL \cite{czajkowski2012opencl} based on C-like OpenCL and IBM Lime \cite{auerbach2010lime} based on Java.
+Fortunately, several frameworks have been proposed to provide abstractions for generic FPGA programming. Examples of such works include Xilinx Vivado 高层次综合 (High Level Synthesis) \cite{feist2012vivado} based on C/C++, Altera SDK for OpenCL \cite{czajkowski2012opencl} based on C-like OpenCL and IBM Lime \cite{auerbach2010lime} based on Java.
 
-However, FPGA has a completely different architecture than general-purpose CPUs. For software programmers that bear Von Neumann model in mind, the compilers may generate surprisingly poor hardware logic for reasonable code in high-level language. For example, Click2NetFPGA \cite{Click2NetFPGA} uses LLVM and HLS tools to compile optimized Click C++ code into 硬件描述语言, but the resulting FPGA-based router can only process 178 K pps (packets per second) for 98B packets, and 215 Mbps for large packets, which is 30 -- 50x slower than a CPU core in ClickOS \cite{martins2014clickos}. The bottleneck for small packets is the IP header checking stage \cite{Click2NetFPGA} because this stage is not fully pipelined; the bottleneck for large packets is the byte-wide shared memory \cite{Click2NetFPGA}, indicating a shared-memory design suitable for Von Neumann model would yield poor performance on FPGA.
+However, FPGA has a completely different architecture than general-purpose CPUs. For software programmers that bear Von Neumann model in mind, the compilers may generate surprisingly poor hardware logic for reasonable code in high-level language. For example, Click2NetFPGA \cite{Click2NetFPGA} uses LLVM and 高层次综合 tools to compile optimized Click C++ code into 硬件描述语言, but the resulting FPGA-based router can only process 178 K pps (packets per second) for 98B packets, and 215 Mbps for large packets, which is 30 -- 50x slower than a CPU core in ClickOS \cite{martins2014clickos}. The bottleneck for small packets is the IP header checking stage \cite{Click2NetFPGA} because this stage is not fully pipelined; the bottleneck for large packets is the byte-wide shared memory \cite{Click2NetFPGA}, indicating a shared-memory design suitable for Von Neumann model would yield poor performance on FPGA.
 
 FPGA has millions of logic gates with 10x slower clock rate than CPU, thousands of distributed fast SRAMs each with only KB capacity, and a large DRAM with 10x lower throughput than DRAMs in CPU architecture. Consequently, exploiting both spatial and temporal parallelism is crucial to unleashing the performance of FPGA. In network stream processing, most operations are independent of each other and therefore can be either parallelized (spatial) or pipelined (temporal), so that each stage of the pipeline can process different packets in parallel.
 

@@ -32,7 +32,7 @@
 \label{clicknp:subsec:paral_in_elem}
 
 与在内存中以有限并行性执行指令的CPU不同，FPGA将操作合成为硬件逻辑，因此可以在没有指令负载开销的情况下并行处理。
-如果数据在一个处理函数中需要多个相关操作，则HLS工具将以同步方式将这些操作调度到管道阶段。
+如果数据在一个处理函数中需要多个相关操作，则高层次综合工具将以同步方式将这些操作调度到管道阶段。
 在每个时钟，一个阶段的结果移动到下一个阶段，同时，一个新的数据被输入到这个阶段，如图 \ref{clicknp:fig:dependency}（a）所示。
 这样，处理函数可以在每个时钟周期处理数据并实现最大吞吐量。
 但是，实际上，这种有效的流水线处理可能会在两种情况下发生：（1）操作中存在\textit {内存依赖}; （2）有\textit {不平衡} 的流水线阶段。
@@ -174,11 +174,11 @@ S2: A[idx].cnt ++;
 使用\textit {struct}变量数组时会出现一个微妙的问题。
 图\ref {clicknp:fig:memscattering}（a）显示了这样一个例子，其中哈希表用于维护每个流的计数。
 我们发现\textbf {S2}将具有与\textbf {S1}的内存依赖关系，尽管它们正在访问\textbf {struct}的不同字段。
-原因是几乎所有当前的HLS工具都会将\textbf {struct}数组视为具有较大位宽的单维数组 - 等于\textbf {struct}的大小，并且只使用一个仲裁器控制访问。
+原因是几乎所有当前的高层次综合工具都会将\textbf {struct}数组视为具有较大位宽的单维数组 - 等于\textbf {struct}的大小，并且只使用一个仲裁器控制访问。
 我们称这种类型的内存依赖性\textit {伪依赖}，在物理上，两个字段\textit {key}和\textit {cnt}可以位于不同的内存位置。
 为了解决这个问题，\name 采用了一种名为\textit {内存散射}的简单技术，它自动将\textbf {struct}数组转换为几个独立的数组，每个数组都用于\textbf {struct}中的一个字段，并分配它们进入不同的BRAM（图 \ref {clicknp:fig:memscattering}（b））。
 使用\textit {内存散射}，\textbf {S1}不再依赖于\textbf {S2}。
-因此，管道可以由HLS工具推断，并且当\textbf {S2}仍然在运行时，新的数据可以由\textbf {S1}计时和处理。
+因此，管道可以由高层次综合工具推断，并且当\textbf {S2}仍然在运行时，新的数据可以由\textbf {S1}计时和处理。
 值得注意的是，内存散射仅适用于FPGA中的元素，如果元素分配在主机CPU上运行则禁用。
 
 我们注意到上述技术可能无法解决所有内存依赖性。
@@ -257,7 +257,7 @@ struct hash_entry
 因此，它可能仅适用于具有简单主体和少量迭代的循环。
 在网络功能中，我们发现这种小循环是相当常见的，例如计算校验和，移位数据包有效负载并迭代可能的配置。
 ClickNP编译器提供\textbf {unroll}指令来展开循环。
-虽然许多HLS工具支持循环展开已知次数的迭代，但ClickNP扩展此功能以展开循环，其循环次数未知但在程序员指定的上限之下。
+虽然许多高层次综合工具支持循环展开已知次数的迭代，但ClickNP扩展此功能以展开循环，其循环次数未知但在程序员指定的上限之下。
 
 \iffalse
 \textbf{提供 pragma 让程序员指定最高循环次数}
@@ -347,8 +347,8 @@ instead of up to 4 cycles (Figure~\ref{clicknp:fig:memscattering}(d)).
 \subsubsection{Explict pipeline control}
 \label{clicknp:subsubsec:pipeline-control}
 
-While commercial HLS tools can automatically generate pipeline structure, it is not always perfect. 
-One issue that we are facing occasionally is that HLS tools may too aggressively use large block of combinational logic 
+While commercial 高层次综合 tools can automatically generate pipeline structure, it is not always perfect. 
+One issue that we are facing occasionally is that 高层次综合 tools may too aggressively use large block of combinational logic 
 to implement operations in a handler function.
 Although packing more operations in a combinational logic makes all these operations be evaluated in parallel in one clock,
 it may also reduce the clock frequency of the FPGA as the frequency is restricted by the delay of the logic block, and larger
@@ -356,7 +356,7 @@ the block, longer the delay.
 %
 For example, Figure~\ref{clicknp:fig:pipeline-control}(a) shows such an example. The code snippet selects the maximal value from
 a set of registers (as we will show later, this is a foundation for priority scheduling).
-Since all data are in registers, most HLS tools will aggressively use a large block of combinational logic to implement, so that
+Since all data are in registers, most 高层次综合 tools will aggressively use a large block of combinational logic to implement, so that
 all \textbf{if} operations are evaluated in one clock cycle. However, this will cause a low frequency of xxx MHz. 
 As shown in Figure~
 

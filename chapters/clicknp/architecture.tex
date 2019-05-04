@@ -16,12 +16,12 @@
 \name 以 Catapult Shell 架构构建\cite {putnam2014reconfigurable}。
 \textit {shell}包含许多可重用的逻辑位，这些逻辑对所有应用程序都是通用的，并将它们抽象为一组明确定义的接口，例如，PCIe，直接内存访问（DMA），DRAM内存管理单元（MMU），和以太网MAC。
 \name FPGA程序合成为 Catapult \textit {role}。
-但是，由于\name 依赖于商品HLS工具链来生成FPGA 硬件描述语言，并且不同的工具可以为shell管理的资源生成自己的（和不同的）接口，我们需要一个名为\textit {HLS-的垫片层特定运行时}，用于执行HLS特定接口与shell接口之间的转换。
+但是，由于\name 依赖于商品高层次综合工具链来生成FPGA 硬件描述语言，并且不同的工具可以为shell管理的资源生成自己的（和不同的）接口，我们需要一个名为\textit {高层次综合-的垫片层特定运行时}，用于执行高层次综合特定接口与shell接口之间的转换。
 
 \name{} host 进程通过 \name{} library与 \name{} role 进行通信，这进一步依赖于 Catapult PCIe 驱动程序中的服务与FPGA硬件进行交互。
 \name{} library 实现了两个重要的功能：
 （1）它暴露了一个PCIe通道API，以实现 \name{} host进程和角色之间的高速和低延迟通信;
-（2）它调用几个HLS特定库将初始参数传递给角色中的模块，并控制这些模块的启动/停止/复位。
+（2）它调用几个高层次综合特定库将初始参数传递给角色中的模块，并控制这些模块的启动/停止/复位。
 \name{} host进程有一个管理器线程和零个或多个工作线程。
 管理器线程将FPGA映像加载到硬件中，启动工作线程，根据配置初始化FPGA和CPU中的\name elements，并通过在运行时向元素发送\textit {signals}来控制它们的行为。
 如果将每个工作线程分配给CPU，则每个工作线程可以处理一个或多个模块。
@@ -80,8 +80,8 @@ flit的格式如图 \ref {clicknp:fig:element}（b）所示。每个flit包含�
 \subsubsection{语言}
 
 \name 元件（element）可以声明为面向对象语言（如 C++）中的一个对象。
-不幸的是，许多现有的HLS工具仅支持C语言。
-为了利用商业HLS工具，我们可以编写一个编译器，将面向对象的语言（例如 C++）转换为C，但这种努力并非易事。
+不幸的是，许多现有的高层次综合工具仅支持C语言。
+为了利用商业高层次综合工具，我们可以编写一个编译器，将面向对象的语言（例如 C++）转换为C，但这种努力并非易事。
 在本文中，我们采用一种替代路径来扩展C语言以支持元素声明。
 图 \ref {clicknp:fig:lang}（a）显示了element \textit {Counter}的代码片段，它只计算传递了多少个数据包。元素由 \textbf {.element}关键字定义，后跟元素名称和输入/输出端口数。
 关键字 \textbf {.state} 定义元素的状态变量，\textbf {.init}，\textbf {.handler} 和 \textbf {.signal}指定初始化，处理和信号处理函数元件。
@@ -175,15 +175,15 @@ tee [2] -> logger
 
 \subsubsection{\name\ 工具链}
 \label{clicknp:subsec:toolchain}
-\name 工具链包含一个 \name 编译器作为前端，一个 C / C++ 编译器（例如，Visual Studio或GCC）和一个HLS工具（例如，Altera OpenCL SDK或Xilinx Vivado HLS）作为后端。
+\name 工具链包含一个 \name 编译器作为前端，一个 C / C++ 编译器（例如，Visual Studio或GCC）和一个高层次综合工具（例如，Altera OpenCL SDK或Xilinx Vivado 高层次综合）作为后端。
 如图\ref{clicknp:fig:clicknp}所示，要编写 \name 程序，开发人员需要将代码分为三部分：
 （1）一组元素，每个元素实现概念上简单的操作，
 （2）指定这些元素之间连接的配置文件，以及（3）主机管理器，它初始化每个元素并在运行时控制它们的行为，例如，根据管理员的输入。
 这三部分源代码被送入 \name 编译器并转换为主程序和FPGA程序的中间源文件。
-主程序可以由普通的C / C++编译器直接编译，而FPGA程序则使用商业HLS工具合成。
-现有的商用HLS工具可以通过时序分析确定每个元件的最大时钟频率。
+主程序可以由普通的C / C++编译器直接编译，而FPGA程序则使用商业高层次综合工具合成。
+现有的商用高层次综合工具可以通过时序分析确定每个元件的最大时钟频率。
 然后，\name 处理图的时钟受到图中最慢元素的约束。
-另外，HLS工具还可以生成优化报告，该报告显示元素中的操作之间的依赖性。如果解析了所有依赖关系并且元素通过在每个时钟周期中处理一个flit来实现最佳吞吐量，则元素是\textit {完全流水线化}的。
+另外，高层次综合工具还可以生成优化报告，该报告显示元素中的操作之间的依赖性。如果解析了所有依赖关系并且元素通过在每个时钟周期中处理一个flit来实现最佳吞吐量，则元素是\textit {完全流水线化}的。
 \egg{
 Our ClickNP architecture is built on state-of-the-art data center reconfigurable hardware (Catapult FPGA \cite{putnam2014reconfigurable}) and FPGA programming framework (Altera OpenCL \cite{singh2011implementing}).
 

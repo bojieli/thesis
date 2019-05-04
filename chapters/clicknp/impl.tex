@@ -9,10 +9,10 @@
 \fi
 
 我们构建了一个\name 编译器，它作为\name 工具链的前端（\S \ref {clicknp:subsec:toolchain}）。
-对于宿主程序，我们使用Visual C++作为后端。我们进一步集成了Altera OpenCL SDK（v15.1）\cite {aoc}和Xilinx Vivado HLS（v2015.4）\cite {vivado}作为FPGA程序的后端。
-\name 编译器包含4,925行C ++代码，它们解析配置文件和元素声明，在\S \ref {clicknp:sec:optimization}中执行优化，并生成特定于每个商业HLS工具的代码。
+对于宿主程序，我们使用Visual C++作为后端。我们进一步集成了Altera OpenCL SDK（v15.1）\cite {aoc}和Xilinx Vivado 高层次综合（v2015.4）\cite {vivado}作为FPGA程序的后端。
+\name 编译器包含4,925行C ++代码，它们解析配置文件和元素声明，在\S \ref {clicknp:sec:optimization}中执行优化，并生成特定于每个商业高层次综合工具的代码。
 使用Altera OpenCL时，每个\name 元素都被编译成\textit {kernel}，元素之间的连接被转换为Altera扩展通道。
-使用Xilinx Vivado HLS时，我们将每个元素编译成IP内核，并使用AXI流来实现元素之间的连接。
+使用Xilinx Vivado 高层次综合时，我们将每个元素编译成IP内核，并使用AXI流来实现元素之间的连接。
 元素也可以编译为CPU二进制文件，管理器线程将为每个主机元素创建一个工作线程。
 主机和FPGA元素之间的每个连接都映射到PCIe I / O通道的\textit {插槽}（\S \ref {clicknp:subsec:pcie}）。
 
@@ -24,7 +24,7 @@
 Catapult shell还包含一个OpenCL特定的运行时，因此\name role可以通过此运行时层与shell通信。
 FPGA板具有PCIe Gen2 x8接口，4GB板载DDR内存和两个40G以太网端口。
 到撰写本文时，我们还没有获得Xilinx硬件平台。
-因此，主系统评估基于使用\name + OpenCL的Altera平台，我们使用Vivado HLS生成的报告（例如频率和面积成本）来了解\name + Vivado的性能。
+因此，主系统评估基于使用\name + OpenCL的Altera平台，我们使用Vivado 高层次综合生成的报告（例如频率和面积成本）来了解\name + Vivado的性能。
 
 \subsection{\name 元件库}
 \label{clicknp:subsec:lib}
@@ -131,7 +131,7 @@ passes the message to \textit{CmdHub} through slot 32.
 As aforementioned, OpenCL advocates batch processing model where communication between host program and a kernel in FPGA must go through shared DRAM, and the host program cannot control the kernel while it is running.
 We could use a special kernel to proxy messages between host program and the kernel via DRAM, but it incurs \approx1ms latency.
 DDR access is performed via PCIe link and raw PCIe latency is merely \approx1$\mu$s. As we improve kernel communication efficiency with channels in place of shared memory, we design a host-kernel communication mechanism with channel abstraction for low latency and high throughput.
-We leverage I/O channel in Altera OpenCL and AXI stream in Vivado HLS to connect the Catapult shell to kernels and built a PCIe bypass switch to arbitrate accesses for on-board DRAM and kernel I/O channel.
+We leverage I/O channel in Altera OpenCL and AXI stream in Vivado 高层次综合 to connect the Catapult shell to kernels and built a PCIe bypass switch to arbitrate accesses for on-board DRAM and kernel I/O channel.
 
 A PCIe link is split into multiple logically independent \textit{slots} which can operate in parallel.
 One slot is reserved for signals. Remaining slots are assigned to channels between host and FPGA elements, so each channel can transfer data in parallel without head-of-line blocking.
