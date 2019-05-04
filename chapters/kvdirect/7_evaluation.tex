@@ -225,18 +225,18 @@ The remaining few percent of operations have intrinsic higher processing delay d
 \cline{4-9}
  & & & GET & PUT & GET & PUT & GET & PUT \\
 \midrule
-Memcached~\cite{fitzpatrick2004distributed} & Traditional & Core synchronization & 1.5 & 1.5 & \approx5 & \approx5 & \approx50 & \approx50 \\
-MemC3~\cite{fan2013memc3} & Traditional & OS network stack & 4.3 & 4.3 & \approx14 & \approx14 & \approx50 & \approx50 \\
-RAMCloud~\cite{ousterhout2015ramcloud} & Kernel bypass & Dispatch thread & 6 & 1 & \approx20 & \approx3.3 & 5 & 14 \\
-MICA~\cite{lim2014mica} & Kernel bypass, 24 cores, 12 网卡 ports & CPU 键值 processing & 137 & 135 & 342 & 337 & 81 & 81 \\
-FaRM~\cite{dragojevic2014farm} & One-sided RDMA for GET & RDMA 网卡 & 6 & 3 & \approx30 (261) & \approx15 & 4.5 & \approx10 \\
-DrTM-键值~\cite{wei2015fast} & One-sided RDMA and HTM & RDMA 网卡 & 115.2 & 14.3 & \approx500 (3972) & \approx60 & 3.4 & 6.3 \\
-HERD'16~\cite{kalia2016design} & Two-sided RDMA, 12 cores & PCIe & 98.3 & \approx60 & \approx490 & \approx300 & 5 & 5 \\
-Xilinx'13~\cite{blott13hotcloud} & FPGA (with host) & Network & 13 & 13 & 106 & 106 & 3.5 & 4.5 \\
-Mega-键值~\cite{zhang2015mega} & GPU (4~GiB on-board RAM) & GPU 键值 processing & 166 & 80 & \approx330 & \approx160 & 280 & 280 \\
+Memcached~\cite{fitzpatrick2004distributed} & 传统 & CPU 核间同步 & 1.5 & 1.5 & \approx5 & \approx5 & \approx50 & \approx50 \\
+MemC3~\cite{fan2013memc3} & 传统 & 操作系统网络协议栈 & 4.3 & 4.3 & \approx14 & \approx14 & \approx50 & \approx50 \\
+RAMCloud~\cite{ousterhout2015ramcloud} & 内核绕过 & 分派线程 & 6 & 1 & \approx20 & \approx3.3 & 5 & 14 \\
+MICA~\cite{lim2014mica} & 内核绕过，24 个核，12 个网卡口 & CPU 键值处理 & 137 & 135 & 342 & 337 & 81 & 81 \\
+FaRM~\cite{dragojevic2014farm} & 单边 RDMA GET & RDMA 网卡 & 6 & 3 & \approx30 (261) & \approx15 & 4.5 & \approx10 \\
+DrTM-KV~\cite{wei2015fast} & 单边 RDMA 和 HTM & RDMA 网卡 & 115.2 & 14.3 & \approx500 (3972) & \approx60 & 3.4 & 6.3 \\
+HERD'16~\cite{kalia2016design} & 双边 RDMA, 12 核 & PCIe & 98.3 & \approx60 & \approx490 & \approx300 & 5 & 5 \\
+Xilinx'13~\cite{blott13hotcloud} & FPGA & 网络 & 13 & 13 & 106 & 106 & 3.5 & 4.5 \\
+Mega-KV~\cite{zhang2015mega} & GPU (4~GiB 板上 RAM) & GPU 键值处理 & 166 & 80 & \approx330 & \approx160 & 280 & 280 \\
 \midrule
-\textbf{KV-Direct (1 网卡)} & Programmable 网卡, two Gen3 x8 & PCIe \& DRAM & 180 & 114 & 1487 (5454) & 942 (3454) & 4.3 & 5.4 \\
-\textbf{KV-Direct (10 网卡s)} & Programmable 网卡, one Gen3 x8 each & PCIe \& DRAM & 1220 & 610 & 3417 (4518) & 1708 (2259) & 4.3 & 5.4 \\
+\textbf{KV-Direct (1 网卡)} & 可编程网卡，两个 Gen3 x8 & PCIe \& DRAM & 180 & 114 & 1487 (5454) & 942 (3454) & 4.3 & 5.4 \\
+\textbf{KV-Direct (10 网卡)} & 可编程网卡，每卡一个 Gen3 x8 & PCIe \& DRAM & 1220 & 610 & 3417 (4518) & 1708 (2259) & 4.3 & 5.4 \\
 \bottomrule
 \end{tabular}
 \caption{KV-Direct 与其他键值存储系统在长尾（倾斜  Zipf）负载和 10 字节小键下的比较。对于相关工作未报告的性能数字，我们使用相似的硬件来模拟这些系统，并报告我们粗略的测量结果。对于 CPU 绕过的系统，括号内的数字报告峰值负载和空闲情况下的功耗差异。}
@@ -319,7 +319,7 @@ Mega-键值~\cite{zhang2015mega} & GPU (4~GiB on-board RAM) & GPU 键值 process
                                     & 64B write & 12.96 GB/s & 12.94 GB/s \\
 			\bottomrule
 		\end{tabular}
-    	\caption{当KV-Direct达到峰值吞吐量时，对CPU内存访问性能的影响。 使用英特尔性能计数器监视器V2.11测量。}
+    	\caption{当KV-Direct达到峰值吞吐量时，对CPU内存访问性能的影响。 使用英特尔性能计数器监视器（Intel PCM）V2.11测量。}
         \label{kvdirect:tab:cpu-impact}
         
 \end{table}
