@@ -173,9 +173,9 @@ Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数
 \label{socksdirect:subsec:process-mux}
 
 \textbf {挑战1:在kernel和\libipc {}之间复用事件。}
-应用程序轮询来自Linux内核处理的套接字和其他\textit {内核FD}的事件。
+应用程序轮询来自Linux内核处理的套接字和其他\textit {内核文件描述符}的事件。
 轮询内核事件的一种简单方法是每次都调用系统调用（例如\textit {epoll \_wait}），这会产生很高的开销，因为事件轮询几乎是每次发送和接收的频繁操作。
-LOS~ \cite {huang2017high}定期用内核FD调用非阻塞\texttt {epoll \_wait}系统调用，这导致延迟和CPU开销之间的权衡。不同的是，
+LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {epoll \_wait}系统调用，这导致延迟和CPU开销之间的权衡。不同的是，
 不同的是，\libipc {}创建了一个per-process \textit {epoll thread}，它调用\textit {epoll \_wait} syscall来轮询内核事件。每当epoll线程收到内核事件时，应用程序线程将报告该事件以及用户空间套接字事件。
 
 \textbf {挑战2:中断繁忙的进程。}
@@ -195,8 +195,8 @@ LOS~ \cite {huang2017high}定期用内核FD调用非阻塞\texttt {epoll \_wait}
 \textbf{多机通信：用网卡作为 dispatcher，改动内核的调度队列。网卡给 CPU 发送 event queue 表示哪些进程有事情可做。event queue 汇总了这个 core 上各个 completion queue 的事件。进程处理完对应的 CQE 之后，sched yield 到内核，内核开始调度 event queue 中的下一个事件对应的进程。}
 
 %\textbf{Handling events from kernel.}
-%An application often needs to poll kernel FDs (\textit{e.g.} files and semaphores) together with socket FDs.
-%\libipc{} creates a per-process \textit{epoll thread} to poll kernel FDs for all application threads. When it receives a kernel event, it broadcasts the event to application threads via shared memory queues.%\texttt{Epoll\_wait} in \libipc{} will return such kernel events in addition to socket events. Note that Linux allows an event to be received by multiple threads sharing the FD.
+%An application often needs to poll kernel 文件描述符 (\textit{e.g.} files and semaphores) together with socket 文件描述符.
+%\libipc{} creates a per-process \textit{epoll thread} to poll kernel 文件描述符 for all application threads. When it receives a kernel event, it broadcasts the event to application threads via shared memory queues.%\texttt{Epoll\_wait} in \libipc{} will return such kernel events in addition to socket events. Note that Linux allows an event to be received by multiple threads sharing the 文件描述符.
 
 %\textbf{Exit.}
 %When a process exits, the \texttt{atexit} handler of \libipc{} notifies the monitor and all peers to close connections and mark the queues as dead. However, a process may crash or get killed. In this case, monitor detects process death via \texttt{SIGHUP} of the bootstrap socket (Sec.~\ref{socksdirect:subsubsec:fork_fork}) and notify its peers. When a process switches to \texttt{daemon} mode or \texttt{execve} another program, it first follows the process exit procedure, then calls the system call. After that, \libipc{} is re-initialized.
@@ -229,17 +229,17 @@ LOS~ \cite {huang2017high}定期用内核FD调用非阻塞\texttt {epoll \_wait}
 \end{figure}
 
 
-\subsubsection{FD 重映射表}
+\subsubsection{文件描述符 重映射表}
 \label{socksdirect:subsubsec:fd-remapping-table}
 
 
 
-套接字FD和其他FD（例如磁盘文件）共享命名空间，Linux总是分配最低可用FD。
-为了保留这种语义而不在内核中分配虚拟FD，\libipc {}拦截所有与FD相关的Linux API并维护\emph {FD重映射表}以将每个应用FD映射到用户空间套接字对象或内核FD。
-当FD关闭时，\libipc {}将其放入\emph {FD回收池}。
-在FD分配时，\libipc {}首先尝试从池中获取FD。
-如果池为空，则通过递增\emph {FD分配计数器}来分配新的FD。
-FD回收池和分配计数器在进程中的所有线程之间共享。
+套接字文件描述符和其他文件描述符（例如磁盘文件）共享命名空间，Linux总是分配最低可用文件描述符。
+为了保留这种语义而不在内核中分配虚拟文件描述符，\libipc {}拦截所有与文件描述符相关的Linux API并维护\emph {文件描述符重映射表}以将每个应用文件描述符映射到用户空间套接字对象或内核文件描述符。
+当文件描述符关闭时，\libipc {}将其放入\emph {文件描述符回收池}。
+在文件描述符分配时，\libipc {}首先尝试从池中获取文件描述符。
+如果池为空，则通过递增\emph {文件描述符分配计数器}来分配新的文件描述符。
+文件描述符回收池和分配计数器在进程中的所有线程之间共享。
 
 \subsubsection{连接建立}
 
@@ -278,9 +278,9 @@ FD回收池和分配计数器在进程中的所有线程之间共享。
 但是，如果SYN被另一个侦听器窃取，则需要在客户端和新侦听器之间建立新队列，如图 \ref {socksdirect:fig:conn-setup}中的Wait-Server状态所示。
 
 \textbf {连接建立的最后步骤。}
-服务器设置对等队列后，如图 \ref {socksdirect:fig:conn-setup}左侧所示，服务器应用程序向客户端发送ACK。 ACK包含SYN请求中的客户端FD及其分配的服务器FD。
+服务器设置对等队列后，如图 \ref {socksdirect:fig:conn-setup}左侧所示，服务器应用程序向客户端发送ACK。 ACK包含SYN请求中的客户端文件描述符及其分配的服务器文件描述符。
 与TCP握手类似，服务器应用程序可以在发送ACK后将数据发送到队列。
-当客户端收到ACK时，如图 \ref {socksdirect:fig:conn-setup}右侧所示，它设置FD映射并可以开始发送数据。
+当客户端收到ACK时，如图 \ref {socksdirect:fig:conn-setup}右侧所示，它设置文件描述符映射并可以开始发送数据。
 
 
 \subsubsection{与常规 TCP/IP 对端的兼容性}
@@ -295,7 +295,7 @@ FD回收池和分配计数器在进程中的所有线程之间共享。
 如果对等体具有\sys {}能力，则其监视器将接收特殊SYN并且知道客户端具有\sys {}能力。
 然后，服务器使用特殊选项响应SYN + ACK，包括设置RDMA连接的凭据，以便两个监视器之后可以通过RDMA进行通信。
 如果客户端或服务器监视器发现对等方是常规TCP / IP主机，它将使用TCP连接修复 \cite {tcp-connection-repair}在内核中创建已建立的TCP连接。
-然后监视器通过Unix域套接字将内核FD发送到应用程序，\libipc {}可以使用内核FD进行未来的套接字操作。
+然后监视器通过Unix域套接字将内核文件描述符发送到应用程序，\libipc {}可以使用内核文件描述符进行未来的套接字操作。
 
 
 一个棘手的问题是接收的数据包被传递到原始套接字和内核网络堆栈，并且内核将使用RST响应，因为这样的连接不存在。
@@ -314,8 +314,8 @@ FD回收池和分配计数器在进程中的所有线程之间共享。
 
 
 
-当应用程序调用\texttt {close}时，\libipc {}会从重映射表中删除FD。
-然而，套接字数据可能仍然有用，因为FD可以与其他进程共享，并且缓冲区中可能存在未发送的数据。
+当应用程序调用\texttt {close}时，\libipc {}会从重映射表中删除文件描述符。
+然而，套接字数据可能仍然有用，因为文件描述符可以与其他进程共享，并且缓冲区中可能存在未发送的数据。
 我们跟踪每个套接字的引用计数，它在fork上递增，在close时递减。
 为了推出未发送的数据，我们需要在对等体之间进行握手，类似于TCP close。
 因为套接字是双向的，所以\texttt {close}在发送和接收方向上相当于\texttt {shutdown}。
@@ -334,16 +334,16 @@ A \emph{client} process typically \texttt{bind}s without specifying IP and port,
 \textbf{\texttt{Connect} and \texttt{accept}.}
 When a client process connects to a server process on the same host, it sends a \textit{connect request} to the monitor via shared memory queue. When the server process is on another host, it creates a \textit{bootstrap TCP socket} with a special option via the user-space TCP/IP stack. If the server host supports the option, it is a \sys host and its monitor establishes an RDMA connection to the client to speedup later communications. Otherwise, the client process keeps using the bootstrap TCP socket for compatibility.
 
-On a server host, the monitor distributes connect requests to server processes in a round-robin order, and a \textit{backlog} is maintained in each process. If the client is TCP only, the monitor proxies messages between the server process and the user-space TCP/IP stack. If the client is intra-server or RDMA capable, and it is the first time for the client and server processes to communicate, the monitor creates an inter-process queue for the process pair and sends the credentials to both processes via bootstrap sockets. After a server process \texttt{accept}s a connection in the backlog, it sends a message to the client via inter-process queue to create an FD mapping, then the socket is ready for data transmission. As Figure~\ref{socksdirect:fig:conn-setup} shows, connection creation takes three inter-process delays.
+On a server host, the monitor distributes connect requests to server processes in a round-robin order, and a \textit{backlog} is maintained in each process. If the client is TCP only, the monitor proxies messages between the server process and the user-space TCP/IP stack. If the client is intra-server or RDMA capable, and it is the first time for the client and server processes to communicate, the monitor creates an inter-process queue for the process pair and sends the credentials to both processes via bootstrap sockets. After a server process \texttt{accept}s a connection in the backlog, it sends a message to the client via inter-process queue to create an 文件描述符 mapping, then the socket is ready for data transmission. As Figure~\ref{socksdirect:fig:conn-setup} shows, connection creation takes three inter-process delays.
 
 Distributing connection to listeners may lead to starvation when a listener does not \texttt{accept} new connections. We devise a \textit{work stealing} approach. When a listener \texttt{accept}s from empty backlog, it requests the monitor to steal from others' backlog. To avoid polling empty backlogs, each listener notifies the monitor when its backlog becomes empty. To avoid contention between a listener and monitor, the monitor sends a request to the listener rather than stealing from the backlog directly.
 
 %\subsubsection{Connection Close}
 
 \textbf{\texttt{Close} and \texttt{shutdown}.}
-Connection close is a peer-to-peer operation because only the peer process needs to be notified. If FD is deleted immediately after \texttt{close}, a new connection may reuse the FD while the peer process might not yet have received the close event thus sends data to the wrong connection. To avoid this, we require a handshake between peers.
+Connection close is a peer-to-peer operation because only the peer process needs to be notified. If 文件描述符 is deleted immediately after \texttt{close}, a new connection may reuse the 文件描述符 while the peer process might not yet have received the close event thus sends data to the wrong connection. To avoid this, we require a handshake between peers.
 Because socket is bidirectional, \texttt{close} is equivalent to \texttt{shutdown} on both send and receive directions.
-When application shuts down one direction of a connection, it sends a \textit{shutdown message} to the peer. The peer responds with a shutdown message. A process deletes an FD when it receives shutdown messages in both directions.
+When application shuts down one direction of a connection, it sends a \textit{shutdown message} to the peer. The peer responds with a shutdown message. A process deletes an 文件描述符 when it receives shutdown messages in both directions.
 
 %In order to achieve high scalability, we separate scalable operations to different processes. To avoid the overhead of contention, \libipc enable the file descriptor allocation by individual process and when a connection is setup, the other peer of the connection gets notified of the file descriptor number by message passing. Since we treat different threads in one process as different processes, we allocate file descriptor of different ranges to each of them to avoid collision. Since file descriptor is managed separately by each process, it is possible that a file descriptor is reused after the connection is closed. Our solution is that resources of a file descriptor is not released until an ACK is received for the close operation.
 

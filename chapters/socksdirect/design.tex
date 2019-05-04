@@ -23,7 +23,7 @@
 		\includegraphics[width=0.4\textwidth]{images/fork_rdwr}
 	}
 	
-	\caption{Comparison of queue structures. Assume sender and receiver each has two threads. First, \sys{} creates peer-to-peer queues between each pair of sender and receiver threads. Rather than protecting the queue with locks, we designate each FD to a receiver thread to ensure ordering. Second, data from all connections (FDs) are multiplexed through a shared queue, instead of one queue per FD.}
+	\caption{Comparison of queue structures. Assume sender and receiver each has two threads. First, \sys{} creates peer-to-peer queues between each pair of sender and receiver threads. Rather than protecting the queue with locks, we designate each 文件描述符 to a receiver thread to ensure ordering. Second, data from all connections (文件描述符) are multiplexed through a shared queue, instead of one queue per 文件描述符.}
 	\label{socksdirect:fig:fork-rdwr}
 \end{figure}
 \fi
@@ -32,7 +32,7 @@
 %As shown in Figure~\ref{socksdirect:fig:architecture}, the core component of \sys{} is a user-space library \libipc{}.
 
 为了简化部署和开发 \cite {andromeda}，以及删除内核交叉开销，我们在用户空间而不是内核中实现\sys。
-要使用\sys，应用程序通过设置\texttt {LD\_PRELOAD}环境变量来加载用户空间库\libipc {}。 \libipc {}拦截标准C库中与文件描述符（FD）操作相关的所有Linux API。它使用\emph {FD重映射表}来区分套接字FD与内核FD（例如文件和设备），在用户空间中实现套接字功能并将其他功能转发到内核。
+要使用\sys，应用程序通过设置\texttt {LD\_PRELOAD}环境变量来加载用户空间库\libipc {}。 \libipc {}拦截标准C库中与文件描述符（文件描述符）操作相关的所有Linux API。它使用\emph {文件描述符重映射表}来区分套接字文件描述符与内核文件描述符（例如文件和设备），在用户空间中实现套接字功能并将其他功能转发到内核。
 从安全的角度来看，因为\libipc {}驻留在应用程序地址空间中，我们无法信任它的行为。例如，如果恶意应用程序在\libipc {}中强制执行，则可能会绕过防火墙策略。此外，TCP端口是一个需要分配的全局资源 \cite {lin2016scalable,nsdi19freeflow}。因此，我们需要在\libipc {}之外的可信组件来强制实施访问控制和管理全局资源。
 
 为此，我们在每个主机上设计一个\emph {monitor}守护进程来协调控制平面操作，例如连接创建。监视器是系统服务。在每个主机中，所有加载\libipc {}的应用程序必须与主机的监视器守护程序建立共享内存（SHM）队列，从而形成控制平面。在数据平面上，应用程序构建对等队列以直接通信，从而减轻了监视器守护程序的负担。图 \ref {socksdirect:fig:architecture}显示了\sys {}的体系结构。
@@ -90,7 +90,7 @@ SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它�
 	\label{socksdirect:fig:queue-arch}
 \end{figure}
 
-大多数套接字系统都获得了一个per-FD锁，以使线程和进程共享套接字（Sec .~ \ref {socksdirect:subsec:per-operation-overhead}）。
+大多数套接字系统都获得了一个per-文件描述符锁，以使线程和进程共享套接字（Sec .~ \ref {socksdirect:subsec:per-operation-overhead}）。
 以前的工作 \cite {boyd2010analysis,clements2015scalable}表明许多套接字操作不可交换，并且不能始终避免同步。
 我们利用SHM消息传递比锁定 \cite {roghanchi2017ffwd}便宜得多的事实，并使用消息传递作为独占同步机制。
 
@@ -186,12 +186,12 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 	\centering
 	\includegraphics[width=0.6\textwidth]{images/fork_memory}
 	
-	\caption{fork后的内存布局。 FD 3和4在fork之前创建并因此共享。 在fork之后，父进程和子进程分别创建一个新的FD 5，它在FD表中写入时被复制。 FD 3和4的套接字元数据和缓冲区在SHM中并因此被共享。 子进程创建一个新的SHM来存储FD 5的套接字元数据和缓冲区，当它再次分叉时，它将与子进程共享。 RDMA QP位于私有内存中，而SHM队列是共享的。}
+	\caption{fork后的内存布局。 文件描述符 3和4在fork之前创建并因此共享。 在fork之后，父进程和子进程分别创建一个新的文件描述符 5，它在文件描述符表中写入时被复制。 文件描述符 3和4的套接字元数据和缓冲区在SHM中并因此被共享。 子进程创建一个新的SHM来存储文件描述符 5的套接字元数据和缓冲区，当它再次分叉时，它将与子进程共享。 RDMA QP位于私有内存中，而SHM队列是共享的。}
 	\label{socksdirect:fig:fork-memory}
 \end{figure}
 \textbf {套接字数据共享。}
 主要的挑战是在\texttt {fork}和\texttt {exec}之后共享套接字元数据，缓冲区和底层传输。
-内存空间在fork之后变为写时复制并在exec之后被擦除，但是套接字FD仍应该可用。
+内存空间在fork之后变为写时复制并在exec之后被擦除，但是套接字文件描述符仍应该可用。
 我们使用共享内存（SHM）来存储套接字元数据和缓冲区，因此在fork之后，数据仍然是共享的。
 要在exec之后附加SHM，\libipc {}将连接到监视器以获取其父进程的SHM密钥。
 在fork之后，因为父进程看不到子进程创建的套接字，所以子进程创建一个新的SHM来存储新套接字的元数据和缓冲区。
@@ -206,10 +206,10 @@ SHM传输不需要特别小心，因为fork / exec之前创建的SHM仍然在for
 因此，远程可能会看到一个套接字的两个或更多QP，但它们链接到套接字元数据和缓冲区的唯一副本。
 图 \ref {socksdirect:fig:fork-memory}显示了一个fork示例。
 
-\textbf {FD space sharing。}
-与套接字数据不同，FD空间在fork之后变为写入时复制:现有FD是共享的，但新FD由creater进程专有。
-所以FD重映射表驻留在堆内存中，这是fork之后的copy-on-write。
-要在exec之后恢复FD重映射表，它将在exec之前复制到共享内存，并在\libipc {}初始化期间附加到新进程。
+\textbf {文件描述符 space sharing。}
+与套接字数据不同，文件描述符空间在fork之后变为写入时复制:现有文件描述符是共享的，但新文件描述符由creater进程专有。
+所以文件描述符重映射表驻留在堆内存中，这是fork之后的copy-on-write。
+要在exec之后恢复文件描述符重映射表，它将在exec之前复制到共享内存，并在\libipc {}初始化期间附加到新进程。
 
 \textbf{安全。}
 安全性是一个问题，因为恶意进程可能将自己伪装成特权父进程的子进程。
@@ -279,8 +279,8 @@ SHM传输不需要特别小心，因为fork / exec之前创建的SHM仍然在for
 %
 
 %A connection created by a thread can be accessed by all threads in the same process.
-%To avoid creating redundant queues and connection states, \libipc does not share the FD eagerly with other threads, because most threads in existing applications do not use connections created by other threads.
-%When a thread do want to accesses a FD that belongs to another thread, \libipc sends a message to the owner thread and requests sharing the FD. %This procedure is exactly the same as sharing existing connections during thread creation (Sec.~\ref{socksdirect:subsubsec:fork_fork}). %The sharing procedure only happens once for every connection and thread. Sharing existing connections eagerly during thread creation is an optimization. First, children threads are more likely to use existing connections than siblings. Second, batch processing improves performance.
+%To avoid creating redundant queues and connection states, \libipc does not share the 文件描述符 eagerly with other threads, because most threads in existing applications do not use connections created by other threads.
+%When a thread do want to accesses a 文件描述符 that belongs to another thread, \libipc sends a message to the owner thread and requests sharing the 文件描述符. %This procedure is exactly the same as sharing existing connections during thread creation (Sec.~\ref{socksdirect:subsubsec:fork_fork}). %The sharing procedure only happens once for every connection and thread. Sharing existing connections eagerly during thread creation is an optimization. First, children threads are more likely to use existing connections than siblings. Second, batch processing improves performance.
 
 %\subsubsection{Connection Close}
 %\label{socksdirect:subsubsec:fork_close}
@@ -291,11 +291,11 @@ SHM传输不需要特别小心，因为fork / exec之前创建的SHM仍然在for
 %To satisfy the synchronization requirements, the close function call is all completed by message passing. The caller of close need to wait for ACK from all the other peers before release resources. i.e. the status of the connection.
 
 %\textbf{Broadcast.}
-%When a process calls \texttt{close}, all its peers cannot send to or receive from the FD. In this sense, 
+%When a process calls \texttt{close}, all its peers cannot send to or receive from the 文件描述符. In this sense, 
 %A socket is closed if all shared processes close it. So, we need to multicast a notification to the peers and collect responses from them. A challenge arises when \texttt{close} is interleaved with \texttt{fork}. Since \texttt{fork} and \texttt{close} do not commute~\cite{clements2015scalable}, we need a rule to determine their partial order. We make the choice that the ordering is determined by the initiator of \texttt{close}. If a process calls \texttt{close} before receiving fork notification, it will piggyback close notification with fork completion to both parent and child processes.
 
 %\textbf{Handshake before releasing resource.}
-%Another challenge is caused by FD reuse after close. As stated in Sec.~\ref{socksdirect:subsec:socket-api}, a FD is deleted after receiving shutdown message of both directions. With multiple processes sharing a connection, after one process calls \texttt{close}, others can still use the connection. Consequently, a process deletes a FD only after receiving shutdown messages of both directions from all peers of the FD.
+%Another challenge is caused by 文件描述符 reuse after close. As stated in Sec.~\ref{socksdirect:subsec:socket-api}, a 文件描述符 is deleted after receiving shutdown message of both directions. With multiple processes sharing a connection, after one process calls \texttt{close}, others can still use the connection. Consequently, a process deletes a 文件描述符 only after receiving shutdown messages of both directions from all peers of the 文件描述符.
 
 %Another challenge lies in the close of a connection is that close is a broadcast operation while send/receive is sent to a specific process. Besides, fork and close are immutable operations while the scalability requirements of the system impose the constraint that all the operations run asynchronously. As a result, a rule to determine the partial order is required.
 
@@ -316,36 +316,36 @@ SHM传输不需要特别小心，因为fork / exec之前创建的SHM仍然在for
 
 
 %\textbf{Multiplex connections in event-driven applications.}
-To reduce memory footprint and improve locality of memory accesses, we use one queue to multiplex all connections between a pair of threads. Each data item in the queue is marked with its FD. By using a single queue, we reduce per-socket memory footprint, random memory accesses and cache misses.
+To reduce memory footprint and improve locality of memory accesses, we use one queue to multiplex all connections between a pair of threads. Each data item in the queue is marked with its 文件描述符. By using a single queue, we reduce per-socket memory footprint, random memory accesses and cache misses.
 
 \textbf{Message format.}
 As shown in Figure~\ref{socksdirect:fig:locklessq-structure}, the main component of the queue is a \emph{data ring buffer}, where messages are stored back-to-back.
-Each message in the ring buffer consists of an 8-byte header and a variably sized payload. The header consists of an \textit{isvalid} flag, an opcode, the receiver's FD number and the payload size. Messages are aligned to 8 bytes to ensure header write atomicity.% and accelerate payload copy.
+Each message in the ring buffer consists of an 8-byte header and a variably sized payload. The header consists of an \textit{isvalid} flag, an opcode, the receiver's 文件描述符 number and the payload size. Messages are aligned to 8 bytes to ensure header write atomicity.% and accelerate payload copy.
 
 \textbf{Event polling.}
-We maintain a bitmap of each epoll FD set.
-When \texttt{epoll\_wait} is called, we scan all data queues round-robin and check the FD of each data message against the bitmap. If the FD is in the bitmap, an event is returned to the application.
+We maintain a bitmap of each epoll 文件描述符 set.
+When \texttt{epoll\_wait} is called, we scan all data queues round-robin and check the 文件描述符 of each data message against the bitmap. If the 文件描述符 is in the bitmap, an event is returned to the application.
 A global cursor exists to resume data queue scanning from the last position in the last scanned queue.
 
 A per-queue cursor records the last scanned position in each queue to avoid scanning a message multiple times.
-To speedup repeated receive operations of a specific FD, we build a linked list of messages for each FD as a side product of event polling.
-Each FD maintains positions of the first and last scanned but unread messages of the FD.
-When a new message of the FD is scanned, the \emph{nextptr} pointer in the last message is updated to point to the new message.
+To speedup repeated receive operations of a specific 文件描述符, we build a linked list of messages for each 文件描述符 as a side product of event polling.
+Each 文件描述符 maintains positions of the first and last scanned but unread messages of the 文件描述符.
+When a new message of the 文件描述符 is scanned, the \emph{nextptr} pointer in the last message is updated to point to the new message.
 
-To poll events from sockets and other FDs (handled by kernel) at the same time, \libipc{} creates an \textit{epoll thread} in each process to wait on all FDs handled by kernel. When it receives a kernel event, it broadcasts the event to application threads via shared memory queues. %\texttt{Epoll\_wait} in \libipc{} will return such kernel events in addition to socket events. %Note that Linux allows an event to be received by multiple threads sharing the FD.
+To poll events from sockets and other 文件描述符 (handled by kernel) at the same time, \libipc{} creates an \textit{epoll thread} in each process to wait on all 文件描述符 handled by kernel. When it receives a kernel event, it broadcasts the event to application threads via shared memory queues. %\texttt{Epoll\_wait} in \libipc{} will return such kernel events in addition to socket events. %Note that Linux allows an event to be received by multiple threads sharing the 文件描述符.
 
 \textbf{Pick from middle of queue.}
-In order to support receiving data from a specific FD, the queue needs to support picking a message in the middle with a specific FD.
-Fortunately, this does not happen frequently. Event-driven applications typically process incoming events in a FIFO order. For \texttt{epoll\_wait} in level trigger mode, we iterate through all messages in the queue and return those in the set of registered FDs. When applications call \texttt{recv}, \libipc{} would usually dequeue the message at head.
+In order to support receiving data from a specific 文件描述符, the queue needs to support picking a message in the middle with a specific 文件描述符.
+Fortunately, this does not happen frequently. Event-driven applications typically process incoming events in a FIFO order. For \texttt{epoll\_wait} in level trigger mode, we iterate through all messages in the queue and return those in the set of registered 文件描述符. When applications call \texttt{recv}, \libipc{} would usually dequeue the message at head.
 
 To pick from middle of queue, receiver traverses messages in the ring buffer. During traversal, receiver iterates messages from \textit{head} until free space in ring buffer, determined by \textit{isvalid}. Hence, receiver cannot clear \textit{isvalid} when a non-head message is dequeued. That's why each message has an \textit{isdel} flag. When a message is dequeued from the middle, its \textit{isdel} is set. %If the message at \textit{head} has \textit{isdel} set, the receiver advances \textit{head} and repeats this step.
 
 \textbf{Head-of-line blocking.}
-%Second, if application does not receive from a FD for a long time, data items of the FD may fill up the queue and starve other FDs.
-If application does not receive from a FD for a long time, the empty space in queue will become fragmented.
+%Second, if application does not receive from a 文件描述符 for a long time, data items of the 文件描述符 may fill up the queue and starve other 文件描述符.
+If application does not receive from a 文件描述符 for a long time, the empty space in queue will become fragmented.
 When data queue is full, the sender sends a message via emergency queue to trigger garbage collection in the receiver.
 The receiver scans empty space in the middle of queue and moves remaining messages, so that empty space can be returned to the sender.
-%To avoid starvation, we need at least one byte of headroom per FD. Accordingly, we design a single byte \textit{headroom slot} per FD. When data queue is full and the per-FD headroom slot is free, sender uses it and sends a notification via emergency queue. Receiver receives from data queue first, then from the headroom slot if it received a notification.
+%To avoid starvation, we need at least one byte of headroom per 文件描述符. Accordingly, we design a single byte \textit{headroom slot} per 文件描述符. When data queue is full and the per-文件描述符 headroom slot is free, sender uses it and sends a notification via emergency queue. Receiver receives from data queue first, then from the headroom slot if it received a notification.
 
 \textbf{Emergency queue.}
 Control messages may need to be delivered out-of-band when the queue is full. For example, in order to close the receive direction while sending data, the shutdown message should not be blocked by unconsumed data in the queue. To this end, we add an \textit{emergency queue} alongside each data queue.

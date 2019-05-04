@@ -10,7 +10,7 @@
 \end{figure}
 
 
-\RED{API wrapper -> FD remapping layer in Figure.}
+\RED{API wrapper -> 文件描述符 remapping layer in Figure.}
 
 As Figure~\ref{socksdirect:fig:libsd-architecture} shows, \libipc{} has a layered structure.
 
@@ -25,13 +25,13 @@ As Figure~\ref{socksdirect:fig:libsd-architecture} shows, \libipc{} has a layere
 %\parab{LD\_PRELOAD to intercept Linux APIs.}
 %\libipc uses \textit{LD\_PRELOAD} environment variable in Linux to load a shared library and intercept the system call wrappers of GNU libc.
 
-%\parab{Multiplex FD between kernel and \libipc{}.}
-%Taking the idea of MegaPipe~\cite{han2012megapipe} and LOS~\cite{huang2017high}, we partition the FD space between \libipc and Linux kernel. Linux assigns FD from zero to $2^{30}-1$, while \libipc assigns FD from $2^{31}-1$ down to $2^{30}$.
+%\parab{Multiplex 文件描述符 between kernel and \libipc{}.}
+%Taking the idea of MegaPipe~\cite{han2012megapipe} and LOS~\cite{huang2017high}, we partition the 文件描述符 space between \libipc and Linux kernel. Linux assigns 文件描述符 from zero to $2^{30}-1$, while \libipc assigns 文件描述符 from $2^{31}-1$ down to $2^{30}$.
 
 \parab{Multiplex events between kernel and \libipc{}.}
-The application polls events from both sockets and other \textit{kernel FDs} handled by Linux kernel.
+The application polls events from both sockets and other \textit{kernel 文件描述符} handled by Linux kernel.
 A naive way to poll kernel events is to invoke the syscall (e.g. \texttt{epoll\_wait}) every time, which incurs high overhead because event polling is a frequent operation on virtually every send and receive.
-%LOS~\cite{huang2017high} periodically invokes non-blocking \texttt{epoll\_wait} syscall with kernel FDs, which leads to a trade-off between delay and CPU overhead. Differently,
+%LOS~\cite{huang2017high} periodically invokes non-blocking \texttt{epoll\_wait} syscall with kernel 文件描述符, which leads to a trade-off between delay and CPU overhead. Differently,
 Differently, \libipc{} creates a per-process \textit{epoll thread} which invokes \texttt{epoll\_wait} syscall to poll kernel events. Whenever epoll thread receives a kernel event, it broadcasts the event to application threads via shared memory queues. Then the signal layer in \libipc{} will return such kernel events together with user-space socket events to the application.
 %Note that Linux allows an event to be received by multiple threads.
 

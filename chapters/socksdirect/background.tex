@@ -130,7 +130,7 @@ while (true) { // main event loop
 }
 \end{lstlisting}
 
-\caption{Pseudo-code of a typical socket server application, showing most important socket operations. A socket connection is a FIFO byte-stream channel identified by an integer \emph{file descriptor} (FD). Linux enables a readiness-driven I/O multiplexing model, in which the OS tells application which FDs are ready to receive or send, then the application may prepare buffers and issue socket operations.}
+\caption{Pseudo-code of a typical socket server application, showing most important socket operations. A socket connection is a FIFO byte-stream channel identified by an integer \emph{file descriptor} (文件描述符). Linux enables a readiness-driven I/O multiplexing model, in which the OS tells application which 文件描述符 are ready to receive or send, then the application may prepare buffers and issue socket operations.}
 \label{socksdirect:fig:socket-pseudo-code}
 
 \end{figure}
@@ -141,9 +141,9 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 现代数据中心网络具有微秒级基本延迟和数十Gbps吞吐量。 但是，传统的Linux套接字是在具有共享数据结构的操作系统内核空间中实现的，这使得套接字成为在多个主机上运行的通信密集型应用程序的众所周知的瓶颈 \cite {barroso2017attack}。 除了主机间通信之外，同一主机上的云应用程序和容器经常相互通信，使得主机内套接字通信在云时代变得越来越重要。 在压力测试下，Nginx~ \cite {reese2008nginx}，Memcached~ \cite {fitzpatrick2004distributed}和Redis~ \cite {carlson2013redis}等应用程序在内核中消耗50％到90％的CPU时间，主要处理TCP套接字操作 \cite{jeong2014mtcp}。
 
 要了解套接字的成本，我们首先需要了解套接字的功能。
-现代操作系统中的TCP套接字通常具有三个功能:（1）寻址，找到并连接到另一个应用程序；（2）提供可靠且有序的通信通道，由整数\emph {文件描述符}（FD）标识；（3）来自多个频道的多重事件，例如poll和epoll。 大多数Linux应用程序使用准备驱动的I / O多路复用模型。 操作系统告诉应用程序哪些FD已准备好接收或发送，然后应用程序可以准备缓冲区并发出接收或发送操作。
+现代操作系统中的TCP套接字通常具有三个功能:（1）寻址，找到并连接到另一个应用程序；（2）提供可靠且有序的通信通道，由整数\emph {文件描述符}（File Descriptor）标识；（3）来自多个频道的多重事件，例如poll和epoll。 大多数Linux应用程序使用准备驱动的I / O多路复用模型。 操作系统告诉应用程序哪些文件描述符已准备好接收或发送，然后应用程序可以准备缓冲区并发出接收或发送操作。
 
-从概念上讲，Linux网络堆栈由三层组成。首先，VFS层为应用程序提供套接字API（例如\emph {connect}，\emph {send}，\emph {epoll}）。套接字连接是双向，可靠且有序的管道，由整数\emph {文件描述符}（FD）标识。
+从概念上讲，Linux网络堆栈由三层组成。首先，VFS层为应用程序提供套接字API（例如\emph {connect}，\emph {send}，\emph {epoll}）。套接字连接是双向，可靠且有序的管道，由整数\emph {文件描述符}（文件描述符）标识。
 其次，传统的TCP / IP传输层提供I / O复用，拥塞控制，丢失恢复，路由和QoS功能。
 第三，网卡层与网卡硬件（或用于主机内套接字的虚拟环回接口）通信以发送和接收分组。
 众所周知，VFS层贡献了很大一部分成本 \cite {clark1989analysis,boyd2010analysis}。
@@ -164,7 +164,7 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 			\hline
 			Per op & Kernel crossing (syscall) & User space library (\S\ref{socksdirect:sec:architecture}) \\
 			\hline
-			Per op & Socket FD locks for concurrent threads \& processes & Lock-free socket sharing (\S\ref{socksdirect:subsec:fork}) \\
+			Per op & Socket 文件描述符 locks for concurrent threads \& processes & Lock-free socket sharing (\S\ref{socksdirect:subsec:fork}) \\
 			\hline
 			\hline
 			Per packet & Transport protocol (TCP/IP) & Use RDMA / SHM (\S\ref{socksdirect:subsec:lockless-queue}) \\
@@ -181,7 +181,7 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 			Per byte & Payload copy & Page remapping (\S\ref{socksdirect:subsec:zerocopy}) \\
 			\hline
 			\hline
-			Per conn. & Kernel FD allocation & FD remapping table (\S\ref{socksdirect:subsec:connection-management}) \\
+			Per conn. & Kernel 文件描述符 allocation & 文件描述符 remapping table (\S\ref{socksdirect:subsec:connection-management}) \\
 			\hline
 			Per conn. & Locks in TCB management & Distribute to \libipc{} (\S\ref{socksdirect:subsec:connection-management}) \\
 			\hline
@@ -279,7 +279,7 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 			\hline
 			Map 32 pages (128~KiB) & 1.2 & 0.8 \\
 			\hline
-			Open a socket FD & 1.6 & 0.6 \\
+			Open a socket 文件描述符 & 1.6 & 0.6 \\
 			\hline
 			One-sided RDMA write & 1.6 & 13 \\
 			\hline
@@ -387,7 +387,7 @@ TCP拥塞控制中的ACK时钟 \cite {mprdma}要求及时响应收到的数据�
 			\hline
 			Kernel crossing on data plane & & & Batched & \yes & Batched & \yes & \yes & \yes & \yes & $<$16KB msg \\
 			\hline
-			Socket FD locks & & & & & & & & & & \yes \\
+			Socket 文件描述符 locks & & & & & & & & & & \yes \\
 			\hline
 			Transport protocol & & & & & & & & \yes & \yes & \yes \\
 			\hline
@@ -399,7 +399,7 @@ TCP拥塞控制中的ACK时钟 \cite {mprdma}要求及时响应收到的数据�
 			\hline
 			Payload copy & & \yes & & & \yes & & & & & $\ge$16KB msg \\
 			\hline
-			Kernel FD allocation & & \yes &  &  & \yes & & & & & \yes \\
+			Kernel 文件描述符 allocation & & \yes &  &  & \yes & & & & & \yes \\
 			\hline
 			TCB mgmt \& Connection dispatch & \yes & \yes & \yes & \yes & \yes & & & & & \yes \\
 			\hline
@@ -447,13 +447,13 @@ Linux提供了基于准备就绪的事件模型，即应用程序知道传入的
 \label{socksdirect:subsec:per-connection-overhead}
 \quad
 
-\parab {内核FD分配。}
-在Linux中，每个套接字连接都是VFS中的文件，因此需要分配整数FD和\emph {inode}。
-用户空间套接字的挑战是有许多API（例如open，close和epoll）支持套接字和非套接字FD（例如文件和设备），因此我们必须将套接字FD与其他FD区分开来。
-用户空间中的Linux兼容套接字 \cite {libvma,rsockets}通常在内核中打开一个文件以获取每个套接字的虚拟FD，因此它们仍然需要内核FD分配。
-LOS~ \cite {huang2017high}将FD空间划分为用户和内核部分，但违反了Linux分配最小可用FD的属性。
+\parab {内核文件描述符分配。}
+在Linux中，每个套接字连接都是VFS中的文件，因此需要分配整数文件描述符和\emph {inode}。
+用户空间套接字的挑战是有许多API（例如open，close和epoll）支持套接字和非套接字文件描述符（例如文件和设备），因此我们必须将套接字文件描述符与其他文件描述符区分开来。
+用户空间中的Linux兼容套接字 \cite {libvma,rsockets}通常在内核中打开一个文件以获取每个套接字的虚拟文件描述符，因此它们仍然需要内核文件描述符分配。
+LOS~ \cite {huang2017high}将文件描述符空间划分为用户和内核部分，但违反了Linux分配最小可用文件描述符的属性。
 但是，许多应用程序，如Redis~ \cite {redis}和Memcached~ \cite {memcached}都依赖于此属性。
-我们的目标是在保持兼容性的同时绕过内核套接字FD分配。
+我们的目标是在保持兼容性的同时绕过内核套接字文件描述符分配。
 
 \parab {TCB管理中的锁定。}
 在建立连接期间，Linux获取几个全局锁来分配TCB（TCP控制块）。
@@ -519,7 +519,7 @@ LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS
 它类似于分叉容器（到新主机），子容器应该仍然能够访问套接字。
 
 第三，多线程在应用程序中很常见。
-应用程序在套接字操作中承担竞争条件的风险，或者每次操作必须采用套接字FD锁定。
+应用程序在套接字操作中承担竞争条件的风险，或者每次操作必须采用套接字文件描述符锁定。
 后一种方法保证了正确性，但即使没有争用，锁定也会损害性能。
 
 \parab {卸载到网卡的传输:}
@@ -540,7 +540,7 @@ FreeFlow使用RSocket将套接字转换为RDMA。
 第三，由于RSocket使用RDMA作为有线协议，因此无法连接到常规TCP / IP对等体。
 这是一个部署挑战，因为分布式系统中的所有主机和应用程序必须同时切换到RSocket。
 我们的目标是透明地检测远程端是否支持Rsocket，如果没有则回退到TCP / IP。
-在性能方面，他们无法删除有效负载副本，套接字FD锁，缓冲区管理，进程唤醒和每个连接开销。
+在性能方面，他们无法删除有效负载副本，套接字文件描述符锁，缓冲区管理，进程唤醒和每个连接开销。
 例如，RSocket在发送方和接收方分配缓冲区并复制有效负载。
 与Arrakis类似，RSocket使用网卡进行主机内通信，从而导致性能瓶颈。
 
@@ -570,7 +570,7 @@ FreeFlow使用RSocket将套接字转换为RDMA。
 
 
 %\textbf{Virtual file system.}
-%Each socket connection is a \textit{file descriptor} (FD) in Linux. First, each new connection involves expensive \texttt{inode} and \texttt{dentry} creation in the \texttt{proc} file system, which is not scalable and rarely used except for diagnostic and monitoring utilities. Second, socket operations need to pass through the virtual file system (VFS), which introduces CPU overhead and additional latency.
+%Each socket connection is a \textit{file descriptor} (文件描述符) in Linux. First, each new connection involves expensive \texttt{inode} and \texttt{dentry} creation in the \texttt{proc} file system, which is not scalable and rarely used except for diagnostic and monitoring utilities. Second, socket operations need to pass through the virtual file system (VFS), which introduces CPU overhead and additional latency.
 
 
 

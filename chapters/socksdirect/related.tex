@@ -12,7 +12,7 @@
 %\textbf{Communicating with TCP/IP peers.}
 %We use a user-space networking stack to communicate with regular TCP/IP peers, but the compatibility may be limited~\cite{yasukata2016stackmap}.
 %To solve this problem, after receiving the TCP SYN+ACK, the monitor can create an established kernel TCP connection using TCP connection repair~\cite{tcp-connection-repair}.
-%Moreover, if the application and monitor share a network namespace, the monitor can send the kernel FD to the application via Unix domain socket, then \libipc{} can use the FD without delegation to the monitor.
+%Moreover, if the application and monitor share a network namespace, the monitor can send the kernel 文件描述符 to the application via Unix domain socket, then \libipc{} can use the 文件描述符 without delegation to the monitor.
 
 %\textbf{Connecting to many RDMA capable hosts.}
 %With a lot of hosts, the 网卡 still suffer from performance degradation due to large number of connections.

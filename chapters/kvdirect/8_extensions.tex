@@ -136,7 +136,7 @@ KV-Direct的目标是利用数据中心的现有硬件来卸载重要的工作�
 
 在40~Gbps网络中，网络带宽限制了非批量键值吞吐量，因此我们使用客户端批处理（\S \ref {kvdirect:sec:implementation}）。通过更高的网络带宽，可以减少批量大小，从而减少延迟。在200~Gbps网络中，KV-Direct网卡无需批量即可达到180~Mop / s。
 
-KV-Direct利用广泛部署的可编程网卡和FPGA实现 \cite{putnam2014reconfigurable,caulfield2016cloud}。 Flex网卡 \cite {kaufmann2015flexnic,kaufmann2016krishnamurthy} 是另一种具有可重构匹配行动表（RMT） \cite {bosshart2013forwarding} 的可编程网卡的有前途的架构。
+KV-Direct利用广泛部署的可编程网卡和FPGA实现 \cite{putnam2014reconfigurable,caulfield2016cloud}。 FlexNIC \cite {kaufmann2015flexnic,kaufmann2016krishnamurthy} 是另一种具有可重构匹配行动表（RMT） \cite {bosshart2013forwarding} 的可编程网卡的有前途的架构。
 NetCache \cite {netcache-sosp17} 在基于RMT的可编程交换机中实现键值缓存，显示了在基于RMT的网卡中构建KV-Direct的潜力。
 
 \subsection{对现实世界应用的影响}
