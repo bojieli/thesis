@@ -165,28 +165,28 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 			\hline
 			每操作 & 内核穿越（系统调用） & User space library (\S\ref{socksdirect:sec:architecture}) \\
 			\hline
-			Per op & Socket 文件描述符 locks for concurrent threads \& processes & Lock-free socket sharing (\S\ref{socksdirect:subsec:fork}) \\
+			每操作 & 并发线程和进程的套接字文件描述符锁 & 无锁套接字共享 (\S\ref{socksdirect:subsec:fork}) \\
 			\hline
 			\hline
-			Per packet & Transport protocol (TCP/IP) & Use RDMA / SHM (\S\ref{socksdirect:subsec:lockless-queue}) \\
+			每数据包 & 传输层协议（TCP/IP） & 使用 RDMA 或共享内存 (\S\ref{socksdirect:subsec:lockless-queue}) \\
 			\hline
-			Per packet & Buffer management & New ring buffer (\S\ref{socksdirect:subsec:lockless-queue}) \\
+			每数据包 & 缓冲区管理 & 新的环形缓冲区设计 (\S\ref{socksdirect:subsec:lockless-queue}) \\
 			\hline
-			Per packet & I/O multiplexing & Use RDMA / SHM (\S\ref{socksdirect:subsec:lockless-queue}) \\
+			每数据包 & I/O 多路复用 & 使用 RDMA 或共享内存 (\S\ref{socksdirect:subsec:lockless-queue}) \\
 			\hline
-			Per packet & Interrupt handling & Event notification (\S\ref{socksdirect:subsec:process-mux}) \\
+			每数据包 & 中断处理 & 事件通知 (\S\ref{socksdirect:subsec:process-mux}) \\
 			\hline
-			Per packet & Process wakeup & Event notification (\S\ref{socksdirect:subsec:process-mux}) \\
-			\hline
-			\hline
-			Per byte & Payload copy & Page remapping (\S\ref{socksdirect:subsec:zerocopy}) \\
+			每数据包 & 进程唤醒 & 事件通知 (\S\ref{socksdirect:subsec:process-mux}) \\
 			\hline
 			\hline
-			Per conn. & Kernel 文件描述符 allocation & 文件描述符 remapping table (\S\ref{socksdirect:subsec:connection-management}) \\
+			每字节 & 数据复制 & 页面重映射 (\S\ref{socksdirect:subsec:zerocopy}) \\
 			\hline
-			Per conn. & Locks in TCB management & Distribute to \libipc{} (\S\ref{socksdirect:subsec:connection-management}) \\
 			\hline
-			Per conn. & New connection dispatch & Monitor daemon (\S\ref{socksdirect:subsec:connection-management}) \\
+			每连接  & 内核文件描述符分配 & 文件描述符重映射表 (\S\ref{socksdirect:subsec:connection-management}) \\
+			\hline
+			每连接 & TCB 锁管理 & 分派到 \libipc{} (\S\ref{socksdirect:subsec:connection-management}) \\
+			\hline
+			每连接 & 分派新连接 & 守护进程 (\S\ref{socksdirect:subsec:connection-management}) \\
 			\hline
 		\end{tabularx}
 	}
