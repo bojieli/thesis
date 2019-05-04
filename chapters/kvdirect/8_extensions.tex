@@ -9,51 +9,53 @@
 要批量处理PCIe链路上的DMA操作，我们可以利用CPU来执行分散 - 聚集（scatter gather）（图 \ref {kvdirect:fig:sg-arch}）。
 首先，网卡 DMA将地址发送到主机内存中的请求队列。主机CPU轮询请求队列，执行随机内存访问，将数据放入响应队列并将MMIO门铃写入网卡。然后，网卡通过DMA从响应队列中提取数据。
 
-\begin{figure}[t]
-\centering
-\subfloat[Read.\label{kvdirect:fig:sge-read}]
-{\includegraphics[width=.5\textwidth,page=1]{sg-read.pdf}}
-\subfloat[Write.\label{kvdirect:fig:sge-write}]
-{\includegraphics[width=.5\textwidth,page=1]{sg-write.pdf}}
-\caption{Scatter-gather performance.}
-\label{kvdirect:fig:scatter-gather}
 
+\begin{figure}[htbp]
+		\centering
+		\includegraphics[width=0.6\textwidth,page=1]{scatter_gather.PNG}
+		\caption{分散 - 聚集（scatter-gather）架构。}
+		\label{kvdirect:fig:sg-arch}
 \end{figure}
+
 
 图 \ref {kvdirect:fig:scatter-gather} 表明，与CPU旁路方法相比，基于CPU的分散 - 聚集DMA的吞吐量提高了79％。
 除了CPU开销之外，基于CPU的分散 - 聚集的主要缺点是额外的延迟。
 为了将MMIO从CPU保存到网卡，我们每个门铃批量256个DMA操作，这需要 10 $\mu$s 才能完成。
 使用基于CPU的分散 - 聚集网卡访问主机内存的总延迟是大约20美元，比直接DMA高出近20倍。
 
-\subsection{单机多网卡}
+
+
+
+\begin{figure}[htbp]
+	\centering
+	\subfloat[读操作。\label{kvdirect:fig:sge-read}]
+	{\includegraphics[width=.5\textwidth,page=1]{sg-read.pdf}}
+	\subfloat[写操作。\label{kvdirect:fig:sge-write}]
+	{\includegraphics[width=.5\textwidth,page=1]{sg-write.pdf}}
+	\caption{分散 - 聚集（scatter-gather）性能。}
+	\label{kvdirect:fig:scatter-gather}
+\end{figure}\subsection{单机多网卡}
 \label{kvdirect:sec:multi-nic}
-
-\begin{figure}[t]
-\begin{minipage}[t]{0.5\textwidth}
-\centering
-\includegraphics[width=1\textwidth,page=1]{scatter_gather.PNG}
-\caption{分散 - 聚集（scatter-gather）架构。}
-\label{kvdirect:fig:sg-arch}
-\end{minipage}
-\begin{minipage}[t]{0.5\textwidth}
-\centering
-\includegraphics[width=1\textwidth,page=1]{multi_nic.pdf}
-\caption{单机多网卡的性能可扩放性。}
-\label{kvdirect:fig:multiple-nics}
-\end{minipage}
-
-\end{figure}
 
 KV-Direct的主要用例是启用远程直接键值访问，而无需服务器上的CPU开销。
 在某些情况下，可能需要构建一个具有每服务器最大吞吐量的专用键值存储。
 通过模拟，\cite {li2016full}显示了在具有四个（当前不可用的）60核CPU的单个服务器中实现十亿键值运行的可能性。
 如表 \ref{kvdirect:tab:kvs-compare}所示，在服务器上有10个KV-Direct 网卡，使用商用服务器可以轻松实现10亿键值 op / s性能。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.5\textwidth,page=1]{multi_nic.pdf}
+	\caption{单机多网卡的性能可扩放性。}
+	\label{kvdirect:fig:multiple-nics}
+\end{figure}
+
 如图 \ref{kvdirect:fig:photo}，服务器消耗357瓦的功率（在墙壁上测量）以达到1.22~Gop / s GET或0.61~Gop / s PUT 的性能。
 
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=0.8\textwidth]{figure/kvdirect_photo.jpg}
+	\includegraphics[width=0.9\textwidth]{figure/kvdirect_photo.jpg}
 	\caption{以 357 瓦功耗实现 12.2 亿次 键值 操作每秒的 10 卡 KV-Direct 系统。}
 	\label{kvdirect:fig:photo}
 \end{figure}
@@ -151,7 +153,7 @@ NetCache \cite {netcache-sosp17} 在基于RMT的可编程交换机中实现键�
 
 当KV-Direct应用于端到端应用程序时，后台计算显示了潜在的性能提升。 在PageRank \cite {page1999pagerank}中，由于每次边缘遍历都可以通过一次键值操作实现，因此KV-Direct在具有10个可编程网卡的服务器上支持1.22G TEPS。 相比之下，GRAM \cite {wu2015g}支持每台服务器250M TEPS，受交错计算和随机内存访问的约束。
 
-KV-Direct支持用户定义的函数和向量操作（表 \ref {kvdirect:tab:kv-operations}），可以通过将客户端计算卸载到硬件来进一步优化PageRank。 类似的参数适用于参数server \cite {li2014scaling}。 我们希望未来的工作可以利用硬件加速的键值存储来提高分布式应用程序的性能。
+KV-Direct支持用户定义的函数和向量操作（表 \ref {kvdirect:tab:kv-operations}），可以通过将客户端计算卸载到硬件来进一步优化PageRank。 类似的参数适用于参数服务器 \cite {li2014scaling}。 我们希望未来的工作可以利用硬件加速的键值存储来提高分布式应用程序的性能。
 
 \iffalse
 \subsection{键值映射以外的其他数据结构}
