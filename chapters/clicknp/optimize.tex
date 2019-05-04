@@ -44,6 +44,33 @@
 
 \subsubsection{减少内存依赖}
 
+
+如果两个操作访问相同的内存位置，并且其中至少有一个是 \textit {写操作}，我们称这两个操作相互依赖 \cite {dependence}。
+我们无法同时处理具有 \textit {内存依赖}的操作，因为每个内存访问都有一个周期延迟，并且程序的语义正确性很大程度上取决于操作的顺序。
+如图 \ref {clicknp:fig:dependency}（b），\textbf {S1}和 \textbf {S2}相互依赖：\textbf {S2}必须延迟到\textbf {S1}结束 ，只有在\textbf {S2}完成后，\textbf {S1}才能对新的输入数据进行操作。
+因此，该函数将需要两个周期来处理一个数据。
+对于某些处理算法，内存依赖性可能相当复杂，但是由于 \name 的模块化体系结构，大多数元素只执行简单的任务，而\textit {读写操作}之间的内存依赖关系是我们遇到的最常见的情况，如图 \ref{clicknp:fig:dependency}（b）所示。
+
+消除此内存依赖性的一种方法是仅将数据存储在寄存器中。
+由于寄存器足够快，可以在一个周期内执行读取，计算和回写，根本就没有\textit {读写}依赖。
+的确，与CPU相比，FPGA的寄存器数量要大得多，如Altera Stratix V的697Kbit，因此可以使用寄存器尽可能减少内存依赖性。
+\name 编译器只要向变量主动分配寄存器即可，对变量的所有访问都引用一个常量地址 - 变量是标量或具有常量偏移的数组条目。
+当然，程序员可以使用``register''或``local / global''关键字来明确地指示编译器放置一个变量（也可以是一个数组）在寄存器，BRAM或板载DDR内存。
+
+对于较大的数据，它们必须存储在内存中。
+幸运的是，我们仍然可以使用一种名为\textit {延迟写入}的技术
+在图 \ref {clicknp:fig:dependency}（b）中解析\textit {读写操作}之间的内存依赖。
+核心思想是将新数据缓冲在寄存器中并延迟写入操作，直到下一次读操作。
+如果下一个读取访问相同的位置，它将从缓冲寄存器中直接读取值。
+否则，读取和被延迟的写入操作可以并行执行，因为他们将访问不同的内存位置。
+\footnote{FPGA中的大多数BRAM都有两个端口。}
+图 \ref {clicknp:fig:dependency}（c）显示了延迟写入的代码片段。
+由于代码中不再存在内存依赖性，因此元素可以在一个周期内处理一个数据。
+默认情况下，\name 编译器会对一个数组自动应用 \textit {延迟写入}，生成类似图 \ref {clicknp:fig:dependency}（b）的代码。
+但目前编译器每个阵列只能生成一个延迟写入。
+对于复杂的内存依赖性，程序员应该将代码重写为访问不相交内存区域的多个元素，并在必要时使用基于消息的协调。
+
+
 \begin{figure}
 \lstset{style=numbers}
 
@@ -105,30 +132,17 @@ Stratix V, and therefore \name\ aggressively assigns scalar variables
 using registers to increase the parallelism.
 }
 
-如果两个操作访问相同的内存位置，并且其中至少有一个是 \textit {写操作}，我们称这两个操作相互依赖 \cite {dependence}。
-我们无法同时处理具有 \textit {内存依赖}的操作，因为每个内存访问都有一个周期延迟，并且程序的语义正确性很大程度上取决于操作的顺序。
-如图 \ref {clicknp:fig:dependency}（b），\textbf {S1}和 \textbf {S2}相互依赖：\textbf {S2}必须延迟到\textbf {S1}结束 ，只有在\textbf {S2}完成后，\textbf {S1}才能对新的输入数据进行操作。
-因此，该函数将需要两个周期来处理一个数据。
-对于某些处理算法，内存依赖性可能相当复杂，但是由于 \name 的模块化体系结构，大多数元素只执行简单的任务，而\textit {读写操作}之间的内存依赖关系是我们遇到的最常见的情况，如图 \ref{clicknp:fig:dependency}（b）所示。
 
-消除此内存依赖性的一种方法是仅将数据存储在寄存器中。
-由于寄存器足够快，可以在一个周期内执行读取，计算和回写，根本就没有\textit {读写}依赖。
-的确，与CPU相比，FPGA的寄存器数量要大得多，如Altera Stratix V的697Kbit，因此可以使用寄存器尽可能减少内存依赖性。
-\name 编译器只要向变量主动分配寄存器即可，对变量的所有访问都引用一个常量地址 - 变量是标量或具有常量偏移的数组条目。
-当然，程序员可以使用``register''或``local / global''关键字来明确地指示编译器放置一个变量（也可以是一个数组）在寄存器，BRAM或板载DDR内存。
-
-对于大数据，它们必须存储在内存中。
-幸运的是，我们仍然可以使用一种名为\textit {延迟写入}的技术
-在图 \ref {clicknp:fig:dependency}（b）中解析\textit {读写操作}之间的内存依赖。
-核心思想是将新数据缓冲在寄存器中并延迟写入操作，直到下一次读操作。
-如果下一个读取访问相同的位置，它将从缓冲寄存器中直接读取值。
-否则，读取和被延迟的写入操作可以并行执行，因为他们将访问不同的内存位置。
-\footnote{FPGA中的大多数BRAM都有两个端口。}
-图 \ref {clicknp:fig:dependency}（c）显示了延迟写入的代码片段。
-由于代码中不再存在内存依赖性，因此元素可以在一个周期内处理一个数据。
-默认情况下，\name 编译器会对一个数组自动应用 \textit {延迟写入}，生成类似图 \ref {clicknp:fig:dependency}（b）的代码。
-但目前编译器每个阵列只能生成一个延迟写入。
-对于复杂的内存依赖性，程序员应该将代码重写为访问不相交内存区域的多个元素，并在必要时使用基于消息的协调。
+%\smalltitle{Remove pseudo-dependency.}
+使用\textit {struct}变量数组时会出现一个微妙的问题。
+图\ref {clicknp:fig:memscattering}（a）显示了这样一个例子，其中哈希表用于维护每个流的计数。
+我们发现\textbf {S2}将具有与\textbf {S1}的内存依赖关系，尽管它们正在访问\textbf {struct}的不同字段。
+原因是几乎所有当前的高层次综合工具都会将\textbf {struct}数组视为具有较大位宽的单维数组 - 等于\textbf {struct}的大小，并且只使用一个仲裁器控制访问。
+我们称这种类型的内存依赖性\textit {伪依赖}，在物理上，两个字段\textit {key}和\textit {cnt}可以位于不同的内存位置。
+为了解决这个问题，\name 采用了一种名为\textit {内存散射}的简单技术，它自动将\textbf {struct}数组转换为几个独立的数组，每个数组都用于\textbf {struct}中的一个字段，并分配它们进入不同的BRAM（图 \ref {clicknp:fig:memscattering}（b））。
+使用\textit {内存散射}，\textbf {S1}不再依赖于\textbf {S2}。
+因此，管道可以由高层次综合工具推断，并且当\textbf{S2}仍然在运行时，新的数据可以由\textbf {S1}计时和处理。
+值得注意的是，内存散射仅适用于FPGA中的元素，如果元素分配在主机CPU上运行则禁用。
 
 
 \begin{figure}
@@ -170,16 +184,6 @@ S2: A[idx].cnt ++;
 \end{figure}
 
 
-%\smalltitle{Remove pseudo-dependency.}
-使用\textit {struct}变量数组时会出现一个微妙的问题。
-图\ref {clicknp:fig:memscattering}（a）显示了这样一个例子，其中哈希表用于维护每个流的计数。
-我们发现\textbf {S2}将具有与\textbf {S1}的内存依赖关系，尽管它们正在访问\textbf {struct}的不同字段。
-原因是几乎所有当前的高层次综合工具都会将\textbf {struct}数组视为具有较大位宽的单维数组 - 等于\textbf {struct}的大小，并且只使用一个仲裁器控制访问。
-我们称这种类型的内存依赖性\textit {伪依赖}，在物理上，两个字段\textit {key}和\textit {cnt}可以位于不同的内存位置。
-为了解决这个问题，\name 采用了一种名为\textit {内存散射}的简单技术，它自动将\textbf {struct}数组转换为几个独立的数组，每个数组都用于\textbf {struct}中的一个字段，并分配它们进入不同的BRAM（图 \ref {clicknp:fig:memscattering}（b））。
-使用\textit {内存散射}，\textbf {S1}不再依赖于\textbf {S2}。
-因此，管道可以由高层次综合工具推断，并且当\textbf {S2}仍然在运行时，新的数据可以由\textbf {S1}计时和处理。
-值得注意的是，内存散射仅适用于FPGA中的元素，如果元素分配在主机CPU上运行则禁用。
 
 我们注意到上述技术可能无法解决所有内存依赖性。
 在许多情况下，它需要程序员重新考虑他们的代码，甚至改变算法，以确保他们的实现可以在FPGA中完全流水线化。

@@ -39,44 +39,6 @@ Applications forward packets from tor\_in to nic\_out. When TrafficGen receives 
 The wire loopback RTT of TrafficGen is 0.85$\mu$s for 64B packets and 1.39$\mu$s for 1504B packets, which is the system error in all latency numbers we present.
 }
 
-\begin{figure*}[htbp]
-		\centering
-		\subfloat[]{
-			\includegraphics[width=0.5\textwidth]{eval/fw_1}
-		}
-	%	\subfloat[]{
-	%		\includegraphics[width=0.225\textwidth]{eval/fw_2}
-	%	}
-		\subfloat[]{
-			\includegraphics[width=0.5\textwidth]{eval/fw_3}
-		}
-	\hspace{1pt}
-		\subfloat[]{
-			\includegraphics[width=0.5\textwidth]{eval/fw_4}
-		}
-		\subfloat[]{
-			\includegraphics[width=0.5\textwidth]{eval/fw_5}
-		}
-		
-		\caption{防火墙。误差条（error bar）表示 5\% 和 95\% 分位的延迟。在 (a) 和 (b) 图中，数据包大小为 64 字节。}
-		
-		\label{clicknp:fig:firewall}
-\end{figure*}
-
-\begin{figure*}[htbp]
-		\centering
-		\subfloat[]{
-			\includegraphics[width=0.5\textwidth]{eval/ipsec_1}
-		}
-		\subfloat[]{
-			\includegraphics[width=0.5\textwidth]{eval/ipsec_2}
-		}
-		
-		\caption{IPSec 网关。}
-		
-		\label{clicknp:fig:IPSec}
-\end{figure*}
-
 \subsection{吞吐量和延迟}
 
 %In this subsection, we benchmark the throughput and latency of \name\ 网络功能s.
@@ -114,6 +76,31 @@ Dell S6000中的规则插入需要83.7 $\mu$s。
 我们得出结论，\name{} 防火墙在数据包处理方面具有与ASIC类似的性能，但具有灵活性和可重构性。
 
 
+\begin{figure*}[htbp]
+	\centering
+	\subfloat[]{
+		\includegraphics[width=0.5\textwidth]{eval/fw_1}
+	}
+	%	\subfloat[]{
+	%		\includegraphics[width=0.225\textwidth]{eval/fw_2}
+	%	}
+	\subfloat[]{
+		\includegraphics[width=0.5\textwidth]{eval/fw_3}
+	}
+	\hspace{1pt}
+	\subfloat[]{
+		\includegraphics[width=0.5\textwidth]{eval/fw_4}
+	}
+	\subfloat[]{
+		\includegraphics[width=0.5\textwidth]{eval/fw_5}
+	}
+	
+	\caption{防火墙。误差条（error bar）表示 5\% 和 95\% 分位的延迟。在 (a) 和 (b) 图中，数据包大小为 64 字节。}
+	
+	\label{clicknp:fig:firewall}
+\end{figure*}
+
+
 \textbf {A3. IPSec 网关。}
 我们比较IPSec 网关和StrongSwan~ \cite {strongswan}，使用相同的密码套件AES-256-CTR和SHA1。
 我们设置了一个IPSec隧道，图 \ref {clicknp:fig:IPSec}（a）显示了不同数据包大小的吞吐量。
@@ -124,23 +111,20 @@ Dell S6000中的规则插入需要83.7 $\mu$s。
 图 \ref {clicknp:fig:IPSec}（b）显示了不同负载因子下的延迟。 同样，IPSecGW产生的恒定延迟为13 $\mu$s，
 但是StrongSwan会产生更大的延迟和更高的方差，最长可达5 ms！
 
+
+
 \begin{figure*}[htbp]
 	\centering
+	\subfloat[]{
+		\includegraphics[width=0.5\textwidth]{eval/ipsec_1}
+	}
+	\subfloat[]{
+		\includegraphics[width=0.5\textwidth]{eval/ipsec_2}
+	}
 	
-	\subfloat[]{
-		\includegraphics[width=0.5\textwidth]{eval/l4_2}
-	}
-	\subfloat[]{
-		\includegraphics[width=0.5\textwidth]{eval/l4_1}
-	}
-
-	\subfloat[]{
-		\includegraphics[width=0.5\textwidth]{eval/l4_3}
-	}
-
-	\caption{L4 负载均衡器的性能评估。}
-	\label{clicknp:fig:l4}
-
+	\caption{IPSec 网关。}
+	
+	\label{clicknp:fig:IPSec}
 \end{figure*}
 
 
@@ -172,6 +156,25 @@ L4LB需要一次访问DDR内存。因此处理速度降低到11Mpps。
 对于复杂的分配算法，\textit {DIPAlloc} 的CPU核心将成为瓶颈，并且可以通过在更多CPU核心上复制 \textit {DIPAlloc} 元素来提高性能。
 对于LVS，由于数据包处理能力有限，它每秒最多只能接受75K个新连接。
 
+
+\begin{figure*}[htbp]
+	\centering
+	
+	\subfloat[]{
+		\includegraphics[width=0.5\textwidth]{eval/l4_2}
+	}
+	\subfloat[]{
+		\includegraphics[width=0.5\textwidth]{eval/l4_1}
+	}
+	
+	\subfloat[]{
+		\includegraphics[width=0.5\textwidth]{eval/l4_3}
+	}
+	
+	\caption{L4 负载均衡器的性能评估。}
+	\label{clicknp:fig:l4}
+	
+\end{figure*}
 
 \textbf {A5. pFabric 验证。}
 \name 也是网络研究的好工具。

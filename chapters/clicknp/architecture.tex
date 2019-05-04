@@ -5,18 +5,20 @@
 \subsection{系统架构}
 \label{clicknp:subsec:sysarch}
 
-\begin{figure}
-\centering
-\includegraphics[width=.8\textwidth]{clicknp-arch.pdf}
-\caption{ClickNP 架构。}
-\label{clicknp:fig:clicknp}
-\end{figure}
-
 图 \ref{clicknp:fig:clicknp} 显示了 \name 的体系结构。
 \name 以 Catapult Shell 架构构建\cite {putnam2014reconfigurable}。
 \textit {shell}包含许多可重用的逻辑位，这些逻辑对所有应用程序都是通用的，并将它们抽象为一组明确定义的接口，例如，PCIe，直接内存访问（DMA），DRAM内存管理单元（MMU），和以太网MAC。
 \name FPGA程序合成为 Catapult \textit {role}。
 但是，由于\name 依赖于商品高层次综合工具链来生成FPGA 硬件描述语言，并且不同的工具可以为shell管理的资源生成自己的（和不同的）接口，我们需要一个名为\textit {高层次综合-的垫片层特定运行时}，用于执行高层次综合特定接口与shell接口之间的转换。
+
+
+\begin{figure}
+	\centering
+	\includegraphics[width=.8\textwidth]{clicknp-arch.pdf}
+	\caption{ClickNP 架构。}
+	\label{clicknp:fig:clicknp}
+\end{figure}
+
 
 \name{} host 进程通过 \name{} library与 \name{} role 进行通信，这进一步依赖于 Catapult PCIe 驱动程序中的服务与FPGA硬件进行交互。
 \name{} library 实现了两个重要的功能：
@@ -90,13 +92,16 @@ flit的格式如图 \ref {clicknp:fig:element}（b）所示。每个flit包含�
 与Click类似，\name 也使用简单脚本来指定网络功能的配置。配置有两部分：\textit {declarations} 和 \textit {connections}，遵循Click语言的类似语法 \cite {kohler2000click}。
 值得注意的是，在 \name 中，我们可以使用关键字 \textbf {host}来注释元素，这将导致元素被编译为CPU二进制文件并在CPU上执行。
 
+\iffalse
 \textbf{Verilog 元件。}
+\fi
 
 \begin{table}
 
 \centering
 \caption{\name\ 管道上的内置操作。}
 \label{clicknp:tab:built-in}
+\scalebox{0.9}{
 \begin{tabular}{p{.4\textwidth}|p{.5\textwidth}}
 \toprule
 uint get\_input\_port() & 获取具有可用数据的所有输入端口的位图。 \\
@@ -116,7 +121,7 @@ void set\_signal(ClSignal p) & 在信号端口上设置输出信号。\\
 return (uint bitmap) & \textbf{.handler} 的返回值指定下一次迭代时要读取的输入端口的位图。 \\
 \bottomrule
 \end{tabular}
-
+}
 \end{table}
 
 \begin{figure}[htbp]
