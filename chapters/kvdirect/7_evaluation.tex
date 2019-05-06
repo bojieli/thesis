@@ -246,7 +246,7 @@ The remaining few percent of operations have intrinsic higher processing delay d
 62B和更大的键值没有内联，因此它们需要额外的内存访问。
 长尾工作负载比统一工作负载具有更高的吞吐量，并且能够在读密集工作负载下达到180~Mops的时钟频率范围，或达到$ \geq $ 62B 键值大小的网络吞吐量。
 在长尾工作负载下，无序执行引擎在最流行的密钥上合并到大约15％的操作，并且板载DRAM在60％负载分配比率下具有大约60％的高速缓存命中率，这可以统一导致高达2倍的吞吐量作为统一的工作量。
-如表 \ref {kvdirect:tab:kvs-compare} 所示，KV-Direct 网卡的吞吐量与具有数十个CPU核心的最先进的键值存储服务器相当。
+如本章末尾的整页表 \ref {kvdirect:tab:kvs-compare} 所示，KV-Direct 网卡的吞吐量与具有数十个CPU核心的最先进的键值存储服务器相当。
 
 \subsubsection{能耗效率}
 
@@ -255,7 +255,7 @@ The remaining few percent of operations have intrinsic higher processing delay d
 与表 \ref {kvdirect:tab:kvs-compare} 中最先进的键值存储系统相比，KV-Direct的功率效率是其他系统的3倍，是第一个达到100万的通用键值存储系统 商用服务器上每瓦特的键值操作。
 
 当拔出KV-Direct网卡时，空闲服务器的功耗为87.0瓦，因此可编程网卡，PCIe，主机内存和CPU上的守护进程的总功耗仅为34瓦。
-测量的功率差异是合理的，因为CPU几乎处于空闲状态，服务器可以在KV-Direct运行时运行其他工作负载（我们对单侧RDMA使用相同的标准，如表 \ref {kvdirect:tab:kvs} 的括号中所示）。
+测量的功率差异是合理的，因为CPU几乎处于空闲状态，服务器可以在KV-Direct运行时运行其他工作负载（我们对单侧RDMA使用相同的标准，如表 \ref{kvdirect:tab:kvs-compare} 的括号中所示）。
 在这方面，KV-Direct的功率效率是基于CPU的系统的10倍。
 
 \subsubsection{延迟}

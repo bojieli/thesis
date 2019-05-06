@@ -154,20 +154,23 @@
 \subsection{硬件架构}
 
 
-图 \ref{arch:fig:smartnic-current} 显示了本文使用的 Catapult 可编程网卡 \cite{putnam2014reconfigurable} 硬件架构。
-本文第 \ref{chapter:clicknp} 章和第 \ref{chapter:kvdirect} 章使用其中的 FPGA 可重构逻辑来实现网络功能和数据结构处理；第 \ref{chapter:socksdirect} 章使用其中的商用 RDMA 网卡实现套接字原语中的硬件传输协议部分。
-来自数据中心网络的数据包从 FPGA 左上角的网络接口被可编程网卡接收。如果它是网络功能或者数据结构处理需求，就直接在 FPGA 可重构逻辑中进行处理，处理过程中 FPGA 需要使用板上 DRAM 和通过 CPU 互连（如 PCIe）访问主机 DRAM。
-如果数据包是用于第 \ref{chapter:socksdirect} 章中的套接字通信，它将在 FPGA 中进行虚拟网络的解封装，并通过 FPGA 与商用 RDMA 网卡之间的网络接口发送给商用 RDMA 网卡。
-商用 RDMA 网卡会把数据包的内容通过 CPU 互连（如 PCIe） DMA 发送给主机上的用户态套接字库。
+图 \ref{arch:fig:my-smartnic-current} 显示了本文使用的 Catapult 可编程网卡 \cite{putnam2014reconfigurable} 硬件架构。
+
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.4\textwidth]{figures/smartnic-current.pdf}
-	\label{arch:fig:smartnic-current}
 	\caption{本文使用的 Catapult 可编程网卡。}
+	\label{arch:fig:my-smartnic-current}
 \end{figure}
 
 
+
+
+本文第 \ref{chapter:clicknp} 章和第 \ref{chapter:kvdirect} 章使用其中的 FPGA 可重构逻辑来实现网络功能和数据结构处理；第 \ref{chapter:socksdirect} 章使用其中的商用 RDMA 网卡实现套接字原语中的硬件传输协议部分。
+来自数据中心网络的数据包从 FPGA 左上角的网络接口被可编程网卡接收。如果它是网络功能或者数据结构处理需求，就直接在 FPGA 可重构逻辑中进行处理，处理过程中 FPGA 需要使用板上 DRAM 和通过 CPU 互连（如 PCIe）访问主机 DRAM。
+如果数据包是用于第 \ref{chapter:socksdirect} 章中的套接字通信，它将在 FPGA 中进行虚拟网络的解封装，并通过 FPGA 与商用 RDMA 网卡之间的网络接口发送给商用 RDMA 网卡。
+商用 RDMA 网卡会把数据包的内容通过 CPU 互连（如 PCIe） DMA 发送给主机上的用户态套接字库。
 
 
 
@@ -175,7 +178,7 @@
 
 \subsection{高级语言编程框架}
 
-第 \ref{chapter:clicknp} 章将提出适合流式处理的模块化 FPGA 高级语言编程框架 ClickNP。
+为了简化 FPGA 编程，本文第 \ref{chapter:clicknp} 章将提出适合流式处理的模块化 FPGA 高级语言编程框架 ClickNP。
 如图 \ref{arch:fig:element_arch} 所示，ClickNP 的基本处理模块是元件（element）。元件之间使用管道（channel）连接。
 每个元件使用类 C 语言编程，可以被编译成 FPGA 上的逻辑模块或者 CPU 上的线程。
 每个元件逻辑上可以类比成一个 CPU 核，是一个状态机，由私有内部状态、全局状态、若干输入管道、若干输出管道、数据处理函数和信号处理函数构成。
@@ -197,9 +200,9 @@ ClickNP 编程框架可以自动生成状态导入导出逻辑，并与管道输
 
 \subsection{基础服务中间件}
 
-第 \ref{chapter:clicknp} 章的 ClickNP 架构比较适合无状态或状态简单的流水线式数据包处理，而对基于连接状态或应用层请求的处理，就显得捉襟见肘。
-例如，第 \ref{chapter:clicknp} 章四层负载均衡器应用中的调度器和哈希表与应用逻辑耦合紧密，既不容易扩放到大量并发连接，代码的可维护性也不强，事实上在开发过程中花费了大量的时间来解决死锁问题。
-第 \ref{chapter:kvdirect} 章的 KV-Direct 系统将提出 FPGA 内的有状态处理（stateful processing）和哈希表数据结构设计，这些基础组件是第 \ref{chapter:clicknp} 章的有状态网络功能、第 \ref{chapter:kvdirect} 章的内存键值存储、第 \ref{chapter:socksdirect} 章的可扩放 RDMA 的基础。
+本文第 \ref{chapter:clicknp} 章将提出的 ClickNP 架构比较适合无状态或状态简单的流水线式数据包处理，而对基于连接状态或应用层请求的处理，就显得捉襟见肘。
+例如，四层负载均衡器应用中的调度器和哈希表与应用逻辑耦合紧密，既不容易扩放到大量并发连接，代码的可维护性也不强。事实上在开发过程中花费了大量的时间来解决死锁问题。
+为此，本文第 \ref{chapter:kvdirect} 章的 KV-Direct 系统将提出 FPGA 内的有状态处理（stateful processing）和哈希表数据结构设计，这些基础组件可以作为第 \ref{chapter:clicknp} 章的有状态网络功能（如四层负载均衡器）、第 \ref{chapter:kvdirect} 章的内存键值存储、第 \ref{chapter:socksdirect} 章的可扩放 RDMA 的基础。
 
 为了模块化和可扩放性，使用 KV-Direct 作为基础后，可编程网卡上应用的架构如图 \ref{arch:fig:kvdirect_arch} 所示。
 事务代表着前后依赖关系，例如有状态网络处理中的一个连接，分多个数据包的一个应用层 HTTP 请求，或者键值存储中对同一个键（key）的操作。
@@ -217,4 +220,4 @@ ClickNP 编程框架可以自动生成状态导入导出逻辑，并与管道输
 	\label{arch:fig:kvdirect_arch}
 \end{figure}
 
-在下面三章中，我们将依次详细讨论本文的三个主要创新点，即基于可编程网卡的网络功能（ClickNP）、存储数据结构（KV-Direct）和操作系统通信原语（SocksDirect）加速。
+接下来的三章将依次详细讨论本文的三个主要创新点，即基于可编程网卡的网络功能（ClickNP）、存储数据结构（KV-Direct）和操作系统通信原语（SocksDirect）加速。
