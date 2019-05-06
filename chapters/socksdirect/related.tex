@@ -21,8 +21,8 @@
 %An application can choose to use RDMA for latency sensitive and throughput demanding connections, and user-space networking stack for others.
 
 \parab {扩放到大量连接。}
-\sys {}对许多连接的可伸缩性受SHM和RDMA的限制。
-为了表明\libipc {}和监视器不是瓶颈，我们运行一个综合实验，在两个重用RDMA QP和SHM的进程之间创建了很多连接。使用\libipc {}的应用程序线程每秒可以创建1.4~M个新连接，这是Linux的20倍和mTCP的2倍 \cite {jeong2014mtcp}。监视器每秒可以创建5.3~M个连接。
+\sys {}对许多连接的可伸缩性受共享内存和RDMA的限制。
+为了表明 \libipc {} 和监视器不是瓶颈，本节在两个重用RDMA QP和共享内存的进程之间创建了很多连接。使用 \libipc {} 的应用程序线程每秒可以创建1.4~M个新连接，这是Linux的20倍和mTCP的2倍 \cite {jeong2014mtcp}。监视器每秒可以创建5.3~M个连接。
 
 由于主机内的进程数量有限，因此SHM连接的数量可能不会很大。
 但是，一台主机可能连接到许多其他主机，RDMA的可扩展性成为一个问题。
@@ -30,13 +30,13 @@
 首先，RDMA 网卡使用网卡内存作为缓存来保持每个连接状态。有数千个并发连接，性能受到频繁缓存未命中的影响 \cite {mprdma,kaminsky2016design,kalia2018datacenter}。
 但是，网卡配备了小内存，因为RDMA传统上部署在中小型集群中。
 随着近年来大规模的RDMA部署 \cite {guo2016rdma}，商品网卡拥有更大的内存来存储数千个连接 \cite {kalia2018datacenter}而Smart网卡拥有千兆字节的DRAM~ \cite {mellanox-innova,mellanox-bluefield,smartnic}。
-我们相信未来的数据中心不会担心网卡缓存未命中问题。
-第二个问题是在我们的测试平台中建立RDMA连接需要大约 $30 \mu s$，这对于短连接很重要。但是，此过程仅涉及本地CPU和网卡之间的通信，我们希望未来的工作能够得到改进。
+因此，我们预测未来的数据中心不会为网卡缓存未命中问题担心过多。
+第二个问题是本文的测试平台中建立RDMA连接需要大约 $30 \mu s$，这对于短连接很重要。但是，此过程仅涉及本地CPU和网卡之间的通信，希望未来的工作能够得到改进。
 
 %Another promising direction to solve the RDMA concurrency issue is to implement the reliable transport in CPU, and the 网卡 remains stateless. However, RDMA UD does not support one-sided write, so the ring buffer in Sec.~\ref{socksdirect:subsec:lockless-queue} will not work. Existing software RDMA~\cite{soft-roce} has low performance. It would be interesting to co-design software and 网卡.
 
 \textbf {RDMA的QoS。}
-我们将数据平面性能隔离和拥塞控制卸载到RDMA网卡上，遵循新的工作方式 \cite {peter2016arrakis,zhu2015congestion,lu2017memory,mprdma,mittal2018revisiting}这个方向，因为数据中心的网卡正变得越来越可编程  \cite{smartnic,cavium,kaufmann2015flexnic,mellanox-innova,mellanox-bluefield}，公有云已经在虚拟机之外的网络功能中提供QoS了\cite {li2016clicknp,panda2016netbricks,floem-osdi18}。
+将数据平面性能隔离和拥塞控制卸载到 RDMA 网卡上是一个越来越流行的研究方向 \cite {peter2016arrakis,zhu2015congestion,lu2017memory,mprdma,mittal2018revisiting}，因为数据中心的网卡正变得越来越可编程  \cite{smartnic,cavium,kaufmann2015flexnic,mellanox-innova,mellanox-bluefield}，而公有云已经在虚拟机之外的网络功能中提供了 QoS \cite {li2016clicknp,panda2016netbricks,floem-osdi18}。
 
 %\textbf{Networking stack on other layers.}
 %RDMA: lower layer,

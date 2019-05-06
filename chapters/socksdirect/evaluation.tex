@@ -9,7 +9,8 @@
 %	\label{socksdirect:fig:eval-fork-tput}
 %\end{figure}
 
-我们在三个组件中实现\sys :一个用户空间库\libipc {}和一个带有17K行C ++代码的监控守护进程，以及一个支持零拷贝的修改过的RDMA 网卡驱动程序。 我们在以下方面评估\sys :
+\sys{} 在三个组件中实现：一个用户空间库 \libipc {} 和一个带有17K行C ++代码的监控守护进程，以及一个支持零拷贝的修改过的RDMA 网卡驱动程序。
+本节从以下方面评估\sys{}：
 
 \parab {有效地为主机内套接字使用共享内存。}
 对于8字节消息，\sys 实现0.3 $\mu$s RTT和每秒23~M消息的吞吐量。 对于大型消息，\sys 使用零拷贝来实现Linux的1/13延迟和26x吞吐量。
@@ -35,12 +36,12 @@
 \subsection{方法}
 \label{socksdirect:subsec:methodology}
 
-我们使用两个Xeon E5-2698 v3 CPU，256~GiB内存和一个Mellanox ConnectX-4网卡评估服务器上的\sys 。服务器与Arista 7060CX-32S 100G交换机互连 \cite {arista-7060cx}。我们使用Ubuntu 16.04和Linux 4.15，RoCEv2用于RDMA，每64条消息轮询完成队列。
-每个线程都固定在CPU内核上。在收集数据之前，我们会进行足够的预热测试。
-对于延迟，我们构建一个乒乓应用程序并报告平均往返时间，误差条代表1％和99％百分位数。
+本节使用两个Xeon E5-2698 v3 CPU，256~GiB内存和一个Mellanox ConnectX-4网卡评估服务器上的\sys{}。服务器与Arista 7060CX-32S 100G交换机互连 \cite {arista-7060cx}。服务器使用Ubuntu 16.04和Linux 4.15，将RoCEv2用于RDMA协议，每64条消息轮询一次完成队列。
+每个线程都固定在CPU内核上。在收集数据之前，进行了足够的预热测试。
+对于延迟，本节使用一个乒乓应用程序报告平均往返时间，误差条代表1％和99％百分位数。
 对于吞吐量，一方保持发送数据而另一方不断接收数据。
-我们将比较Linux，原始RDMA写动词，Rsocket~ \cite {rsockets}和LibVMA~ \cite {libvma}，这是针对Mellanox 网卡优化的用户空间TCP / IP堆栈。
-我们没有评估mTCP~ \cite {jeong2014mtcp}，因为底层DPDK库对我们的网卡的支持有限。由于批处理，mTCP具有比RDMA高得多的延迟，报告的吞吐量为每秒1.7~M包~~ \cite {kalia2018datacenter}。
+本节将比较Linux，原始RDMA写原语（write verb），Rsocket~ \cite {rsockets}和LibVMA~ \cite {libvma}，这是针对Mellanox 网卡优化的用户空间TCP / IP堆栈。
+本节没有评估mTCP~ \cite {jeong2014mtcp}，因为底层DPDK库对Mellanox ConnectX-4网卡的支持有限。由于批处理，mTCP具有比RDMA高得多的延迟，报告的吞吐量为每秒1.7~M包~~ \cite {kalia2018datacenter}。
 
 \subsection{微基准测试}
 \label{socksdirect:subsec:microbenchmark}
@@ -130,7 +131,7 @@ LibVMA只是将内核TCP套接字用于主机内部。
 \sys 实现了主机内和主机间套接字的几乎线性可扩展性。
 对于主机内套接字，\sys 在16对发送器和接收器核心之间提供每秒306~M消息的吞吐量，这是Linux的40倍和RSocket的30倍。
 LibVMA回退到Linux用于主机内套接字。
-使用RDMA作为主机间套接字，\sys 使用批处理以16个内核实现每秒276~M个消息的吞吐量，这是我们RDMA网卡的消息吞吐量的2.5倍。
+使用RDMA作为主机间套接字，\sys 使用批处理以16个内核实现每秒276~M个消息的吞吐量，这是本章使用的RDMA网卡的消息吞吐量的2.5倍。
 由于缓冲区管理的可扩展性有限，RSocket的主机内部为24~M，主机间为33~M。
 由于共享网卡队列上的锁争用，与单线程相比，LibVMA的吞吐量减少到两个线程的1/4，而三个和更多线程的1/10。
 Linux吞吐量从1到7个核心线性扩展，并在环回或具有更多核心的网卡队列上出现瓶颈。
@@ -161,7 +162,7 @@ Linux吞吐量从1到7个核心线性扩展，并在环回或具有更多核心�
 
 %Figure~\ref{socksdirect:fig:eval-conn-setup-tput} shows the throughput of connection creation with different number of cores. Each core can create 1.4~M new connections per second, which is 20x of Linux and 2x of mTCP~\cite{jeong2014mtcp}. The upper bound is 5.3~M connections per second, where the monitor becomes a bottleneck.
 
-最后，我们评估共享核心的多个线程的性能。 每个线程都需要等待轮到它来处理消息。
+最后评估共享核心的多个线程的性能。 每个线程都需要等待轮到它来处理消息。
 如图 \ref {socksdirect:fig:eval-context-switch}所示，尽管消息处理延迟几乎与活动进程的数量呈线性增长，但它仍然是Linux的1/20到1/30。
 
 
