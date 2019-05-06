@@ -2,7 +2,7 @@
 \label{kvdirect:sec:conclusion}
 
 
-在本章中，我们描述了\oursys {}的设计和评估，这是一个高性能的内存中键值存储。 在计算机系统设计的悠久历史中，\oursys {}是另一项利用可重新配置硬件来加速重要工作量的练习。 \oursys {}能够通过精心设计硬件和软件来获得卓越的性能，以消除系统中的瓶颈并实现接近底层硬件物理极限的性能。
+本章描述了\oursys {}的设计和评估，这是一个高性能的内存中键值存储。 在计算机系统设计的悠久历史中，\oursys {}是另一项利用可重新配置硬件来加速重要工作量的练习。 \oursys {}能够通过精心设计硬件和软件来获得卓越的性能，以消除系统中的瓶颈并实现接近底层硬件物理极限的性能。
 
 \iffalse
 \textbf{从网络到数据结构}
@@ -12,13 +12,13 @@
 
 \begin{sidewaystable}[h]
 	\centering
-	\caption{KV-Direct 与其他键值存储系统在长尾（倾斜  Zipf）负载和 10 字节小键下的比较。对于相关工作未报告的性能数字，我们使用相似的硬件来模拟这些系统，并报告我们粗略的测量结果。对于 CPU 绕过的系统，括号内的数字报告峰值负载和空闲情况下的功耗差异。}
+	\caption{KV-Direct 与其他键值存储系统在长尾（倾斜  Zipf）负载和 10 字节小键下的比较。对于相关工作未报告的性能数字，本文使用相似的硬件来模拟这些系统，并报告粗略的测量结果。对于 CPU 绕过的系统，括号内的数字报告峰值负载和空闲情况下的功耗差异。}
 	\label{kvdirect:tab:kvs-compare}
 	\small
 	\begin{tabular}{|l|l|l|r|r|r|r|r|r|r|}
 		\toprule
 		键值存储  & 注释 & 性能瓶颈 & \multicolumn{2}{c|}{吞吐量 (Mops)} & \multicolumn{2}{c|}{功耗效率 (Kops/W)} & \multicolumn{2}{c|}{平均延迟 ($\mu$s)} \\
-		\cline{4-9}
+		\cline{4-9}表 \ref {clicknp:tab:elements} 
 		& & & GET & PUT & GET & PUT & GET & PUT \\
 		\midrule
 		Memcached~\cite{fitzpatrick2004distributed} & 传统 & CPU 核间同步 & 1.5 & 1.5 & \approx5 & \approx5 & \approx50 & \approx50 \\

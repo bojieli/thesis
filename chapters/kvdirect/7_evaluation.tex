@@ -3,16 +3,16 @@
 
 
 \label{kvdirect:sec:evaluation}
-在本节中，我们首先采用简化视角来支持我们的设计选择，使用关键组件的微基准，然后切换到整体方法，以演示系统基准中\oursys {}的整体性能。
+本节首先采用简化视角来支持本文的设计选择，使用关键组件的微基准，然后切换到整体方法，以演示系统基准中\oursys {}的整体性能。
 
 
-我们在8台服务器和1台Arista DCS-7060CX-32S交换机的测试台上评估KV-Direct。
+本节在8台服务器和1台Arista DCS-7060CX-32S交换机的测试台上评估KV-Direct。
 每台服务器配备两个禁用超线程的8核Xeon E5-2650 v2 CPU，形成两个通过QPI Link连接的NUMA节点。每个NUMA节点都装有8个DIMM 8~GiB三星DDR3-1333 ECC RAM，每台服务器上总共有128~GiB的主机内存。
 可编程网卡~ \cite {caulfield2016cloud}连接到CPU 0的PCIe root complex，其40~Gbps以太网端口连接到交换机。可编程网卡在分叉的Gen3 x16物理连接器中有两个PCIe Gen3 x8链路。
 经过测试的服务器配备SuperMicro X9DRG-QF主板和一个运行Archlinux的120~GB SATA SSD（内核版本4.11.9-1）。
 
-对于系统基准测试，我们使用YCSB工作负载 \cite {cooper2010benchmarking}。
-对于偏斜（skewed）的Zipf工作负载，我们选择偏差（skewness）0.99并将其称为\textit {长尾}工作负载。
+对于系统基准测试，使用YCSB工作负载 \cite {cooper2010benchmarking}。
+对于偏斜（skewed）的Zipf工作负载，本文选择偏差（skewness）0.99并将其称为\textit {长尾}工作负载。
 
 \subsection{微基准测试}
 \label{kvdirect:sec:microbenchmarks}
@@ -22,12 +22,12 @@
 \subsubsection{哈希表}
 \label{kvdirect:sec:hashtable-eval}
 
-我们的哈希表设计中有两个自由参数：（1）内联阈值，（2）整个内存空间中哈希索引的比率。
+哈希表设计中有两个自由参数：（1）内联阈值，（2）整个内存空间中哈希索引的比率。
 如图\ref {kvdirect:fig:optimize_fix_mem}所示，当哈希索引比率增长时，可以内联存储更多的键值对，从而产生更低的平均内存访问时间。
 图\ref {kvdirect:fig:optimize_fix_ratio}显示了随着使用更多内存而增加的内存访问量。
 如图\ref {kvdirect:fig:hashline-ratio}所示，最大可实现内存利用率在较高哈希索引比率下下降，因为可用于动态分配的内存较少。
 因此，为了在给定的存储器大小中容纳整个语料库，哈希索引比率具有上限。
-我们选择此上限并获得最小的平均内存访问时间，如图\ref {kvdirect:fig:hashline-ratio}中的虚线所示。
+本节选择此上限并获得最小的平均内存访问时间，如图\ref {kvdirect:fig:hashline-ratio}中的虚线所示。
 
 
 \begin{figure}[t]
@@ -46,9 +46,9 @@
 	\label{kvdirect:fig:hashline-ratio}
 \end{figure}
 
-在图\ref {kvdirect:fig:mem-access-tput}中，我们绘制了三种可能的哈希表设计的每个GET和PUT操作的内存访问次数：在KV-Direct中链接，MemC3中的桶式布谷鸟哈希（bucketized Cuckoo Hash）\cite {fan2013memc3}和FaRM \cite {dragojevic2014farm}中的链式关联（chain associative）跳房子散列（Hopscotch Hash）。
-对于KV-Direct，我们针对给定的键值大小和内存利用率要求，为内联阈值和哈希索引比率做出最佳选择。
-对于布谷鸟和跳房子散列，我们假设键是内联的并且可以并行比较，而值存储在动态分配的板中。
+图\ref {kvdirect:fig:mem-access-tput} 绘制了三种可能的哈希表设计的每个GET和PUT操作的内存访问次数：在KV-Direct中链接，MemC3中的桶式布谷鸟哈希（bucketized Cuckoo Hash）\cite {fan2013memc3} 和FaRM \cite {dragojevic2014farm} 中的链式关联（chain associative）跳房子散列（Hopscotch Hash）。
+对于KV-Direct，针对给定的键值大小和内存利用率要求，为内联阈值和哈希索引比率做出最佳选择。
+对于布谷鸟和跳房子散列，假设键是内联的并且可以并行比较，而值存储在动态分配的板中。
 由于MemC3和FaRM的哈希表不能支持10B 键值大小超过55％的内存利用率，图\ref {kvdirect:fig:mem-access-10-get}和图\ref {kvdirect:fig:mem-access-10-put}仅显示KV-Direct的性能。
 
 
@@ -73,7 +73,7 @@
 对于内联键值，KV-Direct在每个GET上接近1个内存访问，在非极端内存利用率下每个PUT接近2个内存访问。
 非内联键值的GET和PUT有一个额外的内存访问。
 在高内存利用率下比较KV-Direct和链式跳房子散列，跳房子散列在GET中表现更好，但在PUT中表现更差。
-虽然KV-Direct无法保证最坏情况下的DMA访问，但我们会在GET和PUT之间取得平衡。
+虽然KV-Direct无法保证最坏情况下的DMA访问，但会在GET和PUT之间取得平衡。
 布谷鸟散列需要在GET上访问最多两个散列槽，因此在大多数内存利用率下，KV-Direct具有更多的内存访问。
 在高内存利用率下，布谷鸟散列会导致每个PUT的内存访问时间出现大幅波动。
 
@@ -82,7 +82,7 @@
 \label{kvdirect:sec:slab-eval}
 
 slab内存分配器的通信开销来自网卡访问主机内存中的可用slab队列。
-为了维持每秒180M操作的最大吞吐量，在最坏的情况下，需要传输180M平板插槽，消耗720 MB / s PCIe吞吐量，即我们网卡的总PCIe吞吐量的5％。
+为了维持每秒180M操作的最大吞吐量，在最坏的情况下，需要传输180M平板插槽，消耗720 MB / s PCIe吞吐量，即网卡的总PCIe吞吐量的5％。
 
 slab内存分配器的计算开销来自主机CPU上的slab拆分和合并。
 幸运的是，它们并不经常被调用。
@@ -109,7 +109,7 @@ slab内存分配器的计算开销来自主机CPU上的slab拆分和合并。
 \subsubsection{乱序执行引擎}
 \label{kvdirect:sec:ooo-eval}
 
-我们通过比较吞吐量和在原子和长尾工作负载下使关键冲突管道停滞的简单方法来评估乱序执行的有效性。单面RDMA和双面RDMA \cite {kalia2016design}吞吐量也显示为基线。
+本节通过比较吞吐量和在原子和长尾工作负载下使关键冲突管道停滞的简单方法，评估乱序执行的有效性。单面RDMA和双面RDMA \cite {kalia2016design}吞吐量也显示为基线。
 
 如果没有此引擎，原子操作需要等待网卡中的PCIe延迟和处理延迟，在此期间无法执行对同一密钥的后续原子操作。
 这使得单键原子吞吐量在图 \ref{kvdirect:fig:ooo-atomic} 中为0.94~Mops，与从RDMA 网卡测量的2.24~Mops一致 \cite {kalia2016design}。
@@ -213,14 +213,14 @@ The remaining few percent of operations have intrinsic higher processing delay d
 
 \subsubsection{方法}
 
-在每个基准测试之前，我们根据键值大小，访问模式和目标内存利用率来调整哈希索引比率，内联阈值和负载分派比率。
-然后我们生成具有给定大小的随机键值对。
+在每个基准测试之前，根据键值大小，访问模式和目标内存利用率来调整哈希索引比率，内联阈值和负载分派比率。
+然后生成具有给定大小的随机键值对。
 给定内联键值大小的密钥大小与KV-Direct的性能无关，因为在处理期间将密钥填充到最长的内联键值大小。
-为了测试内联案例，我们使用键值大小作为插槽大小的倍数（当大小为$ \leq $ 50时，即10个插槽）。为了测试非内联的情况，我们使用的键值大小是2减2字节的幂（对于元数据）。
-作为准备的最后一步，我们发出PUT操作以将键值对插入空闲键值存储，直到50％内存利用率。
+为了测试内联案例，使用键值大小作为插槽大小的倍数（当大小为$ \leq $ 50时，即10个插槽）。为了测试非内联的情况，使用的键值大小是2减2字节的幂（对于元数据）。
+作为准备的最后一步，发出PUT操作以将键值对插入空闲键值存储，直到50％内存利用率。
 其他内存利用率下的性能可以从图 \ref {kvdirect:fig:mem-access-tput}中获得。
 
-在基准测试期间，我们在同一个ToR中使用基于FPGA的数据包生成器 \cite {li2016clicknp}来生成批量键值操作，将它们发送到键值服务器，接收完成并测量可持续的吞吐量和延迟。
+在基准测试期间，在同一个ToR中使用基于FPGA的数据包生成器 \cite {li2016clicknp}来生成批量键值操作，将它们发送到键值服务器，接收完成并测量可持续的吞吐量和延迟。
 分组生成器的处理延迟通过直接环回预先校准，并从延迟测量中移除。
 误差线表示$ 5^{th} $和$ 95^{th} $百分位数。
 
@@ -255,7 +255,7 @@ The remaining few percent of operations have intrinsic higher processing delay d
 与表 \ref {kvdirect:tab:kvs-compare} 中最先进的键值存储系统相比，KV-Direct的功率效率是其他系统的3倍，是第一个达到100万的通用键值存储系统 商用服务器上每瓦特的键值操作。
 
 当拔出KV-Direct网卡时，空闲服务器的功耗为87.0瓦，因此可编程网卡，PCIe，主机内存和CPU上的守护进程的总功耗仅为34瓦。
-测量的功率差异是合理的，因为CPU几乎处于空闲状态，服务器可以在KV-Direct运行时运行其他工作负载（我们对单侧RDMA使用相同的标准，如表 \ref{kvdirect:tab:kvs-compare} 的括号中所示）。
+测量的功率差异是合理的，因为CPU几乎处于空闲状态，服务器可以在KV-Direct运行时运行其他工作负载（对单侧RDMA使用相同的标准，如表 \ref{kvdirect:tab:kvs-compare} 的括号中所示）。
 在这方面，KV-Direct的功率效率是基于CPU的系统的10倍。
 
 \subsubsection{延迟}
@@ -281,7 +281,7 @@ The remaining few percent of operations have intrinsic higher processing delay d
 
 
 KV-Direct旨在绕过服务器CPU，仅使用一部分主机内存用于键值存储。 因此，CPU仍然可以运行其他应用程序。
-当单个网卡 KV-Direct处于峰值负载时，我们的测量结果对服务器上的其他工作负载的影响最小。
+当单个网卡 KV-Direct处于峰值负载时，测量对服务器上的其他工作负载的影响最小。
 表 \ref {kvdirect:tab:cpu-impact} 量化了KV-Direct峰值吞吐量的影响。
 除了CPU 0的顺序吞吐量以访问其自己的NUMA内存（以粗体标记的行）之外，CPU内存访问的延迟和吞吐量大多不受影响。
 这是因为8个主机存储器通道可以提供比所有CPU核心消耗的更高的随机访问吞吐量，而CPU确实可以强调DRAM通道的顺序吞吐量。
