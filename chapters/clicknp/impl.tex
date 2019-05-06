@@ -63,7 +63,7 @@ HashTCAM和RateLimiter具有适度的逻辑资源使用，因为这些元件具�
 
 如前所述，\name 的一个关键属性是支持联合CPU / FPGA处理。
 本章通过设计高吞吐量，低延迟的PCIe I / O通道来实现这一目标。
-我们扩展了OpenCL运行时，添加一个新的I / O通道，并连接到shell中的PCIe交换机。
+为此，我们扩展了OpenCL运行时，添加一个新的I / O通道，并连接到shell中的PCIe交换机。
 PCIe交换机将仲裁新添加的I / O通道与shell中的其他组件（例如DDR内存控制器）之间的访问。
 
 Catapult shell \cite {putnam2014reconfigurable}中的PCIe插槽DMA引擎将PCIe Gen2 x8链路划分为64个逻辑子通道，即\textit {slots}。
