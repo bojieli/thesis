@@ -46,9 +46,9 @@
 	\label{kvdirect:fig:hashline-ratio}
 \end{figure}
 
-图\ref {kvdirect:fig:mem-access-tput} 绘制了三种可能的哈希表设计的每个GET和PUT操作的内存访问次数：在KV-Direct中链接，MemC3中的桶式布谷鸟哈希（bucketized Cuckoo Hash）\cite {fan2013memc3} 和FaRM \cite {dragojevic2014farm} 中的链式关联（chain associative）跳房子散列（Hopscotch Hash）。
+图\ref {kvdirect:fig:mem-access-tput} 绘制了三种可能的哈希表设计的每个GET和PUT操作的内存访问次数：在KV-Direct中链接，MemC3中的桶式布谷鸟哈希（bucketized Cuckoo Hash）\cite {fan2013memc3} 和FaRM \cite {dragojevic2014farm} 中的链式关联（chain associative）跳房子哈希（Hopscotch Hash）。
 对于KV-Direct，针对给定的键值大小和内存利用率要求，为内联阈值和哈希索引比率做出最佳选择。
-对于布谷鸟和跳房子散列，假设键是内联的并且可以并行比较，而值存储在动态分配的板中。
+对于布谷鸟和跳房子哈希，假设键是内联的并且可以并行比较，而值存储在动态分配的板中。
 由于MemC3和FaRM的哈希表不能支持10B 键值大小超过55％的内存利用率，图\ref {kvdirect:fig:mem-access-10-get}和图\ref {kvdirect:fig:mem-access-10-put}仅显示KV-Direct的性能。
 
 
@@ -72,10 +72,10 @@
 
 对于内联键值，KV-Direct在每个GET上接近1个内存访问，在非极端内存利用率下每个PUT接近2个内存访问。
 非内联键值的GET和PUT有一个额外的内存访问。
-在高内存利用率下比较KV-Direct和链式跳房子散列，跳房子散列在GET中表现更好，但在PUT中表现更差。
+在高内存利用率下比较KV-Direct和链式跳房子哈希，跳房子哈希在GET中表现更好，但在PUT中表现更差。
 虽然KV-Direct无法保证最坏情况下的DMA访问，但会在GET和PUT之间取得平衡。
-布谷鸟散列需要在GET上访问最多两个散列槽，因此在大多数内存利用率下，KV-Direct具有更多的内存访问。
-在高内存利用率下，布谷鸟散列会导致每个PUT的内存访问时间出现大幅波动。
+布谷鸟哈希需要在GET上访问最多两个哈希槽，因此在大多数内存利用率下，KV-Direct具有更多的内存访问。
+在高内存利用率下，布谷鸟哈希会导致每个PUT的内存访问时间出现大幅波动。
 
 
 \subsubsection{Slab 内存分配器}
@@ -239,7 +239,7 @@ The remaining few percent of operations have intrinsic higher processing delay d
 
 图 \ref {kvdirect:fig:ycsb-tput} 显示了YCSB均匀和长尾（偏斜Zipf）工作负载下KV-Direct的吞吐量。
 三个因素可能是KV-Direct的瓶颈：时钟频率，网络和PCIe / DRAM。
-对于在散列索引中内联的5B至15B 键值，大多数GET需要一个PCIe / DRAM访问，而PUT需要两个PCIe / DRAM访问。
+对于在哈希索引中内联的5B至15B 键值，大多数GET需要一个PCIe / DRAM访问，而PUT需要两个PCIe / DRAM访问。
 这种小型键值在许多系统中很普遍。在PageRank中，边的键值大小为8B。在稀疏逻辑回归中，键值大小通常为8B-16B。对于分布式系统中的顺控程序和锁定，键值大小为8B。
 
 在相同的内存利用率下，由于哈希冲突的概率较高，较大的内联键值具有较低的吞吐量。

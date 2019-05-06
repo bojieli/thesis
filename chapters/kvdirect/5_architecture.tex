@@ -72,7 +72,7 @@ HLS工具自动提取复制函数中的数据依赖性，并生成完全流水�
 接下来，乱序执行引擎（\S \ref {kvdirect:sec:ooo}）从保留站向操作解码器发出独立的键值操作。
 根据操作类型，键值处理器查找哈希表（\S \ref {kvdirect:sec:hashtable}）并执行相应的操作。
 为了最小化内存访问次数，较小的键值对在哈希表中内联（inline）存储，其他的键值对存储在slab内存分配器（\S \ref {kvdirect:sec:slab}）的动态分配内存中。
-散列索引和slab分配的内存都由统一的内存访问引擎（\S \ref {kvdirect:sec:dram-cache}）管理，它通过PCIe DMA访问主机内存并缓存部分主机内存。板载DRAM。
+哈希索引和slab分配的内存都由统一的内存访问引擎（\S \ref {kvdirect:sec:dram-cache}）管理，它通过PCIe DMA访问主机内存并缓存部分主机内存。板载DRAM。
 在键值操作完成之后，结果被发送回无序执行引擎（\S \ref {kvdirect:sec:ooo}）以在保留站中找到并执行匹配的键值操作。
 
 正如\S \ref {kvdirect:sec:challenge}中所讨论的，PCIe操作吞吐量的稀缺性要求键值处理器在DMA访问上节俭。
@@ -103,20 +103,20 @@ KV-Direct仔细设计哈希表，以便在每次查找和插入时实现接近�
 %For inline 键值s, to mark the begin and end of each hash slot, as well as the separation between inline key and value, the information is encoded in a 50b metadata corresponding to 50 bytes of hash slots.
 %The inline keys and secondary hashes of offline keys in all hash slots are compared in parallel, and the first match is found.
 
-每个散列槽包括指向动态分配的存储器中的键值数据的指针和辅助散列。
+每个哈希槽包括指向动态分配的存储器中的键值数据的指针和辅助哈希。
 辅助哈希是一种启用并行内联检查的优化。始终检查键以确保正确性，但需要额外的一次内存访问。
 假设主机内存中的64~GiB 键值存储和32字节分配粒度（内部碎片和分配元数据开销之间的权衡），指针需要31位。
-9位的二级散列给出1/512误报可能性。
-累积地，散列槽大小是5个字节。
-为了确定散列桶大小，需要在每个桶的散列槽数和DMA吞吐量之间进行权衡。
+9位的二级哈希给出1/512误报可能性。
+累积地，哈希槽大小是5个字节。
+为了确定哈希桶大小，需要在每个桶的哈希槽数和DMA吞吐量之间进行权衡。
 图\ref {kvdirect:fig:dma-tput}表明DMA读取吞吐量低于64B粒度受DMA引擎中PCIe延迟和并行性的约束。
 由于哈希冲突的可能性增加，小于64B的桶大小是次优的。
-另一方面，将桶大小增加到64B以上会降低散列查找吞吐量。
+另一方面，将桶大小增加到64B以上会降低哈希查找吞吐量。
 因此桶大小选择为64字节。
 
 \textit {键值大小}是指键和值的总大小。
 小于阈值的键值在哈希索引中内联（inline）存储，以保存对获取键值数据的额外存储器访问。
-内联键值可以跨越多个散列槽，其指针和二级散列字段被重新用于存储键值数据。
+内联键值可以跨越多个哈希槽，其指针和二级哈希字段被重新用于存储键值数据。
 内联所有可装入铲斗的键值可能不是最佳选择。
 为了最小化平均访问时间，假设可以同等地访问越来越小的键，则更希望内联小于\textit {内联阈值}的键值。
 为了量化所有桶中使用的桶的部分，本章使用\textit {内存利用率}而不是负载率（load factor），因为它更多地涉及可以适合固定内存量的键值的数量。
@@ -133,10 +133,10 @@ KV-Direct仔细设计哈希表，以便在每次查找和插入时实现接近�
 \end{figure}
 
 
-当存储桶中的所有插槽都已填满时，有几种解决方案可以解决散列冲突。
+当存储桶中的所有插槽都已填满时，有几种解决方案可以解决哈希冲突。
 Cuckoo哈希\cite {pagh2004cuckoo}和跳房子哈希（Hopscotch Hash）\cite {herlihy2008hopscotch}通过在插入过程中移动占用的插槽来保证恒定时间查找。
 但是，在写入密集型工作负载中，高负载率下的内存访问时间会经历大的波动。
-线性探测可能受到主群集的影响，因此其性能对散列函数的均匀性敏感。
+线性探测可能受到主群集的影响，因此其性能对哈希函数的均匀性敏感。
 为此，选择\textit {拉链法}来解决哈希冲突，这会平衡查找和插入，同时对哈希群集更加健壮。
 
 %In KV-Direct, we measure memory utilization instead of load factor, because chaining has dynamic size and that we care more about the overall storage efficiency counting all indexing, metadata and memory fragmentation overhead.
@@ -146,7 +146,7 @@ Cuckoo哈希\cite {pagh2004cuckoo}和跳房子哈希（Hopscotch Hash）\cite {h
 \subsubsection{Slab 内存分配器}
 \label{kvdirect:sec:slab}
 
-链式散列槽和非内联键值需要动态内存分配。
+链式哈希槽和非内联键值需要动态内存分配。
 为此，选择slab内存分配器\cite {bonwick1994slab}来实现每个分配和释放的$O（1）$平均内存访问。主slab分配器逻辑在主机CPU上运行，并通过PCIe与键值处理器通信。
 Slab分配器将分配大小四舍五入到最接近的2的幂，称为\textit {slab 大小}。
 它为每个可能的slab大小（32,64，\ldots，512字节）和全局 \textit {分配位图}维护\textit {空闲 slab 池}，以帮助将小的空闲slab合并回更大的slab。
@@ -176,12 +176,12 @@ Slab分配器将分配大小四舍五入到最接近的2的幂，称为\textit {
 但是，并行比较256个16字节键将占用FPGA的40％逻辑资源。
 相反，本节将键值操作存储在片上BRAM中的小哈希表中，由键的哈希索引。
 键值操作可能具有相同的哈希值，因此可能存在误报，但它永远不会错过依赖关系。
-具有相同散列的操作在链中组织并顺序检查。
-散列冲突会降低链检查的效率，因此保留站包含1024个散列槽，使哈希冲突可能性低于25％。
+具有相同哈希的操作在链中组织并顺序检查。
+哈希冲突会降低链检查的效率，因此保留站包含1024个哈希槽，使哈希冲突可能性低于25％。
 
 保留站不仅保留挂起的操作，还缓存\textit {数据转发}（data forwarding）的最新值。
 当主处理流水线完成键值操作时，其结果返回给客户端，最新值被转发到保留站。
-逐个检查相同散列槽中的待定操作，并立即执行具有匹配键的操作并从保留站移除。
+逐个检查相同哈希槽中的待定操作，并立即执行具有匹配键的操作并从保留站移除。
 对于原子操作，计算在专用执行引擎中执行。
 对于写入操作，将更新缓存的值。
 执行结果直接返回给客户端。
@@ -206,7 +206,7 @@ Slab分配器将分配大小四舍五入到最接近的2的幂，称为\textit {
 另一种方法是使用网卡 DRAM作为主机内存的缓存，由于网卡 DRAM的吞吐量有限，吞吐量会降低。
 
 本节采用混合解决方案将DRAM用作主机内存中固定部分键值存储的缓存，如图\ref {kvdirect:fig:cache}所示。
-可缓存部分由存储器地址的散列确定，其粒度为64字节。选择散列函数，使得散列索引和动态分配的存储器中的地址具有可高速缓存的相同可能性。
+可缓存部分由存储器地址的哈希确定，其粒度为64字节。选择哈希函数，使得哈希索引和动态分配的存储器中的地址具有可高速缓存的相同可能性。
 整个键值存储内存中可缓存内存的部分称为\textit {负载分配比例}（$ l $）。
 使用更大的负载调度比$ l $，将更多负载分配给板载DRAM，并且缓存命中率$ h(l)$将增加。
 假设缓存命中率可能是$ h(l)$。

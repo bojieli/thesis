@@ -149,7 +149,7 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 例如图形计算\cite {page1999pagerank}，参数服务器\cite {li2014scaling}。
 对于图表中的PageRank计算\cite {page1999pagerank} 或参数服务器中的梯度下降\cite {li2014scaling}，每次迭代读取和写入每个节点或参数一次，并且键值存储将提供相同数量的GET和PUT操作。
 序列号发生器（sequencer）\cite {kalia2016design}需要原子增量操作而不需要只读操作。
-这些工作负载支持散列表结构，可以有效地处理读写操作。
+这些工作负载支持哈希表结构，可以有效地处理读写操作。
 
 \textbf {快速原子操作。}
 几个非常流行的原子操作出现在应用程序中，例如集中式调度程序\cite {perry2014fastpass}，序列号发生器 \cite {kalia2016design,eris}，counter \cite {zhu2015packet}和 Web 应用程序中临时值\cite {atikoglu2012workload}。
@@ -185,8 +185,8 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 \end{figure}
 
 当推到极限时，在高性能键值存储系统中，吞吐量瓶颈可归因于键值操作中的计算和随机存储器访问中的延迟。
-基于CPU的键值存储需要花费CPU周期来进行键比较和散列槽计算。
-此外，键值存储散列表比CPU高速缓存大几个数量级，因此存储器访问等待时间由实际访问模式的高速缓存未命中等待时间决定。
+基于CPU的键值存储需要花费CPU周期来进行键比较和哈希槽计算。
+此外，键值存储哈希表比CPU高速缓存大几个数量级，因此存储器访问等待时间由实际访问模式的高速缓存未命中等待时间决定。
 
 
 测量表明，当代计算机的64字节随机读取延迟大约为1~ns。当CPU内核落入指令窗口时，CPU核心可以同时发出多个内存访问指令，受核心中加载存储单元数量的限制（如3至4个） \cite {gharachorloo1992hiding,han2010packetshader,zhang2015mega}。如图 \ref{kvdirect:tab:kv-cpu-throughput} 所示，在本文实验使用的CPU中，每个核心每秒最大吞吐量为29.3~M随机64B访问。另一方面，访问64字节键值对的操作通常需要大约100~ns计算或大约500条指令，这太大而不适合指令窗口（测量为100至200）。当与计算交错时，CPU内核的性能降低到每秒5.5~M 键值操作（Mops）。优化是通过在一次发出内存访问之前将多个操作的计算聚类在一起来批量键值存储中的内存访问\cite {li2016full,narula2014phase}。这将本文使用的CPU的每核心吞吐量提高到7.9~MOps，这仍远低于主机DRAM的随机64B吞吐量。
@@ -212,7 +212,7 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 
 观察键值处理中CPU的有限容量，最近的工作是：利用片面RDMA将键值处理卸载到客户端，并有效地将键值存储服务器用作共享内存池。
 尽管RDMA网卡提供了高消息率（8 至 150~Mops \cite {kalia2016design}），但要找到RDMA原语和键值操作之间的有效匹配是一项挑战。
-对于写入（PUT或原子）操作，可能需要多个网络往返和多个存储器访问来查询散列索引，处理散列冲突并分配可变大小的存储器。
+对于写入（PUT或原子）操作，可能需要多个网络往返和多个存储器访问来查询哈希索引，处理哈希冲突并分配可变大小的存储器。
 RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或分布式原子广播保持一致性 \cite{szepesi2014designing}，这两者都会产生通信开销和同步延迟 \cite {mitchell2013using,dragojevic2014farm}。
 因此，大多数基于RDMA的键值存储 \cite {mitchell2013using,dragojevic2014farm,kalia2014using}建议仅使用单面RDMA进行GET操作。对于PUT操作，它们会回退到服务器CPU。写入密集型工作负载的吞吐量仍然是CPU核心的瓶颈。
 
@@ -263,7 +263,7 @@ FPGA中的DMA引擎仅支持64个PCIe标签，进一步将DMA读取并发限制�
 这归结为三个挑战：
 
 \textbf {最小化每键值操作的DMA请求。}
-散列表和内存分配是键值存储中需要随机内存访问的两个主要组件。
+哈希表和内存分配是键值存储中需要随机内存访问的两个主要组件。
 以前的工作建议哈希表\cite {dragojevic2014farm,breslow2016horton}，即使在高负载因子下，每个GET操作也有接近1个内存访问。
 但是，在高于50％的负载因子下，这些表平均每个PUT操作需要多次存储器访问，且方差很大。
 这不仅会消耗PCIe吞吐量，还会导致写入密集型工作负载的延迟变化。

@@ -78,7 +78,7 @@ ECC DRAM通常每64位数据具有8个ECC位。
 %The client could match the completions with requests by the key, because completions with a same key are guaranteed to be in request order.
 
 \subsection{向量操作译码器}
-在整个键值处理器设计中，将批处理视为在一个存储桶中获取多个散列槽，使自由slab队列与主机内存同步，懒惰拆分和slab槽合并以及依赖键值操作的数据转发的通用原则。
+在整个键值处理器设计中，将批处理视为在一个存储桶中获取多个哈希槽，使自由slab队列与主机内存同步，懒惰拆分和slab槽合并以及依赖键值操作的数据转发的通用原则。
 批处理通过将控制平面开销分摊到多个数据平面有效负载来提高性能。
 与PCIe相比，网络是一种更加稀缺的资源，具有更低的带宽（5~GB / s）和更高的延迟（2~$\mu$s）。
 以太网上的RDMA写数据包有88字节的报头和填充开销，而PCIe TLP数据包只有26字节的开销。
