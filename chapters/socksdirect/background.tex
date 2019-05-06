@@ -489,7 +489,7 @@ MegaPipe~ \cite {han2012megapipe}和StackMap~ \cite {yasukata2016stackmap}提出
 
 \parab {用户空间TCP / IP堆栈:}第二类工作完全绕过内核TCP / IP堆栈并在用户空间中实现TCP / IP。
 在这个类别中，IX~ \cite {belay2017ix}和Arrakis~\cite {peter2016arrakis}是新的操作系统架构，它使用虚拟化来确保安全性和隔离性。 IX利用LwIP~ \cite {dunkels2001design}在用户空间中实现TCP / IP，同时使用内核转发每个数据包以实现性能隔离和QoS。相比之下，Arrakis将QoS卸载到网卡，因此绕过数据平面的内核。
-他们使用网卡在同一主机中的应用程序之间转发数据包。
+它们使用网卡在同一主机中的应用程序之间转发数据包。
 如表 \ref {socksdirect:tab:operation-performance}所示，从CPU到网卡的发夹延迟远远高于核心间缓存迁移延迟。
 吞吐量也受到内存映射I / O（MMIO）门铃延迟和PCIe带宽的限制 \cite {neugebauer2018understanding,li2017kv}。
 
@@ -527,13 +527,13 @@ FreeFlow~ \cite {nsdi19freeflow}虚拟化容器覆盖网络的RDMA 网卡，它�
 FreeFlow使用RSocket将套接字转换为RDMA。
 
 但是，由于RDMA和套接字的抽象不匹配，这些工作有局限性。
-在兼容性方面，首先，他们缺乏对几个重要API的支持，例如\textit {epoll}，因此它与许多应用程序不兼容，包括Nginx，Memcached，Redis等。
+在兼容性方面，首先，它们缺乏对几个重要API的支持，例如\textit {epoll}，因此它与许多应用程序不兼容，包括Nginx，Memcached，Redis等。
 这是因为RDMA仅提供传输功能，而\textit {epoll}是与OS事件通知集成的文件抽象。
 其次，RDMA QP不支持\textit {fork}和容器实时迁移 \cite{nsdi19freeflow}，因此RSocket也有同样的问题。
 第三，由于RSocket使用RDMA作为有线协议，因此无法连接到常规TCP / IP对等体。
 这是一个部署挑战，因为分布式系统中的所有主机和应用程序必须同时切换到RSocket。
 本章的目标是透明地检测远程端是否支持Rsocket，如果没有则回退到TCP / IP。
-在性能方面，他们无法删除有效负载副本，套接字文件描述符锁，缓冲区管理，进程唤醒和每个连接开销。
+在性能方面，它们无法删除有效负载副本，套接字文件描述符锁，缓冲区管理，进程唤醒和每个连接开销。
 例如，RSocket在发送方和接收方分配缓冲区并复制有效负载。
 与Arrakis类似，RSocket使用网卡进行主机内通信，从而导致性能瓶颈。
 
