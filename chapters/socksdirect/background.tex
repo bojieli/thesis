@@ -500,7 +500,7 @@ FaSST~ \cite {kalia2016fasst}和eRPC~ \cite {kalia2018datacenter}提供RPC API�
 LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS~ \cite {huang2017high}符合标准套接字API。
 
 用户空间TCP / IP堆栈提供了比Linux更好的性能，但它仍然不接近RDMA和SHM。
-一个重要原因是现有的工作都不支持在线程和进程之间共享套接字，导致fork和容器实时迁移中的兼容性问题，以及多线程锁开销。
+一个重要原因是现有的工作都不支持在线程和进程之间共享套接字，导致fork和容器热迁移中的兼容性问题，以及多线程锁开销。
 
 首先，当进程fork时，只有父进程和子进程中的一个可以使用现有套接字。
 但是，许多Web服务 \cite {apache,nginx,php-fpm,python-gunicorn,vsftpd}和键值存储 \cite {memcached}都有一个主进程来接受连接并（可选）读取请求头，然后它可以fork一个子进程来处理请求，其中子进程需要访问套接字。
@@ -508,7 +508,7 @@ LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS
 这使得此类Web服务无法正常工作。
 更棘手的情况是父进程和子进程可以通过现有套接字同时写入日志服务器。
 
-其次，容器实时迁移与fork有关。
+其次，容器热迁移与fork有关。
 它类似于fork容器（到新主机），子容器应该仍然能够访问套接字。
 
 第三，多线程在应用程序中很常见。
@@ -529,7 +529,7 @@ FreeFlow使用RSocket将套接字转换为RDMA。
 但是，由于RDMA和套接字的抽象不匹配，这些工作有局限性。
 在兼容性方面，首先，它们缺乏对几个重要API的支持，例如\textit {epoll}，因此它与许多应用程序不兼容，包括Nginx，Memcached，Redis等。
 这是因为RDMA仅提供传输功能，而\textit {epoll}是与OS事件通知集成的文件抽象。
-其次，RDMA QP不支持\textit {fork}和容器实时迁移 \cite{nsdi19freeflow}，因此RSocket也有同样的问题。
+其次，RDMA QP不支持\textit {fork}和容器热迁移 \cite{nsdi19freeflow}，因此RSocket也有同样的问题。
 第三，由于RSocket使用RDMA作为有线协议，因此无法连接到常规TCP / IP对等体。
 这是一个部署挑战，因为分布式系统中的所有主机和应用程序必须同时切换到RSocket。
 本章的目标是透明地检测远程端是否支持Rsocket，如果没有则回退到TCP / IP。

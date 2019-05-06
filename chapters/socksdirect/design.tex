@@ -57,7 +57,7 @@ SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它�
 对于\emph {主机间}（inter-host）通信，两个主机的监视器都参与其中。当应用程序连接到远程主机时，其本地监视器会建立常规TCP连接，并检测远程主机是否支持\sys {}。
 如果是这样，它会在两个监视器之间建立一个RDMA队列，以便可以更快地创建两个主机之间的未来连接。远程端的监视器调度与目标的连接，并帮助两个应用程序建立RDMA队列，如图 \ref {socksdirect:fig:architecture} 中的主机1和2之间。如果远程主机不支持\sys {}，它将继续使用TCP连接，如图 \ref {socksdirect:fig:architecture} 中的主机1和3之间。详细的连接管理协议在第 \ref {socksdirect:subsec:connection-management} 节中介绍。
 
-为了确保线程安全并避免锁，以及支持fork和container实时迁移，本章针对只有一对发送和接收线程处于活动状态的常见情况进行了优化，同时确保所有情况下的正确性（第 \ref {socksdirect:subsec:fork} 节）。
+为了确保线程安全并避免锁，以及支持fork和container热迁移，本章针对只有一对发送和接收线程处于活动状态的常见情况进行了优化，同时确保所有情况下的正确性（第 \ref {socksdirect:subsec:fork} 节）。
 为了消除缓冲区管理开销，设计了一个环形缓冲区，每个主机间消息平摊下来只需要一次RDMA写操作，每个主机内消息需要一个缓存迁移（第 \ref {socksdirect:subsec:lockless-queue}  节）。
 本章进一步设计了一种零拷贝机制，可以在发送和接收端删除大型消息的数据拷贝（第 \ref {socksdirect:subsec:zerocopy} 节）。
 最后，第 \ref {socksdirect:subsec:process-mux} 节提供了事件通知机制。
@@ -127,7 +127,7 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 
 %\RED{Need performance comparison in a figure.}
 
-每种类型的操作的详细信息如下:a）数据传输（\texttt {send}和\texttt {recv}），b）添加新的发送者和接收者（\texttt {fork}和线程创建 ），c）容器实时迁移，和d）连接关闭。
+每种类型的操作的详细信息如下:a）数据传输（\texttt {send}和\texttt {recv}），b）添加新的发送者和接收者（\texttt {fork}和线程创建 ），c）容器热迁移，和d）连接关闭。
 
 \subsubsection{发送/接收操作}
 \label{socksdirect:subsubsec:fork_rdwr}
@@ -136,7 +136,7 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 当一个线程没有发送令牌但想要通过套接字发送时，非活动线程需要\emph {接管}令牌。
 如果在非活动线程和活动线程之间创建直接通信通道，则会有对等队列，其数量为线程数的二次方，或者是具有锁的共享队列。
 为了避免这两种开销，在\emph {接管}过程中使用监控守护进程作为代理。
-此消息传递设计还具有以下优点:发送方进程可以位于不同的主机上，这在容器实时迁移中非常有用。
+此消息传递设计还具有以下优点:发送方进程可以位于不同的主机上，这在容器热迁移中非常有用。
 
 接管过程如下:
 非活动发送方向监视器发送\emph {take over}命令，监视器将其添加到等待列表并将命令代理到活动发送方。
@@ -266,7 +266,7 @@ SHM传输不需要特别小心，因为fork / exec之前创建的SHM仍然在for
 在迁移期间，旧监视器会转储已迁移容器的状态并将它们发送到新监视器。
 
 \textbf {建立新的沟通渠道。}
-迁移后，所有通信通道都已过时，因为共享内存在主机上是本地的，而RDMA不支持实时迁移 \cite{nsdi19freeflow,slim}。
+迁移后，所有通信通道都已过时，因为共享内存在主机上是本地的，而RDMA不支持热迁移 \cite{nsdi19freeflow,slim}。
 首先，新主机上的迁移容器需要与本地监视器建立连接。
 本地监视器指示以下过程。
 两个容器之间的主机内连接可能变为主机间，因此\libipc {}在这种情况下创建RDMA连接。
