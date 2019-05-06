@@ -40,18 +40,18 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 当发件人将数据包入队时，它会消耗信用。 当接收器使消息出列时，它会在本地递增计数器，并在计数器超过环形缓冲区大小的一半时在发送者的内存中写入\textit {credit return flag}。 发送者在检测到标志时重新获得队列信用。
 请注意，此机制与拥塞控制无关; 后者由网卡硬件处理 \cite {zhu2015congestion}。
 
-\textbf {发送和接收方的两个环形缓冲区副本。}
+\textbf {发送和接收方的两个环形缓冲区拷贝。}
 上述机制仍然会在发送端引起缓冲区管理，因为发送方需要在缓冲区中构造RDMA消息。
 其次，它不支持容器实时迁移，因为RDMA队列中的剩余数据很难迁移。
 第三，本章的目标是批量处理小消息以提高吞吐量。
-为此，本章在发送方和接收方都保留了环形缓冲区的副本。
+为此，本章在发送方和接收方都保留了环形缓冲区的拷贝。
 发送方写入其本地环形缓冲区，并调用RDMA以使发送方与接收方同步。
 \libipc{} 为每个环形缓冲区使用一个 RDMA RC QP，并维护一个机上RDMA消息的计数器。
 如果计数器未超过阈值，则为每个socket \texttt {send}操作发送RDMA消息。
 否则，不发送消息，\emph {send\_next}标记第一个未发送的消息。
 完成RDMA写入后，\libipc{} 会在图 \ref {socksdirect:fig:ringbuffer-new}中发送包含所有未发送更改的消息（\emph {send\_next}到\emph {tail}）。
 这种自适应批处理机制可最大限度地减少空闲链路上的延迟，并最大化繁忙链路上的吞
-对于SHM，只有一个由两个进程共享的环形缓冲区副本，并且同步由高速缓存一致性硬件完成。
+对于SHM，只有一个由两个进程共享的环形缓冲区拷贝，并且同步由高速缓存一致性硬件完成。
 
 %Before sending, sender clears header of the next message to prevent the receiver from considering junk data in the ring buffer to be a message. Next, sender writes payload, then writes header, finally advances \textit{tail}. Receiver polls \textit{isvalid} at \textit{head} pointer, then copies the message, finally advances \textit{head}.
 %For RDMA, the sender maintains a local copy of ring buffer, and we use one-sided RDMA write to synchronize updates from sender to receiver.

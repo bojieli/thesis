@@ -90,7 +90,7 @@ Linux套接字只能实现比硬件的原始功能差一个数量级的延迟和
 通常，线程和fork进程之间共享套接字连接。
 为了避免访问套接字元数据和缓冲区中的竞争条件，需要同步。通过基于令牌的共享方法，而不是锁每个操作，消除了常见情况下的同步开销。
 从网卡发送和接收数据时，现有系统为每个数据包分配缓冲区。
-为了消除缓冲区管理开销，本章设计了每个连接独享的环形缓冲区，在发送方和接收方都有两个副本，然后利用RDMA和SHM从发送方环缓冲区同步到接收方。
+为了消除缓冲区管理开销，本章设计了每个连接独享的环形缓冲区，在发送方和接收方都有两个拷贝，然后利用RDMA和SHM从发送方环缓冲区同步到接收方。
 为了实现大型消息的零拷贝，本章利用虚拟内存重新映射页面。
 %Finally, we observe that cooperative context switch is faster than process wakeup, so we design a mechanism to allow CPU time sharing among polling processes.
 

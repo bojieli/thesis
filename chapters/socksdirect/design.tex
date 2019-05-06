@@ -59,7 +59,7 @@ SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它�
 
 为了确保线程安全并避免锁，以及支持fork和container实时迁移，本章针对只有一对发送和接收线程处于活动状态的常见情况进行了优化，同时确保所有情况下的正确性（第 \ref {socksdirect:subsec:fork} 节）。
 为了消除缓冲区管理开销，设计了一个环形缓冲区，每个主机间消息平摊下来只需要一次RDMA写操作，每个主机内消息需要一个缓存迁移（第 \ref {socksdirect:subsec:lockless-queue}  节）。
-本章进一步设计了一种零拷贝机制，可以在发送和接收端删除大型消息的数据副本（第 \ref {socksdirect:subsec:zerocopy} 节）。
+本章进一步设计了一种零拷贝机制，可以在发送和接收端删除大型消息的数据拷贝（第 \ref {socksdirect:subsec:zerocopy} 节）。
 最后，第 \ref {socksdirect:subsec:process-mux} 节提供了事件通知机制。
 
 %In order to remove synchronization overhead for multi-threaded applications, we treat each thread as a separate process.
@@ -203,7 +203,7 @@ SHM传输不需要特别小心，因为fork / exec之前创建的SHM仍然在for
 在exec之后，整个RDMA上下文被清除。
 本章的解决方案是让子进程在fork / exec之后重新初始化RDMA资源（PD，MR等）。
 当子进程使用在fork之前创建的套接字时，它会要求监视器与远程端点重新建立RDMA QP。
-因此，远程可能会看到一个套接字的两个或更多QP，但它们链接到套接字元数据和缓冲区的唯一副本。
+因此，远程可能会看到一个套接字的两个或更多QP，但它们链接到套接字元数据和缓冲区的唯一拷贝。
 图 \ref {socksdirect:fig:fork-memory}显示了一个fork示例。
 
 \textbf {文件描述符 space sharing。}
