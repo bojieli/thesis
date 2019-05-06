@@ -240,7 +240,7 @@ The remaining few percent of operations have intrinsic higher processing delay d
 图 \ref {kvdirect:fig:ycsb-tput} 显示了YCSB均匀和长尾（偏斜Zipf）工作负载下KV-Direct的吞吐量。
 三个因素可能是KV-Direct的瓶颈：时钟频率，网络和PCIe / DRAM。
 对于在哈希索引中内联的5B至15B 键值，大多数GET需要一个PCIe / DRAM访问，而PUT需要两个PCIe / DRAM访问。
-这种小型键值在许多系统中很普遍。在PageRank中，边的键值大小为8B。在稀疏逻辑回归中，键值大小通常为8B-16B。对于分布式系统中的顺控程序和锁定，键值大小为8B。
+这种小型键值在许多系统中很普遍。在PageRank中，边的键值大小为8B。在稀疏逻辑回归中，键值大小通常为8B-16B。对于分布式系统中的顺控程序和锁，键值大小为8B。
 
 在相同的内存利用率下，由于哈希冲突的概率较高，较大的内联键值具有较低的吞吐量。
 62B和更大的键值没有内联，因此它们需要额外的内存访问。

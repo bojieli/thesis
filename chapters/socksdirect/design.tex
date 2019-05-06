@@ -57,7 +57,7 @@ SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它�
 对于\emph {主机间}（inter-host）通信，两个主机的监视器都参与其中。当应用程序连接到远程主机时，其本地监视器会建立常规TCP连接，并检测远程主机是否支持\sys {}。
 如果是这样，它会在两个监视器之间建立一个RDMA队列，以便可以更快地创建两个主机之间的未来连接。远程端的监视器调度与目标的连接，并帮助两个应用程序建立RDMA队列，如图 \ref {socksdirect:fig:architecture} 中的主机1和2之间。如果远程主机不支持\sys {}，它将继续使用TCP连接，如图 \ref {socksdirect:fig:architecture} 中的主机1和3之间。详细的连接管理协议在第 \ref {socksdirect:subsec:connection-management} 节中介绍。
 
-为了确保线程安全并避免锁定，以及支持fork和container实时迁移，本章针对只有一对发送和接收线程处于活动状态的常见情况进行了优化，同时确保所有情况下的正确性（第 \ref {socksdirect:subsec:fork} 节）。
+为了确保线程安全并避免锁，以及支持fork和container实时迁移，本章针对只有一对发送和接收线程处于活动状态的常见情况进行了优化，同时确保所有情况下的正确性（第 \ref {socksdirect:subsec:fork} 节）。
 为了消除缓冲区管理开销，设计了一个环形缓冲区，每个主机间消息平摊下来只需要一次RDMA写操作，每个主机内消息需要一个缓存迁移（第 \ref {socksdirect:subsec:lockless-queue}  节）。
 本章进一步设计了一种零拷贝机制，可以在发送和接收端删除大型消息的数据副本（第 \ref {socksdirect:subsec:zerocopy} 节）。
 最后，第 \ref {socksdirect:subsec:process-mux} 节提供了事件通知机制。
@@ -90,16 +90,16 @@ SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它�
 	\label{socksdirect:fig:queue-arch}
 \end{figure}
 
-大多数套接字系统都获得了一个per-文件描述符锁，以使线程和进程共享套接字（第 \ref {socksdirect:subsec:per-operation-overhead} 节）。
-以前的工作 \cite {boyd2010analysis,clements2015scalable}表明许多套接字操作不可交换，并且不能始终避免同步。
-本章利用SHM消息传递比锁定 \cite {roghanchi2017ffwd}便宜得多的事实，并使用消息传递作为独占同步机制。
+大多数套接字系统都获得了一个每文件描述符的锁，以使线程和进程共享套接字（第 \ref {socksdirect:subsec:per-operation-overhead} 节）。
+以前的工作 \cite {boyd2010analysis,clements2015scalable} 表明许多套接字操作不可交换，并且不能始终避免同步。
+本章利用SHM消息传递比锁 \cite {roghanchi2017ffwd} 便宜得多的事实，并使用消息传递作为独占同步机制。
 
-逻辑上，套接字由两个相反方向的FIFO \emph {queues}组成，每个FIFO具有多个并发发送器和接收器。
+逻辑上，套接字由两个相反方向的FIFO \emph {队列}组成，每个FIFO具有多个并发发送器和接收器。
 本章的目标是在保持FIFO语义的同时最大化通用情况性能。
 我们提出两点观察：首先，由于成本高，在高性能应用程序中创建fork和线程很少。
 其次，几个进程从共享套接字发送或接收并不常见，因为套接字的字节流语义使得很难避免接收部分消息。
-％如果应用程序需要同时发送或接收，则通常使用消息代理 \cite {hintjens2013zeromq,rabbitmq2017rabbitmq,kreps2011kafka}。
-常见的情况是应用程序隐式地将套接字从一个进程迁移到另一个进程，例如将事务从master卸载到工作进程。
+需要同时发送或接收的应用程序通常使用消息代理（message broker） \cite {hintjens2013zeromq,rabbitmq2017rabbitmq,kreps2011kafka} 而非直接共享套接字。
+常见的进程间套接字共享情况是应用程序隐式地将套接字从一个进程迁移到另一个进程，例如将事务从主进程卸载到工作进程。
 
 \iffalse
 Based on the observations, we propose the following requirements:
@@ -134,7 +134,7 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 
 
 当一个线程没有发送令牌但想要通过套接字发送时，非活动线程需要\emph {接管}令牌。
-如果在非活动线程和活动线程之间创建直接通信通道，则会有对等队列，其数量为线程数的二次方，或者是具有锁定的共享队列。
+如果在非活动线程和活动线程之间创建直接通信通道，则会有对等队列，其数量为线程数的二次方，或者是具有锁的共享队列。
 为了避免这两种开销，在\emph {接管}过程中使用监控守护进程作为代理。
 此消息传递设计还具有以下优点:发送方进程可以位于不同的主机上，这在容器实时迁移中非常有用。
 

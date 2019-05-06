@@ -204,7 +204,7 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 许多应用程序都是多线程的，原因有两个。
 首先，与FreeBSD不同，用于在Linux中读写磁盘文件的异步接口无法利用操作系统缓存和缓冲区，因此应用程序继续使用具有多个线程的同步接口 \cite {nginx-multi-thread}。
 其次，许多Web应用程序框架更喜欢同步编程模型来处理每个用户请求，因为它更容易编写和调试 \cite {barroso2017attack}。
-进程中的多个线程共享套接字连接。此外，在进程分叉之后，父进程和子进程共享现有套接字。套接字也可以通过Unix域套接字传递给另一个进程。为了保护并发操作，Linux内核为每个套接字操作获取每个套接字锁定 \cite {boyd2010analysis,han2012megapipe,lin2016scalable}。表 \ref {socksdirect:tab:operation-performance}表明，受原子操作保护的共享内存队列具有4x延迟和无锁队列的22％吞吐量，即使没有争用。
+进程中的多个线程共享套接字连接。此外，在进程分叉之后，父进程和子进程共享现有套接字。套接字也可以通过Unix域套接字传递给另一个进程。为了保护并发操作，Linux内核为每个套接字操作获取每个套接字锁 \cite {boyd2010analysis,han2012megapipe,lin2016scalable}。表 \ref {socksdirect:tab:operation-performance}表明，受原子操作保护的共享内存队列具有4x延迟和无锁队列的22％吞吐量，即使没有争用。
 本章的目标是通过优化常见情况并删除常用套接字操作中的同步来最小化同步开销。
 
 %\parab{Intra-host communication.}
@@ -448,7 +448,7 @@ LOS~ \cite {huang2017high}将文件描述符空间划分为用户和内核部分
 但是，许多应用程序，如Redis~ \cite {redis}和Memcached~ \cite {memcached}都依赖于此属性。
 本章的目标是在保持兼容性的同时绕过内核套接字文件描述符分配。
 
-\parab {TCB管理中的锁定。}
+\parab {TCB管理中的锁。}
 在建立连接期间，Linux获取几个全局锁来分配TCB（TCP控制块）。
 最近的工作，如MegaPipe~ \cite {han2012megapipe}和FastSocket~ \cite {lin2016scalable}通过对全局表进行分区来减少锁争用，但正如Table~ \ref {socksdirect:tab:operation-performance}所示，非争用自旋锁是仍然很贵。
 本章将工作分发到每个进程中的用户空间库\libipc {}。
@@ -456,7 +456,7 @@ LOS~ \cite {huang2017high}将文件描述符空间划分为用户和内核部分
 \parab {新连接调度。}
 多个进程和线程可以侦听同一端口以接受传入连接。
 在Linux中，处理\texttt {accept}调用的核心在传入连接的队列上进行竞争。
-本章利用委托比锁定 \cite {roghanchi2017ffwd}更快并使用监视器守护程序来分派新连接的事实。
+本章利用委托比锁 \cite {roghanchi2017ffwd}更快并使用监视器守护程序来分派新连接的事实。
 
 
 %Most modern applications use socket in an event-driven style. similar to Figure~\ref{socksdirect:fig:socket-pseudo-code}.
@@ -500,7 +500,7 @@ FaSST~ \cite {kalia2016fasst}和eRPC~ \cite {kalia2018datacenter}提供RPC API�
 LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS~ \cite {huang2017high}符合标准套接字API。
 
 用户空间TCP / IP堆栈提供了比Linux更好的性能，但它仍然不接近RDMA和SHM。
-一个重要原因是现有的工作都不支持在线程和进程之间共享套接字，导致fork和容器实时迁移中的兼容性问题，以及多线程锁定开销。
+一个重要原因是现有的工作都不支持在线程和进程之间共享套接字，导致fork和容器实时迁移中的兼容性问题，以及多线程锁开销。
 
 首先，当进程分叉时，只有父进程和子进程中的一个可以使用现有套接字。
 但是，许多Web服务 \cite {apache,nginx,php-fpm,python-gunicorn,vsftpd}和键值存储 \cite {memcached}都有一个主进程来接受连接并（可选）读取请求头，然后它可以分叉一个子进程来处理请求，其中子进程需要访问套接字。
@@ -512,8 +512,8 @@ LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS
 它类似于分叉容器（到新主机），子容器应该仍然能够访问套接字。
 
 第三，多线程在应用程序中很常见。
-应用程序在套接字操作中承担竞争条件的风险，或者每次操作必须采用套接字文件描述符锁定。
-后一种方法保证了正确性，但即使没有争用，锁定也会损害性能。
+应用程序在套接字操作中承担竞争条件的风险，或者每次操作必须采用套接字文件描述符锁。
+后一种方法保证了正确性，但即使没有争用，锁也会损害性能。
 
 \parab {卸载到网卡的传输:}
 第三类工作将套接字系统的一部分卸载到网卡硬件上。

@@ -1,7 +1,7 @@
 \section{相关工作}
 \label{kvdirect:sec:related}
 
-作为一种重要的基础设施，分布式键值存储系统的研究和开发受到性能的驱动。大量分布式键值存储基于CPU。为了降低计算成本，Masstree~ \cite {mao2012cache}，MemC3~ \cite {fan2013memc3}和libcuckoo~ \cite {li2014algorithmic}优化锁定，缓存，哈希和内存分配算法，而 \oursys{} 带有新的哈希值专为FPGA设计的表和内存管理机制，以最大限度地减少PCIe流量。 MICA~ \cite {lim2014mica}将哈希表分区到每个核心，从而完全避免同步。然而，这种方法为偏移的工作负载引入了核心不平衡。
+作为一种重要的基础设施，分布式键值存储系统的研究和开发受到性能的驱动。大量分布式键值存储基于CPU。为了降低计算成本，Masstree~ \cite {mao2012cache}，MemC3~ \cite {fan2013memc3}和libcuckoo~ \cite {li2014algorithmic}优化锁，缓存，哈希和内存分配算法，而 \oursys{} 带有新的哈希值专为FPGA设计的表和内存管理机制，以最大限度地减少PCIe流量。 MICA~ \cite {lim2014mica}将哈希表分区到每个核心，从而完全避免同步。然而，这种方法为偏移的工作负载引入了核心不平衡。
 
 为了摆脱操作系统内核的开销， \cite {rizzo2012netmap,intel2014data}直接轮询来自网卡的网络数据包，并且\cite {jeong2014mtcp,marinos2014network}使用用户空间轻量级网络堆栈处理它们。
 键值存储系统 \cite {kapoor2012chronos,ousterhout2010case,ousterhout2015ramcloud,lim2014mica,li2016full}受益于这种高性能优化。
