@@ -186,7 +186,7 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 	\centering
 	\includegraphics[width=0.6\textwidth]{images/fork_memory}
 	
-	\caption{fork后的内存布局。 文件描述符 3和4在fork之前创建并因此共享。 在fork之后，父进程和子进程分别创建一个新的文件描述符 5，它在文件描述符表中写入时被复制。 文件描述符 3和4的套接字元数据和缓冲区在SHM中并因此被共享。 子进程创建一个新的SHM来存储文件描述符 5的套接字元数据和缓冲区，当它再次分叉时，它将与子进程共享。 RDMA QP位于私有内存中，而SHM队列是共享的。}
+	\caption{fork后的内存布局。 文件描述符 3和4在fork之前创建并因此共享。 在fork之后，父进程和子进程分别创建一个新的文件描述符 5，它在文件描述符表中写入时被复制。 文件描述符 3和4的套接字元数据和缓冲区在SHM中并因此被共享。 子进程创建一个新的SHM来存储文件描述符 5的套接字元数据和缓冲区，当它再次fork时，它将与子进程共享。 RDMA QP位于私有内存中，而SHM队列是共享的。}
 	\label{socksdirect:fig:fork-memory}
 \end{figure}
 \textbf {套接字数据共享。}

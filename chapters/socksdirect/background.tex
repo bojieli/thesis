@@ -204,7 +204,7 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 许多应用程序都是多线程的，原因有两个。
 首先，与FreeBSD不同，用于在Linux中读写磁盘文件的异步接口无法利用操作系统缓存和缓冲区，因此应用程序继续使用具有多个线程的同步接口 \cite {nginx-multi-thread}。
 其次，许多Web应用程序框架更喜欢同步编程模型来处理每个用户请求，因为它更容易编写和调试 \cite {barroso2017attack}。
-进程中的多个线程共享套接字连接。此外，在进程分叉之后，父进程和子进程共享现有套接字。套接字也可以通过Unix域套接字传递给另一个进程。为了保护并发操作，Linux内核为每个套接字操作获取每个套接字锁 \cite {boyd2010analysis,han2012megapipe,lin2016scalable}。表 \ref {socksdirect:tab:operation-performance}表明，受原子操作保护的共享内存队列具有4x延迟和无锁队列的22％吞吐量，即使没有争用。
+进程中的多个线程共享套接字连接。此外，在进程fork之后，父进程和子进程共享现有套接字。套接字也可以通过Unix域套接字传递给另一个进程。为了保护并发操作，Linux内核为每个套接字操作获取每个套接字锁 \cite {boyd2010analysis,han2012megapipe,lin2016scalable}。表 \ref {socksdirect:tab:operation-performance}表明，受原子操作保护的共享内存队列具有4x延迟和无锁队列的22％吞吐量，即使没有争用。
 本章的目标是通过优化常见情况并删除常用套接字操作中的同步来最小化同步开销。
 
 %\parab{Intra-host communication.}
@@ -502,14 +502,14 @@ LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS
 用户空间TCP / IP堆栈提供了比Linux更好的性能，但它仍然不接近RDMA和SHM。
 一个重要原因是现有的工作都不支持在线程和进程之间共享套接字，导致fork和容器实时迁移中的兼容性问题，以及多线程锁开销。
 
-首先，当进程分叉时，只有父进程和子进程中的一个可以使用现有套接字。
-但是，许多Web服务 \cite {apache,nginx,php-fpm,python-gunicorn,vsftpd}和键值存储 \cite {memcached}都有一个主进程来接受连接并（可选）读取请求头，然后它可以分叉一个子进程来处理请求，其中子进程需要访问套接字。
+首先，当进程fork时，只有父进程和子进程中的一个可以使用现有套接字。
+但是，许多Web服务 \cite {apache,nginx,php-fpm,python-gunicorn,vsftpd}和键值存储 \cite {memcached}都有一个主进程来接受连接并（可选）读取请求头，然后它可以fork一个子进程来处理请求，其中子进程需要访问套接字。
 同时，父进程仍需要通过现有套接字接受新连接。
 这使得此类Web服务无法正常工作。
 更棘手的情况是父进程和子进程可以通过现有套接字同时写入日志服务器。
 
 其次，容器实时迁移与fork有关。
-它类似于分叉容器（到新主机），子容器应该仍然能够访问套接字。
+它类似于fork容器（到新主机），子容器应该仍然能够访问套接字。
 
 第三，多线程在应用程序中很常见。
 应用程序在套接字操作中承担竞争条件的风险，或者每次操作必须采用套接字文件描述符锁。
