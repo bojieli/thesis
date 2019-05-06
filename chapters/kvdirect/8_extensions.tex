@@ -57,9 +57,9 @@ KV-Direct的主要用例是启用远程直接键值访问，而无需服务器�
 
 为了使两个Xeon E5 CPU的80个PCIe Gen3通道饱和，用带有10个PCIe Gen3 x8插槽的 SuperMicro X9DRX+-F 主板替换了基准测试服务器的主板（\S\ref {kvdirect:sec:eval}） 。
 使用PCIe x16到x8转换器连接每个插槽上的10个可编程网卡，每个网卡上只启用一个PCIe Gen3 x8链路，因此每个网卡的吞吐量低于图 \ref {kvdirect:fig:ycsb-tput}。
-每个网卡在主机内存中拥有一个独占内存区域，并提供不相交的密钥分区。
+每个网卡在主机内存中拥有一个独占内存区域，并提供不相交的键分区。
 多个网卡遇到与多核键值存储实现相同的负载不平衡问题。
-幸运的是，对于少量分区（例如10个），负载不平衡并不重要 \cite {lim2014mica,li2016full}。在YCSB长尾工作负载下，负载最高的网卡的平均负载为1.5倍，非常流行的密钥所增加的负载由无序执行引擎提供（\S \ref {kvdirect:sec:ooo}）。
+幸运的是，对于少量分区（例如10个），负载不平衡并不重要 \cite {lim2014mica,li2016full}。在YCSB长尾工作负载下，负载最高的网卡的平均负载为1.5倍，非常流行的键所增加的负载由无序执行引擎提供（\S \ref {kvdirect:sec:ooo}）。
 相比之下，为了实现与240个CPU内核的匹配性能，最热 CPU 核心的负载将是平均值的10倍。
 图\ref {kvdirect:fig:multiple-nics}显示KV-Direct吞吐量几乎与服务器上的网卡数量呈线性关系。
 
@@ -91,56 +91,58 @@ KV-Direct的主要用例是启用远程直接键值访问，而无需服务器�
 
 KV-Direct的目标是利用数据中心的现有硬件来卸载重要的工作负载（键值访问），而不是设计特殊的硬件来实现最大的键值存储性能。可编程网卡通常包含有限数量的DRAM用于缓冲和连接状态跟踪。 大型DRAM在芯片尺寸和功耗方面都很昂贵。
 
-\begin{table}[t]
-\centering
-\caption{不同网卡 DRAM / PCIe吞吐率（垂直）和网卡 /主机内存大小比（水平）下长尾工作负载的最佳负载分配比。}
-\label{kvdirect:tab:optimal-load-dispatch}
-\small
-\begin{tabular}{|l|r|r|r|r|r|r|}
-\hline
-     & 1/1024 & 1/256 & 1/64 & 1/16 & 1/4 & 1 \\
-\hline
-1/2  & 0.366 & 0.358 & 0.350 & 0.342 & 0.335 & 0.327 \\
-\hline
-1    & 0.583 & 0.562 & 0.543 & 0.525 & 0.508 & 0.492 \\
-\hline
-2    & 0.830 & 0.789 & 0.752 & 0.718 & 0.687 & 0.658 \\
-\hline
-4    & 1     & 0.991 & 0.933 & 0.881 & 0.835 & 0.793 \\
-\hline
-8    & 1     & 1     & 1     & 0.995 & 0.937 & 0.885 \\
-\hline
-\end{tabular}
-\end{table}
-
-\begin{table}[t]
-\centering
-\caption{与简单分区相比，负载分派的相对吞吐量。 列标题与表格相同~\ref{kvdirect:tab:optimal-load-dispatch}。}
-\label{kvdirect:tab:optimal-load-dispatch-throughput}
-\small
-\begin{tabular}{|l|r|r|r|r|r|r|}
-\hline
-    & 1/1024 & 1/256 & 1/64 & 1/16 & 1/4 & 1 \\
-\hline
-1/2 & 1.36	& 1.39	& 1.40	& 1.37	& 1.19	& 1.02 \\ 
-\hline
-1	& 1.71	& 1.77	& 1.81	& 1.79	& 1.57	& 1.01 \\
-\hline
-2	& 2.40	& 2.52	& 2.62	& 2.62	& 2.33	& 1.52 \\
-\hline
-4	& 3.99	& 4.02	& 4.22	& 4.27	& 3.83	& 2.52 \\
-\hline
-8	& 7.99	& 7.97	& 7.87	& 7.56	& 6.83	& 4.52 \\
-\hline
-\end{tabular}
-\end{table}
-
-
-即使未来的网卡具有更快或更大的板载内存，在长尾工作负载下，本文的负载分配设计（\S \ref {kvdirect:sec:dram-cache}）仍然显示出比简单的分区设计更高的性能。密钥统一根据网卡和主机内存容量。
-表 \ref {kvdirect:tab:optimal-load-dispatch} 显示了具有10亿个密钥的长尾工作负载的最佳负载分配比率，不同的网卡 DRAM和PCIe吞吐率以及不同的网卡和主机比率内存大小。
+即使未来的网卡具有更快或更大的板载内存，在长尾工作负载下，本文的负载分配设计（\S \ref {kvdirect:sec:dram-cache}）仍然显示出比简单的分区设计更高的性能。键统一根据网卡和主机内存容量。
+表 \ref {kvdirect:tab:optimal-load-dispatch} 显示了具有10亿个键的长尾工作负载的最佳负载分配比率，不同的网卡 DRAM和PCIe吞吐率以及不同的网卡和主机比率内存大小。
 如果网卡具有更快的DRAM，则将更多负载分派给网卡。负载分配比率为1表示网卡内存的行为与主机内存的高速缓存完全相同。
 如果网卡具有更大的DRAM，则将稍微少量的负载分派给网卡。
 如表 \ref {kvdirect:tab:optimal-load-dispatch-throughput} 所示，即使网卡 DRAM的大小只是主机内存的一小部分，吞吐量增益也很大。
+
+
+\begin{table}[t]
+	\centering
+	\caption{不同网卡 DRAM / PCIe吞吐率（垂直）和网卡 /主机内存大小比（水平）下长尾工作负载的最佳负载分配比。}
+	\label{kvdirect:tab:optimal-load-dispatch}
+	\small
+	\begin{tabular}{|l|r|r|r|r|r|r|}
+		\hline
+		& 1/1024 & 1/256 & 1/64 & 1/16 & 1/4 & 1 \\
+		\hline
+		1/2  & 0.366 & 0.358 & 0.350 & 0.342 & 0.335 & 0.327 \\
+		\hline
+		1    & 0.583 & 0.562 & 0.543 & 0.525 & 0.508 & 0.492 \\
+		\hline
+		2    & 0.830 & 0.789 & 0.752 & 0.718 & 0.687 & 0.658 \\
+		\hline
+		4    & 1     & 0.991 & 0.933 & 0.881 & 0.835 & 0.793 \\
+		\hline
+		8    & 1     & 1     & 1     & 0.995 & 0.937 & 0.885 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+
+\begin{table}[t]
+	\centering
+	\caption{与简单分区相比，负载分派的相对吞吐量。 列标题与表格相同~\ref{kvdirect:tab:optimal-load-dispatch}。}
+	\label{kvdirect:tab:optimal-load-dispatch-throughput}
+	\small
+	\begin{tabular}{|l|r|r|r|r|r|r|}
+		\hline
+		& 1/1024 & 1/256 & 1/64 & 1/16 & 1/4 & 1 \\
+		\hline
+		1/2 & 1.36	& 1.39	& 1.40	& 1.37	& 1.19	& 1.02 \\ 
+		\hline
+		1	& 1.71	& 1.77	& 1.81	& 1.79	& 1.57	& 1.01 \\
+		\hline
+		2	& 2.40	& 2.52	& 2.62	& 2.62	& 2.33	& 1.52 \\
+		\hline
+		4	& 3.99	& 4.02	& 4.22	& 4.27	& 3.83	& 2.52 \\
+		\hline
+		8	& 7.99	& 7.97	& 7.87	& 7.56	& 6.83	& 4.52 \\
+		\hline
+	\end{tabular}
+\end{table}
+
 
 乱序执行引擎（\S \ref {kvdirect:sec:ooo}）可以应用于需要隐藏延迟的各种应用程序，我们希望未来的RDMA 网卡能够支持更更性能的原子操作。
 

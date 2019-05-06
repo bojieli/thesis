@@ -17,7 +17,7 @@
 \oursys{} 充分利用了网卡 DRAM和主机DRAM，使基于FPGA的键值存储系统通用，并且能够进行大规模部署。此外，精心的硬件和软件协同设计，以及对PCIe和网络的优化，将本文的性能推向了物理限制，推进了最先进的解决方案。
 
 二级索引是通过其他键检索数据的重要功能
-比数据存储系统中的主键 \cite {escriva2012hyperdex,kejriwal2016slik}。 SLIK~ \cite {kejriwal2016slik}在键值存储系统中使用B +树算法支持多个二级密钥。探索如何支持二级索引以帮助 \oursys{} 迈向通用数据存储系统将会很有趣。 SwitchKV~ \cite {li2016fast}利用基于内容的路由将请求路由到基于缓存密钥的后端节点，NetCache~ \cite {netcache-sosp17}进一步将键值缓存在交换机中。这种负载平衡和缓存也将使系统受益。
+比数据存储系统中的主键 \cite {escriva2012hyperdex,kejriwal2016slik}。 SLIK~ \cite {kejriwal2016slik}在键值存储系统中使用B +树算法支持多个二级键。探索如何支持二级索引以帮助 \oursys{} 迈向通用数据存储系统将会很有趣。 SwitchKV~ \cite {li2016fast}利用基于内容的路由将请求路由到基于缓存键的后端节点，NetCache~ \cite {netcache-sosp17}进一步将键值缓存在交换机中。这种负载平衡和缓存也将使系统受益。
 Eris~ \cite {eris}利用网络序列发生器来实现高效的分布式事务，这可以为客户端同步的单侧RDMA方法带来新的生命。
 
 

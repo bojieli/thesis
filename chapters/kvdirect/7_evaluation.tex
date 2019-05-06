@@ -111,7 +111,7 @@ slab内存分配器的计算开销来自主机CPU上的slab拆分和合并。
 
 本节通过比较吞吐量和在原子和长尾工作负载下使关键冲突管道停滞的简单方法，评估乱序执行的有效性。单面RDMA和双面RDMA \cite {kalia2016design}吞吐量也显示为基线。
 
-如果没有此引擎，原子操作需要等待网卡中的PCIe延迟和处理延迟，在此期间无法执行对同一密钥的后续原子操作。
+如果没有此引擎，原子操作需要等待网卡中的PCIe延迟和处理延迟，在此期间无法执行对同一键的后续原子操作。
 这使得单键原子吞吐量在图 \ref{kvdirect:fig:ooo-atomic} 中为0.94~Mops，与从RDMA 网卡测量的2.24~Mops一致 \cite {kalia2016design}。
 RDMA 网卡的更高吞吐量可归因于其更高的时钟频率和更低的处理延迟。
 对于无序执行，KV-Direct中的单键原子操作可以在峰值吞吐量下处理，即每个时钟周期一次操作。
@@ -123,7 +123,7 @@ RDMA 网卡的更高吞吐量可归因于其更高的时钟频率和更低的处
 
 图 \ref {kvdirect:fig:ooo-longtail} 显示了长尾工作负载下的吞吐量。
 回想一下，当PUT操作使用相同的键找到任何正在进行的操作时，管道会停止。
-长尾工作负载具有多个非常流行的密钥，因此具有相同流行密钥的两个操作很可能及时到达。
+长尾工作负载具有多个非常流行的键，因此具有相同流行键的两个操作很可能及时到达。
 具有更高的PUT比率，更有可能的是，两个操作中的至少一个是PUT，因此触发流水线停顿。
 
 
@@ -215,7 +215,7 @@ The remaining few percent of operations have intrinsic higher processing delay d
 
 在每个基准测试之前，根据键值大小，访问模式和目标内存利用率来调整哈希索引比率，内联阈值和负载分派比率。
 然后生成具有给定大小的随机键值对。
-给定内联键值大小的密钥大小与KV-Direct的性能无关，因为在处理期间将密钥填充到最长的内联键值大小。
+给定内联键值大小的键大小与KV-Direct的性能无关，因为在处理期间将键填充到最长的内联键值大小。
 为了测试内联案例，使用键值大小作为插槽大小的倍数（当大小为$ \leq $ 50时，即10个插槽）。为了测试非内联的情况，使用的键值大小是2减2字节的幂（对于元数据）。
 作为准备的最后一步，发出PUT操作以将键值对插入空闲键值存储，直到50％内存利用率。
 其他内存利用率下的性能可以从图 \ref {kvdirect:fig:mem-access-tput}中获得。
@@ -245,7 +245,7 @@ The remaining few percent of operations have intrinsic higher processing delay d
 在相同的内存利用率下，由于哈希冲突的概率较高，较大的内联键值具有较低的吞吐量。
 62B和更大的键值没有内联，因此它们需要额外的内存访问。
 长尾工作负载比统一工作负载具有更高的吞吐量，并且能够在读密集工作负载下达到180~Mops的时钟频率范围，或达到$ \geq $ 62B 键值大小的网络吞吐量。
-在长尾工作负载下，无序执行引擎在最流行的密钥上合并到大约15％的操作，并且板载DRAM在60％负载分配比率下具有大约60％的高速缓存命中率，这可以统一导致高达2倍的吞吐量作为统一的工作量。
+在长尾工作负载下，无序执行引擎在最流行的键上合并到大约15％的操作，并且板载DRAM在60％负载分配比率下具有大约60％的高速缓存命中率，这可以统一导致高达2倍的吞吐量作为统一的工作量。
 如本章末尾的整页表 \ref {kvdirect:tab:kvs-compare} 所示，KV-Direct 网卡的吞吐量与具有数十个CPU核心的最先进的键值存储服务器相当。
 
 \subsubsection{能耗效率}
@@ -271,11 +271,11 @@ The remaining few percent of operations have intrinsic higher processing delay d
 \end{figure}
 
 图 \ref {kvdirect:fig:ycsb-lat} 显示了YCSB工作负载峰值吞吐量下KV-Direct的延迟。
-在没有网络批处理的情况下，尾部延迟范围为3至9 $\mu$s，具体取决于键值大小，操作类型和密钥分配。
+在没有网络批处理的情况下，尾部延迟范围为3至9 $\mu$s，具体取决于键值大小，操作类型和键分配。
 由于额外的内存访问，PUT具有比GET更高的延迟。
 由于更有可能在板载DRAM中进行缓存，因此倾斜的工作负载具有比均匀更低的延迟。
 由于额外的网络和PCIe传输延迟，较大的键值具有较高的延迟。
-网络批处理比非批处理操作增加了不到1~$\mu$s 的延迟，但显着提高了吞吐量，已在图 \ref {kvdirect:fig:eval-network-batching} 中进行了评估。
+网络批处理比非批处理操作增加了不到1~$\mu$s 的延迟，但显著提高了吞吐量，已在图 \ref {kvdirect:fig:eval-network-batching} 中进行了评估。
 
 \subsubsection{对 CPU 性能的影响}
 
@@ -294,22 +294,22 @@ KV-Direct旨在绕过服务器CPU，仅使用一部分主机内存用于键值�
 	\small
 		\begin{tabular}{l|l|r|r}
 			\toprule
-			\multicolumn{2}{r}{KV-Direct status $\rightarrow$} & Idle & Busy \\
+			\multicolumn{2}{r}{KV-Direct 状态 $\rightarrow$} & 空闲 & 繁忙 \\
 			\midrule
-			\multirow{4}{*}{\specialcell{Random\\Latency}} & CPU0-0 & 82.2 ns & 83.5 ns \\
+			\multirow{4}{*}{\specialcell{随机访问延迟}} & CPU0-0 & 82.2 ns & 83.5 ns \\
             					  & CPU0-1 & 129.3 ns & 129.9 ns \\
                                   & CPU1-0 & 122.3 ns & 122.2 ns \\
                                   & CPU1-1 & 84.2 ns & 84.3 ns \\
 			\midrule
-            \multirow{4}{*}{\specialcell{Sequential\\Throughput}} & \textbf{CPU0-0} & \textbf{60.3 GB/s} & \textbf{55.8 GB/s} \\
+            \multirow{4}{*}{\specialcell{顺序访问吞吐量}} & \textbf{CPU0-0} & \textbf{60.3 GB/s} & \textbf{55.8 GB/s} \\
             					  & CPU0-1 & 25.7 GB/s & 25.6 GB/s \\
                                   & CPU1-0 & 25.5 GB/s & 25.9 GB/s \\
                                   & CPU1-1 & 60.2 GB/s & 60.3 GB/s \\
 			\midrule
-			\multirow{4}{*}{\specialcell{Random\\Throughput}} & 32B read & 10.53 GB/s & 10.46 GB/s \\
-            						& 64B read & 14.41 GB/s & 14.42 GB/s \\
-                                    & 32B write & 9.01 GB/s & 9.04 GB/s \\
-                                    & 64B write & 12.96 GB/s & 12.94 GB/s \\
+			\multirow{4}{*}{\specialcell{随机访问吞吐量}} & 32B read & 10.53 GB/s & 10.46 GB/s \\
+            						& 64B 读 & 14.41 GB/s & 14.42 GB/s \\
+                                    & 32B 写 & 9.01 GB/s & 9.04 GB/s \\
+                                    & 64B 写 & 12.96 GB/s & 12.94 GB/s \\
 			\bottomrule
 		\end{tabular}      
 \end{table}
