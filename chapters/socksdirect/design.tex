@@ -31,8 +31,8 @@
 
 %As shown in Figure~\ref{socksdirect:fig:architecture}, the core component of \sys{} is a user-space library \libipc{}.
 
-为了简化部署和开发 \cite {andromeda}，以及删除内核交叉开销，本章在用户空间而不是内核中实现\sys。
-要使用\sys，应用程序通过设置\texttt {LD\_PRELOAD}环境变量来加载用户空间库\libipc {}。 \libipc {}拦截标准C库中与文件描述符（文件描述符）操作相关的所有Linux API。它使用\emph {文件描述符重映射表}来区分套接字文件描述符与内核文件描述符（例如文件和设备），在用户空间中实现套接字功能并将其他功能转发到内核。
+为了简化部署和开发 \cite {andromeda}，以及删除内核交叉开销，本章在用户空间而不是内核中实现\sys{}。
+要使用\sys{}，应用程序通过设置\texttt {LD\_PRELOAD}环境变量来加载用户空间库\libipc {}。 \libipc {}拦截标准C库中与文件描述符（文件描述符）操作相关的所有Linux API。它使用\emph {文件描述符重映射表}来区分套接字文件描述符与内核文件描述符（例如文件和设备），在用户空间中实现套接字功能并将其他功能转发到内核。
 从安全的角度来看，因为\libipc {}驻留在应用程序地址空间中，它的行为不可信。例如，如果恶意应用程序在\libipc {}中强制执行，则可能会绕过防火墙策略。此外，TCP端口是一个需要分配的全局资源 \cite {lin2016scalable,nsdi19freeflow}。因此，需要在\libipc {}之外的可信组件来强制实施访问控制和管理全局资源。
 
 为此，本章在每个主机上设计一个\emph {monitor}守护进程来协调控制平面操作，例如连接创建。监视器是系统服务。在每个主机中，所有加载\libipc {}的应用程序必须与主机的监视器守护程序建立共享内存（SHM）队列，从而形成控制平面。在数据平面上，应用程序构建对等队列以直接通信，从而减轻了监视器守护程序的负担。图 \ref {socksdirect:fig:architecture}显示了\sys {}的体系结构。
@@ -46,7 +46,7 @@
 SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它。
 套接字发送操作转换为对远程端点上的套接字缓冲区的SHM或RDMA写操作。
 
-对于\emph {intra-host}通信，通信发起者首先向本地监视器发送请求，然后监视器在两个应用程序之间（可能在不同的容器中）建立共享内存队列。 之后这两个应用程序可以直接通信。
+对于\emph {主机内}（intra-host）通信，通信发起者首先向本地监视器发送请求，然后监视器在两个应用程序之间（可能在不同的容器中）建立共享内存队列。 之后这两个应用程序可以直接通信。
 
 
 %During initialization, \libipc{} connects to the local monitor via a shared memory queue.
@@ -54,13 +54,13 @@ SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它�
 %connection request is always sent to the local monitor.
 %For local peers, the monitor just construct a shared memory queue between the two applications , %so they can communicate directly.
 
-对于\emph {inter-host}通信，两个主机的监视器都参与其中。当应用程序连接到远程主机时，其本地监视器会建立常规TCP连接，并检测远程主机是否支持\sys {}。
-如果是这样，它会在两个监视器之间建立一个RDMA队列，以便可以更快地创建两个主机之间的未来连接。远程端的监视器调度与目标的连接，并帮助两个应用程序建立RDMA队列，如图 \ref {socksdirect:fig:architecture}中的主机1和2之间。如果远程主机不支持\sys {}，它将继续使用TCP连接，如图 \ref {socksdirect:fig:architecture}中的主机1和3之间。详细的连接管理协议在Sec .~ \ref {socksdirect:subsec:connection-management}中介绍。
+对于\emph {主机间}（inter-host）通信，两个主机的监视器都参与其中。当应用程序连接到远程主机时，其本地监视器会建立常规TCP连接，并检测远程主机是否支持\sys {}。
+如果是这样，它会在两个监视器之间建立一个RDMA队列，以便可以更快地创建两个主机之间的未来连接。远程端的监视器调度与目标的连接，并帮助两个应用程序建立RDMA队列，如图 \ref {socksdirect:fig:architecture} 中的主机1和2之间。如果远程主机不支持\sys {}，它将继续使用TCP连接，如图 \ref {socksdirect:fig:architecture} 中的主机1和3之间。详细的连接管理协议在第 \ref {socksdirect:subsec:connection-management} 节中介绍。
 
-为了确保线程安全并避免锁定，以及支持fork和container实时迁移，本章针对只有一对发送和接收线程处于活动状态的常见情况进行了优化，同时确保所有情况下的正确性（Sec .~ \ref {socksdirect:subsec:fork}）。
-为了消除缓冲区管理开销，设计了一个环形缓冲区，每个主机间消息平摊下来只需要一次RDMA写操作，每个主机内消息需要一个缓存迁移（Sec .~ \ref {socksdirect:subsec:lockless-queue} ）。
-本章进一步设计了一种零拷贝机制，可以在发送和接收端删除大型消息的数据副本（Sec .~ \ref {socksdirect:subsec:zerocopy}）。
-最后，Sec .~ \ref {socksdirect:subsec:process-mux}提供了事件通知机制。
+为了确保线程安全并避免锁定，以及支持fork和container实时迁移，本章针对只有一对发送和接收线程处于活动状态的常见情况进行了优化，同时确保所有情况下的正确性（第 \ref {socksdirect:subsec:fork} 节）。
+为了消除缓冲区管理开销，设计了一个环形缓冲区，每个主机间消息平摊下来只需要一次RDMA写操作，每个主机内消息需要一个缓存迁移（第 \ref {socksdirect:subsec:lockless-queue}  节）。
+本章进一步设计了一种零拷贝机制，可以在发送和接收端删除大型消息的数据副本（第 \ref {socksdirect:subsec:zerocopy} 节）。
+最后，第 \ref {socksdirect:subsec:process-mux} 节提供了事件通知机制。
 
 %In order to remove synchronization overhead for multi-threaded applications, we treat each thread as a separate process.
 %%Although threads in a process share memory, we use thread-specific storage for most states in \libipc{}.
@@ -90,7 +90,7 @@ SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它�
 	\label{socksdirect:fig:queue-arch}
 \end{figure}
 
-大多数套接字系统都获得了一个per-文件描述符锁，以使线程和进程共享套接字（Sec .~ \ref {socksdirect:subsec:per-operation-overhead}）。
+大多数套接字系统都获得了一个per-文件描述符锁，以使线程和进程共享套接字（第 \ref {socksdirect:subsec:per-operation-overhead} 节）。
 以前的工作 \cite {boyd2010analysis,clements2015scalable}表明许多套接字操作不可交换，并且不能始终避免同步。
 本章利用SHM消息传递比锁定 \cite {roghanchi2017ffwd}便宜得多的事实，并使用消息传递作为独占同步机制。
 
@@ -119,10 +119,10 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 \end{enumerate}
 \fi
 
-本章的解决方案是每个\emph {套接字队列}（套接字的一个方向）有\emph {send token}和\emph {receive token}。
-每个令牌都由\emph {active thread}持有，它具有发送或接收的权限。
+本章的解决方案是每个\emph {套接字队列}（套接字的一个方向）有\emph {发送令牌}和\emph {接收令牌}。
+每个令牌都由\emph {活跃线程} 持有，它具有发送或接收的权限。
 因此，在任何时间点只有一个活动的发送方线程和一个活动的接收方线程。
-套接字队列在线程和进程之间共享，允许来自一个发送方和一个接收方的无锁访问（详细信息将在Sec .~ \ref {socksdirect:subsec:lockless-queue}中讨论）。
+套接字队列在线程和进程之间共享，允许来自一个发送方和一个接收方的无锁访问（详细信息将在第 \ref {socksdirect:subsec:lockless-queue} 节中讨论）。
 当另一个线程想要发送或接收时，它应该请求\emph {接管}令牌。
 
 %\RED{Need performance comparison in a figure.}
