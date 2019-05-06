@@ -30,7 +30,7 @@
 如图 \ref {socksdirect:fig:ringbuffer-traditional}所示，它会导致缓冲区管理开销和内部碎片。
 传统的网卡支持有限数量的环形缓冲区，因此多个连接可以通过一个环形缓冲区进行复用，这种设计可以将有效负载移动到每个连接缓冲区而无需复制。
 幸运的是，RDMA编写动词开辟了新的设计可能性。
-我们的创新是拥有\emph {每个套接字连接一个环形缓冲区}并将数据包背靠背存储，如图 \ref {socksdirect:fig:ringbuffer-new}所示。
+本章的创新是拥有\emph {每个套接字连接一个环形缓冲区}并将数据包背靠背存储，如图 \ref {socksdirect:fig:ringbuffer-new}所示。
 发送方确定环形缓冲区和偏移量（即\emph {tail}指针），然后使用RDMA写动词将数据包写入远程端内存中的尾指针。
 在传输过程中，接收器CPU不需要做任何事情。
 当接收器应用程序调用\texttt {recv}时，数据从\emph {head}指针中出列。
@@ -43,15 +43,15 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 \textbf {发送和接收方的两个环形缓冲区副本。}
 上述机制仍然会在发送端引起缓冲区管理，因为发送方需要在缓冲区中构造RDMA消息。
 其次，它不支持容器实时迁移，因为RDMA队列中的剩余数据很难迁移。
-第三，我们的目标是批量处理小消息以提高吞吐量。
-为此，我们在发送方和接收方都保留了环形缓冲区的副本。
+第三，本章的目标是批量处理小消息以提高吞吐量。
+为此，本章在发送方和接收方都保留了环形缓冲区的副本。
 发送方写入其本地环形缓冲区，并调用RDMA以使发送方与接收方同步。
-我们为每个环形缓冲区使用RDMA RC QP，并维护一个机上RDMA消息的计数器。
+\libipc{} 为每个环形缓冲区使用一个 RDMA RC QP，并维护一个机上RDMA消息的计数器。
 如果计数器未超过阈值，则为每个socket \texttt {send}操作发送RDMA消息。
 否则，不发送消息，\emph {send\_next}标记第一个未发送的消息。
-完成RDMA写入后，我们会在图 \ref {socksdirect:fig:ringbuffer-new}中发送包含所有未发送更改的消息（\emph {send \_next}到\emph {tail}）。
+完成RDMA写入后，\libipc{} 会在图 \ref {socksdirect:fig:ringbuffer-new}中发送包含所有未发送更改的消息（\emph {send\_next}到\emph {tail}）。
 这种自适应批处理机制可最大限度地减少空闲链路上的延迟，并最大化繁忙链路上的吞
-对于SHM，我们只有一个由两个进程共享的环形缓冲区副本，并且同步由高速缓存一致性硬件完成。
+对于SHM，只有一个由两个进程共享的环形缓冲区副本，并且同步由高速缓存一致性硬件完成。
 
 %Before sending, sender clears header of the next message to prevent the receiver from considering junk data in the ring buffer to be a message. Next, sender writes payload, then writes header, finally advances \textit{tail}. Receiver polls \textit{isvalid} at \textit{head} pointer, then copies the message, finally advances \textit{head}.
 %For RDMA, the sender maintains a local copy of ring buffer, and we use one-sided RDMA write to synchronize updates from sender to receiver.
@@ -65,12 +65,12 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 \textbf {有效载荷和元数据之间的一致性。}
 对于SHM，英特尔和AMD的X86处理器提供了整体商店订购 \cite {sewell2010x86,intel-manual}，这意味着其他内核按照与编写时相同的顺序观察到两次写入。一个8字节的\texttt {MOV}指令是原子的，所以写一个标题是原子的。由于发送方在有效负载之后写入标头，因此接收方将读取一致的消息因此，不需要存储器栅栏指令。
 
-因为RDMA不能确保消息中的写入顺序 \cite {infiniband2000infiniband}，我们确实需要确保消息完全到达。虽然在使用go-back-0或go-back-N loss recovery~ \cite {dragojevic2014farm}的RDMA网卡中观察到消息写入顺序，但对于具有选择性重传的更高级网卡，情况并非如此 \cite {mprdma,mittal2018revisiting} 。在\libipc {}中，发送方使用\textit {RDMA write with immediate}动词在接收方生成完成。接收器轮询RDMA \emph {完成队列}而不是环形缓冲区。 RDMA确保接收器上的高速缓存一致性，并且在将数据写入\libipc {}环形缓冲区 \cite {infiniband2000infiniband}之后保证完成消息。
+因为RDMA不能确保消息中的写入顺序 \cite {infiniband2000infiniband}，确实需要确保消息完全到达。虽然在使用go-back-0或go-back-N loss recovery~ \cite {dragojevic2014farm}的RDMA网卡中观察到消息写入顺序，但对于具有选择性重传的更高级网卡，情况并非如此 \cite {mprdma,mittal2018revisiting} 。在\libipc {}中，发送方使用\textit {RDMA write with immediate}动词在接收方生成完成。接收器轮询RDMA \emph {完成队列}而不是环形缓冲区。 RDMA确保接收器上的高速缓存一致性，并且在将数据写入\libipc {}环形缓冲区 \cite {infiniband2000infiniband}之后保证完成消息。
 
 
 \textbf {平摊轮询开销。}
-当不经常使用套接字时，轮询环缓冲区会浪费接收器的CPU周期。我们使用两种技术分摊轮询开销。
-首先，对于RDMA队列，我们​​利用RDMA 网卡将事件通知复用到单个队列中。
+当不经常使用套接字时，轮询环缓冲区会浪费接收器的CPU周期。本章使用两种技术分摊轮询开销。
+首先，对于RDMA队列，利用RDMA 网卡将事件通知复用到单个队列中。
 每个线程对所有RDMA QP使用\emph {共享完成队列}，因此它只需要轮询一个队列而不是所有每个套接字队列。
 
 其次，每个队列可以在\textit {polling}和\textit {interrupt}模式之间切换。监视器的队列始终处于轮询模式。每个队列的接收者维护一个连续空轮询的计数器。当它超过阈值时，接收器向发送器发送消息，通知队列正在进入中断模式，并在短时间后停止轮询。当发送方以中断模式写入队列时，它还会通知监视器，监视器将通知接收方恢复轮询。
@@ -112,13 +112,13 @@ Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数
 % so we can remap virtual address of a buffer to another physical page if the data occupies entire 4~KiB pages.
 
 
-要启用零拷贝，我们需要修改网卡驱动程序以公开与页面重新映射相关的几个内核函数。
+要启用零拷贝，需要修改网卡驱动程序以公开与页面重新映射相关的几个内核函数。
 为了分摊页面重新映射成本，我们仅对\texttt {send}或\texttt {recv}使用零拷贝，且有效载荷至少为16~KiB。
 而是复制较小的消息。
 
 \textbf {内存对齐。}
 页面重新映射仅在发送和接收地址页面对齐且传输包含整个页面时才有效。
-我们拦截\texttt {malloc}和\texttt {realloc}函数，并为具有多个4K大小的分配分配4~KiB对齐的地址，因此大多数缓冲区将与页面边界对齐，而不会浪费内存用于小分配。
+\libipc{} 拦截\texttt {malloc}和\texttt {realloc}函数，并为具有多个4K大小的分配分配4~KiB对齐的地址，因此大多数缓冲区将与页面边界对齐，而不会浪费内存用于小分配。
 如果发送消息的大小不是4~KiB的倍数，则最后一块数据将复制到\texttt {send}和\texttt {recv}。
 
 有时，应用程序需要并不从分配的缓冲区起始地址开始接收或发送数据。例如，数据为 HTTP 请求的一部分，HTTP 请求的内存是对齐的，而由于 HTTP 头的存在，数据就不是对齐的了。
@@ -260,13 +260,13 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 \textbf{连接。}
 客户端应用程序调用\texttt {connect}并发送SYN命令以通过SHM队列进行监视。
 现在，监视器需要将新连接分派给侦听应用程序。
-在Linux中，新的连接请求在内核的\emph {backlog}中排队。
+在Linux中，新的连接请求在内核的\emph {积压}（backlog）中排队。
 每次服务器应用程序调用\texttt {accept}时，它都会访问内核以从积压中出列，这需要同步并增加延迟。
-相反，我们为每个侦听套接字的线程维护一个每个监听器的积压。
+相反，\sys{} 为每个侦听套接字的线程维护一个每个监听器的积压。
 监视器以循环方式将SYN分发给侦听器线程。
 
 当侦听器不接受新连接时，调度与侦听器的连接可能会导致饥饿。
-我们设计了一种\emph {work stealing}方法。
+\sys{} 使用 \emph {work stealing}方法。
 当监听器在积压为空时调用\texttt {accept}时，它会请求监视器窃取其他人的积压。
 为了避免侦听器和监视器之间的争用，监视器向侦听器发送请求以从积压中窃取。
 
@@ -286,10 +286,10 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 \subsubsection{与常规 TCP/IP 对端的兼容性}
 
 
-为了与不支持\sys {}和RDMA的对等端兼容，我们需要检测\sys {}功能并回退到TCP / IP。
+为了与不支持\sys {}和RDMA的对等端兼容，需要检测\sys {}功能并回退到TCP / IP。
 但是，Linux不支持向TCP SYN和ACK数据包添加特殊选项。
 由于中间盒和网络重新排序，使用另一个端口（例如LibVMA~ \cite {libvma}）也是不可靠的。
-为此，我们首先使用内核原始套接字直接发送带有特殊选项的SYN和ACK数据包，如果不存在特殊选项，则回退到内核TCP / IP套接字。
+为此，首先使用内核原始套接字直接发送带有特殊选项的SYN和ACK数据包，如果不存在特殊选项，则回退到内核TCP / IP套接字。
 
 在客户端，监视器通过网络发送带有特殊选项的TCP SYN数据包。
 如果对等体具有\sys {}能力，则其监视器将接收特殊SYN并且知道客户端具有\sys {}能力。
@@ -316,8 +316,8 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 
 当应用程序调用\texttt {close}时，\libipc {}会从重映射表中删除文件描述符。
 然而，套接字数据可能仍然有用，因为文件描述符可以与其他进程共享，并且缓冲区中可能存在未发送的数据。
-我们跟踪每个套接字的引用计数，它在fork上递增，在close时递减。
-为了推出未发送的数据，我们需要在对等体之间进行握手，类似于TCP close。
+\libipc{} 跟踪每个套接字的引用计数，它在fork上递增，在close时递减。
+为了推出未发送的数据，需要在对等体之间进行握手，类似于TCP close。
 因为套接字是双向的，所以\texttt {close}在发送和接收方向上相当于\texttt {shutdown}。
 当应用程序关闭连接的一个方向时，它会向对等方发送\emph {shutdown message}。
 对等体以关闭消息响应。
