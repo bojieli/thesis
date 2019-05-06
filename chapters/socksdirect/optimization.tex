@@ -121,7 +121,8 @@ Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数
 我们拦截\texttt {malloc}和\texttt {realloc}函数，并为具有多个4K大小的分配分配4~KiB对齐的地址，因此大多数缓冲区将与页面边界对齐，而不会浪费内存用于小分配。
 如果发送消息的大小不是4~KiB的倍数，则最后一块数据将复制到\texttt {send}和\texttt {recv}。
 
-\textbf{讨论非对齐情况:接收之后直接发送，没有读写数据。recv 缓冲区如果不对齐，就默认不做映射，首次访问才 page fault 映射上来；recv 之后直接 send，应用程序不 touch payload 就根本不需要映射到虚拟地址空间。}
+有时，应用程序需要并不从分配的缓冲区起始地址开始接收或发送数据。例如，数据为 HTTP 请求的一部分，HTTP 请求的内存是对齐的，而由于 HTTP 头的存在，数据就不是对齐的了。
+对于非对齐情况，如果应用程序在接收之后直接发送，而没有读写数据本身，\sys{} 也可以实现零拷贝的消息传输。\sys{} 的方法是对于非对齐的接收缓冲区，默认不执行内存拷贝，而是记录页面的映射和偏移量关系。在应用程序首次访问时通过页面异常触发数据拷贝；如果应用程序不访问数据，则无需拷贝。
 
 %\textbf{Amortize page remapping cost.}
 
@@ -223,13 +224,12 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.6\textwidth]{images/conn-setup-new}
-	
-	\caption{State machine of connection setup in \libipc{}.}
+	\caption{\libipc{} 中连接建立过程的状态机。}
 	\label{socksdirect:fig:conn-setup}
 \end{figure}
 
 
-\subsubsection{文件描述符 重映射表}
+\subsubsection{文件描述符重映射表}
 \label{socksdirect:subsubsec:fd-remapping-table}
 
 

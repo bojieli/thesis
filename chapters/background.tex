@@ -509,6 +509,9 @@ SCM实际上是上一小节中讨论过的高速非易失性内存的另一种�
 随着主机内异构计算和存储设备数量的增加，CPU的PCIe接口数量不足，PCIe交换机开始被引入主机；由于PCIe的带宽不能满足需求，GPU之间采用NVLink互连，随着互连GPU数量的增加也出现了交换机。数据中心网络的发展历史表明，异构计算设备之间的可扩放互连必须考虑容错性和安全性。为了解决计算和内存设备之间的互连，除了现在我们常用的 JEDEC DDR 和 PCIe 总线标准，工业界还成立了CCIX、Gen-Z和OpenCAPI三个开放标准组织，以及 Intel 的 IAL 和 RSD 两个总线标准。表 \ref{background:tab:ccix-pcie} 总结了这些总线标准的适用范围和主要支持公司。
 
 \begin{table}[htbp]
+	\centering
+	\caption{总线标准的适用范围和主要支持公司}
+	\scalebox{0.9}{
 	\begin{tabular}{l|p{.5\textwidth}|p{.3\textwidth}}
 		\hline
 		总线 & 适用范围 & 主要支持公司 \\
@@ -529,7 +532,7 @@ SCM实际上是上一小节中讨论过的高速非易失性内存的另一种�
 		Gen-Z & 机架范围内的节点间互连，以及节点内 CPU 访问内存 & AMD，HP，Dell，华为等 \\
 		\hline
 	\end{tabular}
-	\caption{总线标准的适用范围和主要支持公司}
+	}
 	\label{background:tab:ccix-pcie}
 \end{table}
 
@@ -693,6 +696,9 @@ ASIC（Application Specific Integrated Circuit，专用集成电路）是为某�
 基于多核通用处理器的 SoC 架构与基于网络处理器的 NP 架构有很多相似之处，也因此经常被统称为同一类架构，但事实上它们有很多区别。表 \ref{background:tab:soc-vs-np} 比较了用于数据中心可编程网卡的 SoC 和 NP 架构。
 
 \begin{table}[htbp]
+	\centering
+	\caption{多核通用处理器与网络处理器架构的比较。}
+	\scalebox{0.9}{
 	\begin{tabular}{l|p{.35\textwidth}|p{.35\textwidth}}
 		\hline
 		比较项目 & 多核通用处理器（SoC） & 网络处理器（NP） \\
@@ -721,7 +727,7 @@ ASIC（Application Specific Integrated Circuit，专用集成电路）是为某�
 		功耗 & \multicolumn{2}{c}{10 W 至 20 W} \\ 
 		\hline
 	\end{tabular}
-	\caption{多核通用处理器与网络处理器架构的比较。}
+	}
 	\label{background:tab:soc-vs-np}
 \end{table}
 
@@ -729,6 +735,9 @@ ASIC（Application Specific Integrated Circuit，专用集成电路）是为某�
 表面上看，可编程网卡与服务器主机 CPU 都使用通用处理器，但如表 \ref{background:tab:host-cpu} 所示，无论在成本还是性能功耗方面，可编程网卡使用的通用处理器都有较明显的优势。此外，如第 \ref{chapter:intro} 章所讨论的，在云计算数据中心，主机 CPU 可以用于出售，其潜在售价远高于单一 CPU 组件的硬件价格。因此，在数据中心使用嵌入在可编程网卡内的通用处理器，比传统上使用主机 CPU 的方法仍然是有优势的。
 
 \begin{table}[htbp]
+	\centering
+	\caption{可编程网卡内的通用处理器与主机 CPU 的比较。}
+	\scalebox{0.9}{
 	\begin{tabular}{l|p{.35\textwidth}|p{.35\textwidth}}
 		\hline
 		比较项目 & 可编程网卡通用处理器 & 服务器 CPU \\
@@ -757,7 +766,7 @@ ASIC（Application Specific Integrated Circuit，专用集成电路）是为某�
 		数据包处理框架 & \multicolumn{2}{c}{通用（如 DPDK）} \\
 		\hline
 	\end{tabular}
-	\caption{可编程网卡内的通用处理器与主机 CPU 的比较。}
+	}
 	\label{background:tab:host-cpu}
 \end{table}
 

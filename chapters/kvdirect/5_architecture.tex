@@ -10,11 +10,19 @@ KV-Direct使\textit {远程直接键值访问}成为可能。
 \subsection{KV-Direct 操作}
 \label{kvdirect:sec:kv-operations}
 
+
+KV-Direct将单面RDMA操作扩展到键值操作，如表\ref {kvdirect:tab:kv-operations}中所述。
+除了表\ref {kvdirect:tab:kv-operations}顶部所示的标准键值存储操作外，KV-Direct还支持两种类型的向量运算：
+将标量发送到服务器上的网卡，网卡将更新应用于向量中的每个元素;或者向服务器发送一个向量，并且网卡逐个元素地更新原始向量。
+此外，KV-Direct支持用户定义的更新功能，作为原子操作的概括。
+更新功能需要在执行前预先注册并编译为硬件逻辑。
+使用用户定义的更新功能的键值操作类似于\textit {动态消息}（active messages）\cite {eicken1992active}，从而节省了通信和同步成本。
+
+
 \begin{table}
 \centering
 \caption{KV-Direct 操作。}
 \label{kvdirect:tab:kv-operations}
-
 \small
 \begin{tabular}{p{.4\textwidth}|p{.5\textwidth} }
 \toprule
@@ -38,13 +46,6 @@ filter ($k, \lambda(v) \rightarrow$ bool) $\rightarrow [v]$ & 在向量 $k$ 中�
 \end{tabular}
 \end{table}
 
-KV-Direct将单面RDMA操作扩展到键值操作，如表\ref {kvdirect:tab:kv-operations}中所述。
-除了表\ref {kvdirect:tab:kv-operations}顶部所示的标准键值存储操作外，KV-Direct还支持两种类型的向量运算：
-将标量发送到服务器上的网卡，网卡将更新应用于向量中的每个元素;或者向服务器发送一个向量，并且网卡逐个元素地更新原始向量。
-此外，KV-Direct支持用户定义的更新功能，作为原子操作的概括。
-更新功能需要在执行前预先注册并编译为硬件逻辑。
-使用用户定义的更新功能的键值操作类似于\textit {动态消息}（active messages）\cite {eicken1992active}，从而节省了通信和同步成本。
-
 当对键执行向量操作更新（update），归约（reduce）或过滤（filter）时，其值被视为固定位宽元素的数组。
 每个函数 $\lambda$ 对向量中的一个元素，客户端指定的参数 $\Delta$ 和/或初始值 $\Sigma$ 进行归约操作。
 KV-Direct开发工具链多次复制$\lambda$以利用FPGA中的并行性并将计算吞吐量与PCIe吞吐量相匹配，然后使用高级综合（HLS）工具将其编译为可重新配置的硬件逻辑\cite {aoc} 。
@@ -62,7 +63,7 @@ HLS工具自动提取复制函数中的数据依赖性，并生成完全流水�
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.6\textwidth,page=1]{processor_architecture.PNG}
+\includegraphics[width=0.7\textwidth,page=1]{processor_architecture.PNG}
 \caption{键值处理器架构。}
 \label{kvdirect:fig:kvprocessor-arch}
 \end{figure}

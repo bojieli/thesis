@@ -34,21 +34,16 @@
 	{\includegraphics[width=.5\textwidth,page=1]{sg-write.pdf}}
 	\caption{分散 - 聚集（scatter-gather）性能。}
 	\label{kvdirect:fig:scatter-gather}
-\end{figure}\subsection{单机多网卡}
+\end{figure}
+
+
+\subsection{单机多网卡}
 \label{kvdirect:sec:multi-nic}
 
 KV-Direct的主要用例是启用远程直接键值访问，而无需服务器上的CPU开销。
 在某些情况下，可能需要构建一个具有每服务器最大吞吐量的专用键值存储。
 通过模拟，\cite {li2016full}显示了在具有四个（当前不可用的）60核CPU的单个服务器中实现十亿键值运行的可能性。
-如表 \ref{kvdirect:tab:kvs-compare}所示，在服务器上有10个KV-Direct 网卡，使用商用服务器可以轻松实现10亿键值 op / s性能。
-
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.5\textwidth,page=1]{multi_nic.pdf}
-	\caption{单机多网卡的性能可扩放性。}
-	\label{kvdirect:fig:multiple-nics}
-\end{figure}
+如本章末尾的表 \ref{kvdirect:tab:kvs-compare} 所示，在服务器上有10个KV-Direct 网卡，使用商用服务器可以轻松实现10亿键值 op / s性能。
 
 如图 \ref{kvdirect:fig:photo}，服务器消耗357瓦的功率（在墙壁上测量）以达到1.22~Gop / s GET或0.61~Gop / s PUT 的性能。
 
@@ -67,6 +62,15 @@ KV-Direct的主要用例是启用远程直接键值访问，而无需服务器�
 幸运的是，对于少量分区（例如10个），负载不平衡并不重要 \cite {lim2014mica,li2016full}。在YCSB长尾工作负载下，负载最高的网卡的平均负载为1.5倍，非常流行的密钥所增加的负载由无序执行引擎提供（\S \ref {kvdirect:sec:ooo}）。
 相比之下，为了实现与240个CPU内核的匹配性能，最热 CPU 核心的负载将是平均值的10倍。
 图\ref {kvdirect:fig:multiple-nics}显示KV-Direct吞吐量几乎与服务器上的网卡数量呈线性关系。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.5\textwidth,page=1]{multi_nic.pdf}
+	\caption{单机多网卡的性能可扩放性。}
+	\label{kvdirect:fig:multiple-nics}
+\end{figure}
+
 
 \iffalse
 \subsection{访问 SSD}
@@ -89,7 +93,9 @@ KV-Direct的目标是利用数据中心的现有硬件来卸载重要的工作�
 
 \begin{table}[t]
 \centering
-\scalebox{0.85}{
+\caption{不同网卡 DRAM / PCIe吞吐率（垂直）和网卡 /主机内存大小比（水平）下长尾工作负载的最佳负载分配比。}
+\label{kvdirect:tab:optimal-load-dispatch}
+\small
 \begin{tabular}{|l|r|r|r|r|r|r|}
 \hline
      & 1/1024 & 1/256 & 1/64 & 1/16 & 1/4 & 1 \\
@@ -105,15 +111,13 @@ KV-Direct的目标是利用数据中心的现有硬件来卸载重要的工作�
 8    & 1     & 1     & 1     & 0.995 & 0.937 & 0.885 \\
 \hline
 \end{tabular}
-}
-\caption{不同网卡 DRAM / PCIe吞吐率（垂直）和网卡 /主机内存大小比（水平）下长尾工作负载的最佳负载分配比。}
-\label{kvdirect:tab:optimal-load-dispatch}
-
 \end{table}
 
 \begin{table}[t]
 \centering
-\scalebox{0.85}{
+\caption{与简单分区相比，负载分派的相对吞吐量。 列标题与表格相同~\ref{kvdirect:tab:optimal-load-dispatch}。}
+\label{kvdirect:tab:optimal-load-dispatch-throughput}
+\small
 \begin{tabular}{|l|r|r|r|r|r|r|}
 \hline
     & 1/1024 & 1/256 & 1/64 & 1/16 & 1/4 & 1 \\
@@ -129,10 +133,6 @@ KV-Direct的目标是利用数据中心的现有硬件来卸载重要的工作�
 8	& 7.99	& 7.97	& 7.87	& 7.56	& 6.83	& 4.52 \\
 \hline
 \end{tabular}
-}
-\caption{与简单分区相比，负载分派的相对吞吐量。 列标题与表格相同~\ref{kvdirect:tab:optimal-load-dispatch}。}
-\label{kvdirect:tab:optimal-load-dispatch-throughput}
-
 \end{table}
 
 

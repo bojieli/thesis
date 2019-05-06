@@ -171,11 +171,8 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 在 键值存储 客户端上
 (图~\ref{kvdirect:fig:memaccess-b})
 或者在硬件加速器上
-(图~\ref{kvdirect:fig:memaccess-c}).
+(图~\ref{kvdirect:fig:memaccess-c})。
 
-当推到极限时，在高性能键值存储系统中，吞吐量瓶颈可归因于键值操作中的计算和随机存储器访问中的延迟。
-基于CPU的键值存储需要花费CPU周期来进行密钥比较和散列槽计算。
-此外，键值存储散列表比CPU高速缓存大几个数量级，因此存储器访问等待时间由实际访问模式的高速缓存未命中等待时间决定。
 
 \begin{figure}[t]
 	\centering
@@ -187,10 +184,18 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 	\label{kvdirect:fig:cpu-mem}
 \end{figure}
 
+当推到极限时，在高性能键值存储系统中，吞吐量瓶颈可归因于键值操作中的计算和随机存储器访问中的延迟。
+基于CPU的键值存储需要花费CPU周期来进行密钥比较和散列槽计算。
+此外，键值存储散列表比CPU高速缓存大几个数量级，因此存储器访问等待时间由实际访问模式的高速缓存未命中等待时间决定。
+
+
+通过我们的测量，当代计算机的64字节随机读取延迟大约为1~ns。当CPU内核落入指令窗口时，CPU核心可以同时发出多个内存访问指令，受核心中加载存储单元数量的限制（在我们的CPU中测量为3至4个） \cite {gharachorloo1992hiding,han2010packetshader,zhang2015mega}。如图 \ref{kvdirect:tab:kv-cpu-throughput} 所示，在我们的CPU中，我们测量每个核心每秒最大吞吐量为29.3~M随机64B访问。另一方面，访问64字节键值对的操作通常需要大约100~ns计算或大约500条指令，这太大而不适合指令窗口（测量为100至200）。当与计算交错时，CPU内核的性能降低到每秒5.5~M 键值操作（Mops）。优化是通过在一次发出内存访问之前将多个操作的计算聚类在一起来批量键值存储中的内存访问\cite {li2016full,narula2014phase}。这将我们CPU中的每核心吞吐量提高到7.9~MOps，这仍远低于主机DRAM的随机64B吞吐量。
+
+
 \begin{table}[htbp]
 	\small
 	\centering
-	\label{kvdirect:tab:tput-unroll}
+	\caption{不同工作负载和内存访问粒度下的吞吐量（百万次操作每秒）。}
 	\begin{tabular}{|c|c|c|c|c|c|c|}
 		\hline
 		\multirow{2}{*}{大小（字节）} & \multirow{2}{*}{仅计算} & \multirow{2}{*}{仅访存} & \multicolumn{4}{c|}{同时计算和访存（批处理大小）} \\\cline{4-7} 
@@ -201,11 +206,9 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 		256 & 2.7 & 13.2 & 2.1 & 2.2 & 2.2 & 2.1 \\\hline
 		512 & 1.3 & 8.2 & 1.2 & 1.1 & 1.2 & 1.1 \\\hline
 	\end{tabular}
-	\caption{不同工作负载和内存访问粒度下的吞吐量（百万次操作每秒）。}
 	\label{kvdirect:tab:kv-cpu-throughput}
 \end{table}
 
-通过我们的测量，当代计算机的64字节随机读取延迟大约为1~ns。当CPU内核落入指令窗口时，CPU核心可以同时发出多个内存访问指令，受核心中加载存储单元数量的限制（在我们的CPU中测量为3至4个） \cite {gharachorloo1992hiding,han2010packetshader,zhang2015mega}。在我们的CPU中，我们测量每个核心每秒最大吞吐量为29.3~M随机64B访问。另一方面，访问64字节键值对的操作通常需要大约100~ns计算或大约500条指令，这太大而不适合指令窗口（测量为100至200）。当与计算交错时，CPU内核的性能降低到每秒5.5~M 键值操作（Mops）。优化是通过在一次发出内存访问之前将多个操作的计算聚类在一起来批量键值存储中的内存访问\cite {li2016full,narula2014phase}。这将我们CPU中的每核心吞吐量提高到7.9~MOps，这仍远低于主机DRAM的随机64B吞吐量。
 
 观察键值处理中CPU的有限容量，最近的工作是：利用片面RDMA将键值处理卸载到客户端，并有效地将键值存储服务器用作共享内存池。
 尽管RDMA网卡提供了高消息率（8 至 150~Mops \cite {kalia2016design}），但要找到RDMA原语和键值操作之间的有效匹配是一项挑战。
@@ -227,22 +230,11 @@ RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或
 %Consequently, for applications with sufficient bit-level and task-level parallelism, FPGAs provide not only high throughput and power efficiency, but also low and predictable latency.
 
 由于网络速度和CPU网络处理能力的不匹配日益增加，带有FPGA的可编程网卡 \cite {vfp,greenberg2015sdn,li2016clicknp,caulfield2016cloud} 现在可以在数据中心进行大规模部署。
-如图\ref {kvdirect:fig:kvdirect-arch}所示，我们使用的可编程网卡的核心是FPGA，带有嵌入式网卡芯片以连接到网络。
+我们使用的可编程网卡的核心是FPGA，带有嵌入式网卡芯片以连接到网络。
 可编程网卡通常带有板载DRAM作为数据包缓冲区和用于网卡固件的运行时内存\cite {li2016clicknp}，但DRAM通常不足以容纳整个键值存储。
 
 \subsection{远程直接键值访问面临的挑战}
 \label{kvdirect:sec:challenge}
-
-\begin{figure}[t]
-\centering
-\subfloat[DMA 吞吐量。\label{kvdirect:fig:dma-tput}]
-{\includegraphics[width=.5\textwidth,page=1]{pcie_bw.pdf}}
-\subfloat[DMA 读延迟。\label{kvdirect:fig:dma-lat}]
-{\includegraphics[width=.5\textwidth,page=1]{pcie_latency.pdf}}
-\caption{PCIe 随机 DMA 性能。}
-\label{kvdirect:fig:dma-perf}
-
-\end{figure}
 
 KV-Direct将键值处理从CPU移动到服务器中的可编程网卡（图\ref {kvdirect:fig:memaccess-c}）。
 与RDMA相同，KV-Direct 网卡通过PCIe访问主机内存。 PCIe是一种分组交换网络，具有大约500 ns的往返延迟和每Gen3 x8端点7.87~GB / s的理论带宽。
@@ -250,6 +242,16 @@ KV-Direct将键值处理从CPU移动到服务器中的可编程网卡（图\ref 
 对于随机非缓存DMA读取，由于DRAM访问，DRAM刷新和PCIe DMA引擎中的PCIe响应重新排序，存在额外的250~ns平均延迟（图\ref {kvdirect:fig:dma-lat}）。
 在吞吐量方面，每个DMA读或写操作都需要一个带有26字节头的PCIe传输层数据包（TLP）和用于64位寻址的填充。
 对于以64字节粒度访问主机内存的PCIe Gen3 x8 网卡，理论吞吐量因此为5.6~GB / s或87~Mops。
+
+\begin{figure}[t]
+	\centering
+	\subfloat[DMA 吞吐量。\label{kvdirect:fig:dma-tput}]
+	{\includegraphics[width=.5\textwidth,page=1]{pcie_bw.pdf}}
+	\subfloat[DMA 读延迟。\label{kvdirect:fig:dma-lat}]
+	{\includegraphics[width=.5\textwidth,page=1]{pcie_latency.pdf}}
+	\caption{PCIe 随机 DMA 性能。}
+	\label{kvdirect:fig:dma-perf}
+\end{figure}
 
 为了使用64字节DMA请求使PCIe Gen3 x8饱和，考虑到我们的1050~ns的延迟，需要92个并发DMA请求。
 实际上，有两个因素进一步限制了DMA请求的并发性。

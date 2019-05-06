@@ -157,7 +157,9 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 
 \begin{table}[t]
 	\centering
-	\scalebox{0.9}{
+	\caption{Linux 套接字的开销。}
+	\label{socksdirect:tab:overhead}
+	\small
 		\begin{tabularx}{1\textwidth}{l|X|X}
 			\hline
 			类型 & 开销 & 我们的解决方案 \\
@@ -189,15 +191,10 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 			每连接 & 分派新连接 & 守护进程 (\S\ref{socksdirect:subsec:connection-management}) \\
 			\hline
 		\end{tabularx}
-	}
-	\caption{Linux 套接字的开销。}
-	\label{socksdirect:tab:overhead}
-	
 \end{table}
 
 \subsubsection{每次操作的开销}
 \label{socksdirect:subsec:per-operation-overhead}
-\quad
 
 \parab {内核穿越。}
 传统上，套接字API在内核中实现，因此需要针对每个套接字操作进行内核交叉（系统调用）。更糟糕的是，内核页表隔离（KPTI）补丁 \cite {kpti}以防止Meltdown \cite {Lipp2018meltdown}攻击使内核交叉4倍昂贵，如表 \ref {socksdirect:tab:operation-performance}显示。
@@ -244,7 +241,9 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 
 \begin{table}[t]
 	\centering
-	\scalebox{0.9}{
+	\caption{往返延迟和单核吞吐量操作（测试平台设置在\S \ref {socksdirect:subsec:methodology}中）。 如果未指定，则消息大小为8个字节。}
+	\label{socksdirect:tab:operation-performance}
+	\small
 		\begin{tabular}{l|l|l|}
 			\hline
 			操作	& 延迟  & 吞吐量  \\
@@ -301,17 +300,12 @@ Socket（套接字）是应用程序，容器和主机之间的标准通信原�
 			\hline
 			主机间 Linux TCP 套接字 & 30 & 0.3 \\
 			\hline
-		\end{tabular}
-	}
-	\caption{往返延迟和单核吞吐量操作（测试平台设置在\S \ref {socksdirect:subsec:methodology}中）。 如果未指定，则消息大小为8个字节。}
-	\label{socksdirect:tab:operation-performance}
-	
+		\end{tabular}	
 \end{table}
 
 
 \subsubsection{每个数据包的开销}
 \label{socksdirect:subsec:per-packet-overhead}
-\quad
 
 \parab {传输协议（TCP / IP）。}
 传统上，TCP / IP是数据中心中的事实上的传输协议。
@@ -345,8 +339,10 @@ TCP拥塞控制中的ACK时钟 \cite {mprdma}要求及时响应收到的数据�
 
 \begin{sidewaystable*}[t]
 	\centering
-	\scalebox{0.68}{
-		\begin{tabularx}{1.45\textwidth}{l|X|X|X|X|X|X|X|X|X|X|}
+	\caption{高性能套接字系统的比较。}
+	\label{socksdirect:tab:related-work}
+	\scalebox{0.8}{
+		\begin{tabularx}{1.25\textwidth}{l|X|X|X|X|X|X|X|X|X|X|}
 			\hline
 			& FastSocket & MegaPipe / StackMap & IX & Arrakis & SandStorm / mTCP & LibVMA & OpenOnload & Rsocket / SDP & FreeFlow & SocksDirect \\
 			\hline
@@ -407,9 +403,6 @@ TCP拥塞控制中的ACK时钟 \cite {mprdma}要求及时响应收到的数据�
 			\hline
 		\end{tabularx}
 	}
-	\caption{高性能套接字系统的比较。}
-	\label{socksdirect:tab:related-work}
-	
 \end{sidewaystable*}
 
  
@@ -434,7 +427,6 @@ Slim~ \cite {slim}将三次内核往返减少到一次。
 
 \subsubsection{每字节的开销}
 \label{socksdirect:subsec:per-byte-overhead}
-\quad
 
 \parab {内容（payload）复制。}
 在大多数套接字系统中，\texttt {send}和\texttt {recv}的语义会导致应用程序和网络堆栈之间的内存复制。 对于非阻塞\texttt {send}，系统需要将数据复制出缓冲区，因为应用程序可能会在\texttt {send}返回后立即覆盖缓冲区。 简单地删除副本可能会违反应用程序的正确性。
@@ -447,7 +439,6 @@ Linux提供了基于准备就绪的事件模型，即应用程序知道传入的
 
 \subsubsection{每条连接的开销}
 \label{socksdirect:subsec:per-connection-overhead}
-\quad
 
 \parab {内核文件描述符分配。}
 在Linux中，每个套接字连接都是VFS中的文件，因此需要分配整数文件描述符和\emph {inode}。

@@ -264,34 +264,14 @@ Next we tested the performance with adversary traffic to thest the worst case pe
 	Most ClickNP implementations show less than 100\% logic overhead and less than 30\% BRAM overhead. For tiny elements (\eg IP checksum), a fixed element overhead dominates.
 }
 
-\begin{table}[htbp]
-	\centering
-	
-	\caption{相比 NetFPGA 的面积开销。}
-	\label{clicknp:tab:netfpga}
-	\begin{tabular}{l|r|r|r}
-		\toprule
-		\multirow{2}{2.2cm}{NetFPGA 功能} & 逻辑查找表（LUT） & 寄存器 & 内存（BRAM） \\
-		& 最小 / 最大 & 最小 / 最大 & 最小 / 最大 \\
-		\midrule
-		输入选择器  & 2.1x / 3.4x & 1.8x / 2.8x & 0.9x / 1.3x \\
-		输出队列   & 1.4x / 2.0x & 2.0x / 3.2x & 0.9x / 1.2x \\
-		数据包头解析器  & 0.9x / 3.2x & 2.1x / 3.2x & N/A \\
-		Openflow 查找表 & 0.9x / 1.6x & 1.6x / 2.3x & 1.1x / 1.2x \\
-		\midrule
-		\midrule
-		IP 校验和计算    & 4.3x / 12.1x & 9.7x / 32.5x & N/A \\
-		隧道封装          & 0.9x / 5.2x & 1.1x / 10.3x & N/A \\
-		\bottomrule
-	\end{tabular}
-	
-\end{table}
 
 
 在本小节中，我们评估\name 网络功能s的资源利用率。
 表 \ref {clicknp:tab:applications}总结了结果。
 除了使用大多数BRAM来保存编码书的IPSec网关之外，所有其他网络功能仅使用中等资源（5 至 50 ％）。
 仍有空间容纳更复杂的网络功能。
+
+
 
 接下来，我们研究了\name 的细粒度模块化的开销。
 由于每个元素都将生成逻辑块边界并仅使用FIFO缓冲区与其他块进行通信，因此应该存在开销。
@@ -305,7 +285,7 @@ Next we tested the performance with adversary traffic to thest the worst case pe
 我们提取NetFPGA中的关键模块，这些模块由经验丰富的Verilog程序员进行了优化，
 并在\ name中实现具有相同功能的对应元素。
 我们使用不同的高层次综合工具作为后端来比较这两种实现之间的相对面积成本。
-结果总结在表 \ref {clicknp:tab:netfpga}中。
+结果总结在表 \ref {clicknp:tab:netfpga} 中（见本章末尾的全页表）。
 由于不同的工具可能具有不同的面积成本，因此我们记录最大值和最小值。
 我们可以看到，与手工优化代码相比，自动生成的硬件描述语言代码使用更多区域。
 然而，差异并不是很大。
@@ -313,6 +293,29 @@ Next we tested the performance with adversary traffic to thest the worst case pe
 对于微小模块（如表格底部所示），相对面积成本看起来更大，但绝对资源使用量很小。
 这是因为所有的高层次综合工具都会产生一个固定的开销，占据微小模块的面积成本。
 
+
+\begin{table}[htbp]
+	\centering
+	\caption{相比 NetFPGA 的面积开销。}
+	\label{clicknp:tab:netfpga}
+	\scalebox{0.9}{
+		\begin{tabular}{l|r|r|r}
+			\toprule
+			\multirow{2}{2.2cm}{NetFPGA 功能} & 逻辑查找表（LUT） & 寄存器 & 内存（BRAM） \\
+			& 最小 / 最大 & 最小 / 最大 & 最小 / 最大 \\
+			\midrule
+			输入选择器  & 2.1x / 3.4x & 1.8x / 2.8x & 0.9x / 1.3x \\
+			输出队列   & 1.4x / 2.0x & 2.0x / 3.2x & 0.9x / 1.2x \\
+			数据包头解析器  & 0.9x / 3.2x & 2.1x / 3.2x & N/A \\
+			Openflow 查找表 & 0.9x / 1.6x & 1.6x / 2.3x & 1.1x / 1.2x \\
+			\midrule
+			\midrule
+			IP 校验和计算    & 4.3x / 12.1x & 9.7x / 32.5x & N/A \\
+			隧道封装          & 0.9x / 5.2x & 1.1x / 10.3x & N/A \\
+			\bottomrule
+		\end{tabular}
+	}
+\end{table}
 
 总之，\name 可以为FPGA生成高效的硬件描述语言，只需要适度的面积成本，可以构建实用的网络功能。
 展望未来，FPGA技术仍在迅速发展。例如，Altera的下一代FPGA Arria 10的面积是本文使用的芯片（Stratix V）的2.5倍。
