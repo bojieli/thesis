@@ -8,7 +8,7 @@
 \textbf{图：编译生成的 OpenCL 代码示例，（1）只包含顺序和选择结构，不包含分支结构，（2）非阻塞（每个流水级有最坏时钟周期数的保证）。可以避免 handler 阻塞 signal。}
 \fi
 
-首先，我们构建了一个\name 编译器，作为\name 工具链的前端（\S \ref {clicknp:subsec:toolchain}）。
+我们实现了一个\name 编译器，作为\name 工具链的前端（\S \ref {clicknp:subsec:toolchain}）。
 对于宿主程序，使用Visual C++作为后端。进一步集成了Altera OpenCL SDK（v15.1）\cite {aoc}和Xilinx Vivado 高层次综合（v2015.4）\cite {vivado}作为FPGA程序的后端。
 \name 编译器包含4,925行C ++代码，它们解析配置文件和元件声明，在\S \ref {clicknp:sec:optimization}中执行优化，并生成特定于每个商业高层次综合工具的代码。
 使用Altera OpenCL时，每个\name 元件都被编译成\textit {kernel}，元件之间的连接被转换为Altera扩展通道。
@@ -29,7 +29,7 @@ FPGA板具有PCIe Gen2 x8接口，4GB板载DDR内存和两个40G以太网端口�
 \subsection{\name 元件库}
 \label{clicknp:subsec:lib}
 
-我们实现了一个包含近200个元件的\name 元件库。
+我们实现了一个包含近 200 个元件的\name 元件库。
 其中一部分（20％）直接来自Click Modular Router，但使用\name 编程框架重新编写。
 这些元件涵盖了网络功能的大量基本操作，包括数据包解析，校验和计算，封装/解封，哈希表，最长前缀匹配（LPM），速率限制，加密和数据包调度。
 由于\name 的模块化体系结构，每个元件的代码大小都是适中的。
@@ -54,7 +54,7 @@ FPGA板具有PCIe Gen2 x8接口，4GB板载DDR内存和两个40G以太网端口�
 这是合理的，因为大多数数据包操作都很简单。
 HashTCAM和RateLimiter具有适度的逻辑资源使用，因为这些元件具有更大的仲裁逻辑。
 但是，BRAM的使用很大程度上依赖于元件的配置。 例如，BRAM使用率随流表中支持的条目数呈线性增长。
-总的来说，本文使用的FPGA芯片有足够的容量来支持包含少量元件的有意义的网络功能（\S \ref{clicknp:sec:application}）。
+总而言之，本文使用的FPGA芯片有足够的容量来支持包含少量元件的有意义的网络功能（\S \ref{clicknp:sec:application}）。
 
 
 
