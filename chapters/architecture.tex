@@ -150,9 +150,6 @@
 \end{figure}
 
 
-\subsection{硬件架构}
-
-
 图 \ref{arch:fig:my-smartnic-current} 显示了本文使用的 Catapult 可编程网卡 \cite{putnam2014reconfigurable} 硬件架构。
 
 
@@ -171,7 +168,7 @@
 如果数据包是用于第 \ref{chapter:socksdirect} 章中的套接字通信，它将在 FPGA 中进行虚拟网络的解封装，并通过 FPGA 与商用 RDMA 网卡之间的网络接口发送给商用 RDMA 网卡。
 商用 RDMA 网卡会把数据包的内容通过 CPU 互连（如 PCIe） DMA 发送给主机上的用户态套接字库。
 
-
+\iffalse
 \textbf{细节移动到后面章节}
 
 
@@ -218,5 +215,6 @@ ClickNP 编程框架可以自动生成状态导入导出逻辑，并与管道输
 	\caption{基于 KV-Direct 的可编程网卡应用层架构。}
 	\label{arch:fig:kvdirect_arch}
 \end{figure}
+\fi
 
 接下来的三章将依次详细讨论本文的三个主要创新点，即基于可编程网卡的网络功能（ClickNP）、存储数据结构（KV-Direct）和操作系统通信原语（SocksDirect）加速。
