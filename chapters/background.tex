@@ -421,6 +421,10 @@ E2 \cite{palkar2015e2} 提出了高可用、高可扩放性的网络功能调度
 \subsection{数据结构处理}
 
 
+
+如图 \ref{background:fig:kvdirect_traditional} 所示，传统基于软件的内存数据结构存储系统在客户端（计算节点）和服务器端（存储节点）都需要跨越标准运行库、操作系统内核、虚拟机监视器等多个层次，还需要通过软件处理共享数据结构的并发访问，带来一系列开销。
+
+
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.6\textwidth]{figures/kvdirect_traditional.png}
@@ -428,9 +432,12 @@ E2 \cite{palkar2015e2} 提出了高可用、高可扩放性的网络功能调度
 	\label{background:fig:kvdirect_traditional}
 \end{figure}
 
-如图 \ref{background:fig:kvdirect_traditional} 所示，传统基于软件的内存数据结构存储系统在客户端和服务器端都需要跨越标准运行库、操作系统内核、虚拟机监视器等多个层次，还需要通过软件处理共享数据结构的并发访问，带来一系列开销。
-本文第 \ref{chapter:kvdirect} 章将提出基于可编程网卡的内存数据结构存储，具有高吞吐量、低延迟、延迟稳定的特点。
-
+其中操作系统内核和虚拟机监视器的开销是前面几个小节已经讨论的。
+即使这些开销被全部消除，内存数据结构处理的吞吐量瓶颈仍受限于数据结构操作中的计算和随机存储器访问中的延迟。
+一方面，基于CPU的键值存储需要花费数百个CPU周期来进行键比较和哈希槽计算。
+另一方面，键值存储哈希表比CPU高速缓存大几个数量级，因此存储器访问等待时间由实际访问模式的高速缓存未命中等待时间决定。
+第 \ref{chapter:kvdirect} 章将详细分析，即使所有 CPU 核心全部处理键值操作，其吞吐量仍远远低于主机 DRAM 内存所能提供的随机访问能力。
+为此，第 \ref{chapter:kvdirect} 章将提出基于可编程网卡的内存数据结构存储。
 
 \iffalse
 \subsection{数据中心功耗的挑战}
