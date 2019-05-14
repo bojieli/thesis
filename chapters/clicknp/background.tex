@@ -2,15 +2,16 @@
 \section{背景}
 \label{clicknp:sec:background}
 
-\subsection{软件网络功能的性能挑战}
+\subsection{软件虚拟网络与网络功能的性能挑战}
 
 
 虚拟网络通常用虚拟交换机软件实现，如 Open vSwitch \cite{pfaff2015design}。
-为了提高虚拟网络的性能，并满足可编程性要求，云服务商重新设计了软件虚拟交换机，如微软的 VFP \cite{firestone2017vfp} 和谷歌的 Andromeda \cite{andromeda}。
+为了提高虚拟网络的性能，并满足可编程性要求，云服务商重新设计了软件虚拟交换机。
 通过利用 DPDK \cite{dpdk} 等高速网络处理包技术，并使用轮询模式运行 CPU 核，可以绕过 OS 网络协议栈来显著降低数据包处理成本。
 %SoftNIC \cite{han2015softnic} 提出用软件实现网卡中固化的功能以提高灵活性。
 但是，即使是不做任何处理的简单网络数据包转发，每个 CPU 核每秒也只能处理 10 M 至 20 M 个数据包 \cite{martins2014clickos,netbricks}，对于 60 M 个数据包每秒的 40 Gbps 线速，仍然需要 3 至 6 个 CPU 核。
 
+传统的网络功能由部署在数据中心特定位置的专用设备实现，如 F5 负载均衡器 \cite{f5-load-balancer}。这些专用网络功能设备不仅价格高昂，也不够灵活，不足以支持云服务中的多租户。
 为了支持灵活的网络功能，云服务商还部署了软件实现的虚拟网络功能。例如，Ananta \cite {ananta} 是一个部署在微软数据中心的软件负载均衡器，用于提供云规模的负载均衡服务。
 为了在一台服务器上支持多种网络功能，RouteBricks \cite {routebricks}、xOMB \cite{anderson2012xomb} 和 COMB \cite{comb} 采用 Click 模块化路由器 \cite{kohler2000click} 的编程模型，把每个网络功能实现成一个 C++ 的类，让每个数据包在一个 CPU 核上依次被各个网络功能处理，即所谓 ``运行到结束（run-to-completion）'' 模型。
 这些工作表明，在实际网络功能下，基于多核 x86 CPU 的每台服务器转发数据包的速度可达 10 Gbps，并且可以通过多核和搭建更多网络节点的集群来扩展容量。
@@ -26,9 +27,18 @@ NFP \cite{sun2017nfp} 利用多个并行的网络功能流水线提高数据包�
 在数据中心，服务器通常服役 3 到 5 年，因此一个物理 CPU 核在服务器生命周期内的售价最高可达 4500 美元 \cite{smartnic}。
 即使考虑到总有一部分 CPU 核没有被售出，并且云经常为大客户提供折扣，与专用硬件相比，即使专门分配一个物理 CPU 核用于虚拟网络也是相当昂贵的。
 
+为了加速虚拟网络和网络功能，以前的工作已经提出使用 GPU \cite {packetshader}，网络处理器（Network Processor，NP） \cite {cavium,netronome} 和硬件网络交换机 \cite {duet}。
+GPU 早期主要用于图形处理，近年来扩展到具有海量数据并行性的其他应用程序。
+PacketShader \cite {packetshader} 表明使用 GPU 可以实现 40Gbps 的分组交换速度。
+GPU 适合批量操作，但是，批量操作会导致高延迟。
+例如，PacketShader \cite {packetshader} 报告的转发延迟约为 $200 \mu{}s$，比 \name{} 高两个数量级。
+
+网络处理器的历史则可以追溯到 20 世纪 90 年代 TCP 卸载的第一波浪潮。
+网络处理器专门用于处理网络流量并且具有许多硬连线（hard-wired）的网络加速器。
+Click 模块化路由器 \cite{kohler2000click} 提出的第二年，NP-Click \cite{shah2004np} 就在网络处理器上实现了 Click 编程框架。
+硬件网络交换机的主要问题是灵活性和查找表容量不足 \cite {duet}。
 
 
-为了加速软件包处理，以前的工作已经提出使用GPU \cite {packetshader}，专用网络处理器（NP）\cite {cavium,netronome} 和硬件交换机 \cite {duet}。
 GPU主要用于图形处理，最近扩展到具有海量数据并行性的其他应用程序。 GPU更适合批量操作。 PacketShader \cite {packetshader}，表明使用GPU可以实现40Gbps的分组交换速度。
 但是，批量操作会导致高延迟。
 例如，\cite {packetshader}中报告的转发延迟约为$200 \mu{}s$，比 \name{} 大两个数量级。

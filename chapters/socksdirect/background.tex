@@ -481,6 +481,7 @@ LOS~ \cite {huang2017high}将文件描述符空间划分为用户和内核部分
 
 学术界和业界都提出了许多高性能套接字系统，如表 \ref {socksdirect:tab:related-work}所示。
 
+
 \parab {内核网络堆栈优化:}第一类工作是优化内核TCP / IP堆栈。 FastSocket~ \cite {lin2016scalable}，Affinity-Accept~ \cite {pesterev2012improving}，FlexSC~ \cite {soares2010flexsc}和零拷贝套接字 \cite {thadani1995efficient,chu1996zero,linux-zero-copy}实现良好的兼容性和隔离性。
 
 MegaPipe~ \cite {han2012megapipe}和StackMap~ \cite {yasukata2016stackmap}提出了新的API来实现零拷贝和改进I / O多路复用，代价是需要修改应用程序。
@@ -489,11 +490,11 @@ MegaPipe~ \cite {han2012megapipe}和StackMap~ \cite {yasukata2016stackmap}提出
 
 \parab {用户空间TCP / IP堆栈:}第二类工作完全绕过内核TCP / IP堆栈并在用户空间中实现TCP / IP。
 在这个类别中，IX~ \cite {belay2017ix}和Arrakis~\cite {peter2016arrakis}是新的操作系统架构，它使用虚拟化来确保安全性和隔离性。 IX利用LwIP~ \cite {dunkels2001design}在用户空间中实现TCP / IP，同时使用内核转发每个数据包以实现性能隔离和QoS。相比之下，Arrakis将QoS卸载到网卡，因此绕过数据平面的内核。
-它们使用网卡在同一主机中的应用程序之间转发数据包。
-如表 \ref {socksdirect:tab:operation-performance}所示，从CPU到网卡的发夹延迟远远高于核心间缓存迁移延迟。
-吞吐量也受到内存映射I / O（MMIO）门铃延迟和PCIe带宽的限制 \cite {neugebauer2018understanding,li2017kv}。
+这些工作使用网卡在同一主机中的应用程序之间转发数据包。
+如表 \ref {socksdirect:tab:operation-performance} 所示，从CPU到网卡的往返（hairpin）延迟远远高于核心间缓存迁移延迟。
+吞吐量也受到内存映射I / O（MMIO）的门铃（doorbell）延迟和PCIe带宽的限制 \cite {neugebauer2018understanding,li2017kv}。
 
-除了这些新的OS体系结构外，许多用户空间套接字在Linux上使用高性能数据包I / O框架，例如Netmap~ \cite {rizzo2012netmap}，Intel DPDK~ \cite {dpdk}和PF\_RING \cite {pf-ring}，以便直接访问用户空间中的网卡队列。
+除了这些新的操作系统体系结构，许多用户空间套接字在Linux上使用高性能数据包I / O框架，例如Netmap~ \cite {rizzo2012netmap}，Intel DPDK~ \cite {dpdk}和PF\_RING \cite {pf-ring}，以便直接访问用户空间中的网卡队列。
 SandStorm~ \cite {marinos2014network}，mTCP~ \cite {jeong2014mtcp}，Seastar~ \cite {seastar}和F-Stack~ \cite {fstack}提出了新的API，因此需要修改应用程序。
 大多数API更改旨在支持零拷贝，标准API仍然会复制数据。
 FaSST~ \cite {kalia2016fasst}和eRPC~ \cite {kalia2018datacenter}提供RPC API而不是套接字。
