@@ -89,26 +89,24 @@ RouteBricks \cite {routebricks} 等工作表明，基于多核 x86 CPU 的每台
 
 由于大规模 Web 服务、大数据处理、机器学习等应用对计算和网络的性能需求非常迫切，图形处理器（GPU）等计算加速设备和远程直接内存访问（RDMA） \cite{infiniband2000infiniband} 等网络加速技术在越来越多的数据中心广泛部署。
 
-为了加速虚拟网络和网络功能，以前的工作已经提出使用 GPU \cite {packetshader}，网络处理器（Network Processor，NP） \cite {cavium,netronome} 和硬件网络交换机 \cite {duet}。
+为了加速虚拟网络和网络功能，以前的工作已经提出使用 GPU \cite {packetshader}，网络处理器（Network Processor，NP） \cite {cavium,netronome} 和硬件网络交换机 \footnote{本文中，\textit{交换机}（switch）与路由器不加区分，数据中心的相关文献中通常使用\textit{交换机}一词指代网络互连设备。} \cite {duet}。
 GPU 早期主要用于图形处理，近年来扩展到具有海量数据并行性的其他应用程序。
 PacketShader \cite {packetshader} 表明使用 GPU 可以实现 40Gbps 的分组交换速度。
 GPU 适合批量操作，但是，批量操作会导致高延迟。
-例如，PacketShader \cite {packetshader} 报告的转发延迟约为 $200 \mu{}s$。
-网络处理器的历史则可以追溯到 20 世纪 90 年代 TCP 卸载的第一波浪潮。
-Click 模块化路由器 \cite{kohler2000click} 提出的第二年，NP-Click \cite{shah2004np} 就在网络处理器上实现了 Click 编程框架。
+网络处理器的历史则可以追溯到 20 世纪 90 年代的网络交换机。
+网络处理器由大量的嵌入式处理器核心构成，每个处理器核心的处理能力有限，而有状态连接通常由固定的处理器核心处理，从而单条连接的吞吐量有一定的局限性。
 硬件网络交换机的主要问题是灵活性和查找表容量不足 \cite {duet}。
 
 为了降低操作系统通信原语的开销，一系列工作将套接字系统的一部分卸载到网卡硬件上。
-TCP 卸载引擎（TCP Offload Engine，TOE） \cite {tcp-chimney-offload} 将部分或全部的 TCP / IP 协议栈卸载到网卡，但由于通用处理器的性能按摩尔定律迅速增长，这些专用硬件的性能优势有限，仅在专用领域中获得成功，例如 iSCSI HBA 存储卡 \cite {iscsi-hba} 和无状态卸载（例如校验和、接收侧扩放（RSS）、大发送数据卸载（LSO）、大接收数据卸载（LRO） \cite {lsolro}）。
+TCP 卸载引擎（TCP Offload Engine，TOE） \cite {tcp-chimney-offload} 将部分或全部的 TCP / IP 协议栈卸载到网卡，但由于通用处理器的性能按摩尔定律迅速增长，这些专用硬件的性能优势有限，仅在专用领域中获得成功。
 近年来，由于数据中心的硬件趋势和应用需求，\emph {有状态}卸载的故事开始复兴 \cite {chuanxiong-rdma-keynote}。
-因此，RDMA \cite {infiniband2000infiniband} 在生产数据中心中广泛使用 \cite {guo2016rdma}。
+因此，远程直接内存访问（RDMA） \cite {infiniband2000infiniband} 在生产数据中心中广泛使用 \cite {guo2016rdma}。
 与基于软件的 TCP / IP 网络协议栈相比，RDMA 使用硬件卸载来提供超低延迟和接近零的 CPU 开销。
-为了使套接字应用程序能够使用 RDMA，RSocket \cite {rsockets}，SDP~ \cite {socketsdirect} 和 UNH EXS~ \cite {russell2008extended} 将套接字操作转换为 RDMA 原语。
+为了使套接字应用程序能够使用 RDMA，RSocket 等工作 \cite {rsockets,socketsdirect,russell2008extended} 将套接字操作转换为 RDMA 原语。
 它们具有相似的设计，其中 RSocket 的开发最活跃，是套接字转换 RDMA 的事实标准。
-FreeFlow~ \cite {nsdi19freeflow} 利用 RDMA 网卡提供容器（container）覆盖网络（overlay network），它利用共享内存进行主机内部通信，利用 RDMA 进行主机间通信。
-FreeFlow 使用 RSocket 将套接字转换为 RDMA。
 但是，RSocket 的性能和兼容性都不令人满意。
 第 \ref{chapter:socksdirect} 章将提出一个与现有应用兼容，并能充分利用 RDMA 网卡性能的套接字系统。
+
 
 为了加速键值存储系统，近年来的工作 \cite {kalia2014using,kalia2016design,kalia2014using,kalia2016design} 利用 RDMA 网卡基于硬件的网络协议栈，使用双面RDMA作为KVS客户端和服务器之间的RPC机制进一步提高每核吞吐量并减少延迟，如图 \ref{intro:fig:memaccess-a} 所示。尽管这些工作进一步降低了网络通信的开销，但如上一节所讨论的，这些系统仍然受到 CPU 的并行性限制。
 

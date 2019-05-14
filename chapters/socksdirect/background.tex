@@ -517,15 +517,15 @@ LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS
 后一种方法保证了正确性，但即使没有争用，锁也会损害性能。
 
 \parab {卸载到网卡的传输:}
-第三类工作将套接字系统的一部分卸载到网卡硬件上。
-TCP卸载引擎（TOE） \cite {tcp-chimney-offload}将部分或完整的TCP / IP堆栈卸载到网卡，但它们仅在专用领域（例如iSCSI HBA~ \cite {iscsi-hba}）和无状态卸载（例如校验和，流动转向和LSO / LRO~ \cite {lsolro}）中获得了商业成功。
-由于数据中心的硬件趋势和应用需求，\emph {stateful}卸载的故事近年来有所不同 \cite {chuanxiong-rdma-keynote}。
-因此，RDMA~ \cite {infiniband2000infiniband}在生产数据中心中广泛使用 \cite {guo2016rdma}。
-与基于软件的TCP / IP网络堆栈相比，RDMA使用硬件卸载来提供超低延迟和接近零的CPU开销。
-要使套接字应用程序能够使用RDMA，RSocket~ \cite {rsockets}，SDP~ \cite {socketsdirect}和UNH EXS~ \cite {russell2008extended}将套接字操作转换为RDMA谓词。
-它们具有相似的设计，而RSocket是最活跃的设计。
-FreeFlow~ \cite {nsdi19freeflow}虚拟化容器覆盖网络的RDMA 网卡，它利用SHM进行主机内部和RDMA进行主机间通信。
-FreeFlow使用RSocket将套接字转换为RDMA。
+为了降低操作系统通信原语的开销，一系列工作将套接字系统的一部分卸载到网卡硬件上。
+TCP 卸载引擎（TCP Offload Engine，TOE） \cite {tcp-chimney-offload} 将部分或全部的 TCP / IP 协议栈卸载到网卡，但由于通用处理器的性能按摩尔定律迅速增长，这些专用硬件的性能优势有限，仅在专用领域中获得成功，例如 iSCSI HBA 存储卡 \cite {iscsi-hba} 和无状态卸载（例如校验和、接收侧扩放（RSS）、大发送数据卸载（LSO）、大接收数据卸载（LRO） \cite {lsolro}）。
+近年来，由于数据中心的硬件趋势和应用需求，\emph {有状态}卸载的故事开始复兴 \cite {chuanxiong-rdma-keynote}。
+因此，RDMA \cite {infiniband2000infiniband} 在生产数据中心中广泛使用 \cite {guo2016rdma}。
+与基于软件的 TCP / IP 网络协议栈相比，RDMA 使用硬件卸载来提供超低延迟和接近零的 CPU 开销。
+为了使套接字应用程序能够使用 RDMA，RSocket \cite {rsockets}，SDP~ \cite {socketsdirect} 和 UNH EXS~ \cite {russell2008extended} 将套接字操作转换为 RDMA 原语。
+它们具有相似的设计，其中 RSocket 的开发最活跃，是套接字转换 RDMA 的事实标准。
+FreeFlow~ \cite {nsdi19freeflow} 利用 RDMA 网卡提供容器（container）覆盖网络（overlay network），它利用共享内存进行主机内部通信，利用 RDMA 进行主机间通信。
+FreeFlow 使用 RSocket 将套接字转换为 RDMA。
 
 但是，由于RDMA和套接字的抽象不匹配，这些工作有局限性。
 在兼容性方面，首先，它们缺乏对几个重要API的支持，例如\textit {epoll}，因此它与许多应用程序不兼容，包括Nginx，Memcached，Redis等。
