@@ -862,24 +862,29 @@ ASIC（Application Specific Integrated Circuit，专用集成电路）是为某�
 注意到网络处理器较难编程的问题，业界提出了基于通用处理器的可编程网卡架构。
 此架构与 2011 年微软亚洲研究院提出的 ServerSwitch~\cite{lu2011serverswitch} 架构类似，由一个硬件网络交换机和一个通用处理器构成。
 例如，Mellanox BlueField \cite{mellanox-bluefield} 可编程网卡由一个 Mellanox ConnectX-5 硬件网卡和一个多核 ARM 处理器构成。
-其中硬件网卡就是第 \ref{smartnic-asic} 节讨论的专用芯片。
-如图 \ref{background:fig:smartnic_soc} 所示，多核 ARM 处理器、Mellanox ConnectX-5 网卡通过一个 PCIe 交换机互连。PCIe 交换机进一步连接到主机 CPU 上，实现多核处理器、硬件网卡（即网络交换机）和主机 CPU 之间三方的互连。
-网络交换机实现了基本的数据包解析、分类、排队和转发功能，与第 \ref{smartnic-asic} 节所讨论的类似。
-多核 ARM 处理器从硬件网卡接收数据包，进行处理后传递给主机 CPU，或者返回硬件网卡。
+其中硬件网卡就是第 \ref{smartnic-asic} 节讨论的专用芯片，实现了基本的数据包解析、分类、排队和转发功能。
+如图 \ref{background:fig:smartnic_soc} 所示，多核 ARM 处理器、Mellanox ConnectX-5 传统网卡和网卡的板上 DRAM 通过一个 PCIe 交换机互连。PCIe 交换机进一步连接到主机 CPU 上，实现多核处理器、传统硬件网卡和主机 CPU 之间三方的互连。
+传统网卡与多核 ARM 处理器之间通过可编程网卡板上的 DRAM 通信。硬件网卡与主机 CPU 以及多核 ARM 处理器与主机 CPU 均可通过主机 DRAM 通信。
+典型的数据包接收流程是：传统网卡把接收的数据包发送到可编程网卡板上的 DRAM。多核 ARM 处理器从 DRAM 中取出数据包，进行处理后发送到主机 CPU 的 DRAM。
 
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=0.6\textwidth]{figures/smartnic_soc.pdf}
+	\includegraphics[width=0.7\textwidth]{figures/smartnic_soc.pdf}
 	\caption{基于通用处理器的可编程网卡架构。}
 	\label{background:fig:smartnic_soc}
 \end{figure}
 
-基于多核通用处理器的 SoC 架构与基于网络处理器的 NP 架构有很多相似之处，也因此经常被统称为同一类架构，但事实上它们有很多区别。表 \ref{background:tab:soc-vs-np} 比较了用于数据中心可编程网卡的 SoC 和 NP 架构。
+
+基于多核SoC的网卡使用大量的嵌入式CPU内核来处理数据包，牺牲一些性能以提供更好的可编程性。
+基于多核通用处理器的 SoC 架构与网络处理器（NP）架构有很多相似之处，也因此经常被统称为同一类架构，但事实上它们有很多区别。
+相比网络处理器，多核 SoC 更容易编程，即可以采用标准的DPDK代码并在熟悉的Linux环境中运行。现有基于主机 CPU 的网络功能代码也很容易交叉编译到多核 SoC 上运行，而网络处理器的代码一般需要重新编写。
+但是，多核 SoC 中的通用处理器核心采用片外 DRAM 与传统网卡通信，比 NP 架构片上高速缓存的访问效率低。
+表 \ref{background:tab:soc-vs-np} 比较了数据中心可编程网卡的 SoC 和 NP 架构。
 
 \begin{table}[htbp]
 	\centering
-	\caption{多核通用处理器与网络处理器架构的比较。}
+	\caption{多核通用处理器与网络处理器架构的比较。其中的数字来自可编程网卡厂商的白皮书，实际应用性能受到应用复杂度的影响，不一定能达到理论性能。}
 	\small
 	\begin{tabular}{l|p{.35\textwidth}|p{.35\textwidth}}
 		\hline
@@ -892,9 +897,15 @@ ASIC（Application Specific Integrated Circuit，专用集成电路）是为某�
 		\hline
 		操作系统、分页等 & 支持 & 一般不支持 \\
 		\hline
-		内存结构 & 统一寻址 & 统一寻址和定制数据通路结合 \\
+		上下文切换与调度 & 软件操作系统 & 硬件 \\
 		\hline
-		数据包处理框架 & 通用（如 DPDK） & 可编程网卡专用 \\
+		锁、定时器等 & 软件 & 硬件 \\
+		\hline
+		板上/核间通信 & 共享内存 & 定制数据通路 \\
+		\hline
+		数据包缓冲区 & 片外 DRAM & 片上高速缓存 \\
+		\hline
+		数据包处理框架 & 通用（如 DPDK） & 专用 \\
 		\hline
 		多核排队模型 & d-FCFS（硬件分派） & c-FCFS（硬件调度） \\
 		\hline
@@ -913,7 +924,15 @@ ASIC（Application Specific Integrated Circuit，专用集成电路）是为某�
 \end{table}
 
 
-表面上看，可编程网卡与服务器主机 CPU 都使用通用处理器，但如表 \ref{background:tab:host-cpu} 所示，无论在成本还是性能功耗方面，可编程网卡使用的通用处理器都有较明显的优势。此外，如第 \ref{chapter:intro} 章所讨论的，在云计算数据中心，主机 CPU 可以用于出售，其潜在售价远高于单一 CPU 组件的硬件价格。因此，在数据中心使用嵌入在可编程网卡内的通用处理器，比传统上使用主机 CPU 的方法仍然是有优势的。
+与前面网络处理器一节讨论的相同，多核 SoC 和网络处理器都受限于单核性能。
+尽管多核 SoC 的单核性能高于网络处理器，但多核 SoC 的核间通信开销高于网络处理器处理核心组成的硬件流水线，从而多核 SoC 中每个数据包一般是在一个处理器核心上处理到完成（run-to-completion）。因此，单流性能一般是在同一数量级的，即在 5 M pps（packet per second，数据包每秒）左右。
+在核心数量增加方面，由于多核 SoC 大多采用分布式先到先服务调度（d-FCFS）模型，如果软件不使用核间工作窃取（work stealing）等技术，处理器间负载的不均衡会随核心数量的增加变得越来越严重。
+在延迟方面，由于多核 SoC 处理器间的负载不平衡，以及多核 SoC 采用通用操作系统和通用的共享内存层次带来的操作系统调度、中断和缓存不命中等非确定性延迟，多核 SoC 的延迟稳定性一般比网络处理器更差，尾延迟（tail latency）一般比网络处理器更高。
+
+因此，虽然多核 SoC 方法具有熟悉的编程模型和良好的应用兼容性，但在更高的网络速度下，单流性能、更高的延迟和更差的可扩展性是其明显的弱点。
+
+从体系结构的角度看，多核 SoC 与主机 CPU 的相似程度是最高的，它们都使用通用处理器。
+但如表 \ref{background:tab:host-cpu} 所示，无论在成本还是性能功耗方面，可编程网卡使用的通用处理器都有较明显的优势。此外，如第 \ref{chapter:intro} 章所讨论的，在云计算数据中心，主机 CPU 可以用于出售，其潜在售价远高于单一 CPU 组件的硬件价格。因此，在数据中心使用嵌入在可编程网卡内的通用处理器，比传统上使用主机 CPU 的方法仍然是有优势的。
 
 \begin{table}[htbp]
 	\centering
@@ -951,26 +970,16 @@ ASIC（Application Specific Integrated Circuit，专用集成电路）是为某�
 \end{table}
 
 
-基于多核SoC的网卡使用大量的嵌入式CPU内核来处理数据包，交换一些性能以提供比ASIC设计更好的可编程性。相比网络处理器，多核 SoC 更容易编程，即可以采用标准的DPDK样式代码并在熟悉的Linux环境中运行。现有基于主机 CPU 的网络功能代码也很容易交叉编译到多核 SoC 上运行，而网络处理器的代码一般需要重新编写。
-
-与前面网络处理器一节讨论的相同，多核 SoC 和网络处理器都受限于单核性能。
-尽管多核 SoC 的单核性能高于网络处理器，但多核 SoC 的核间通信开销高于网络处理器处理核心组成的硬件流水线，从而多核 SoC 中每个数据包一般是在一个处理器核心上处理到完成（run-to-completion）。因此，单流性能一般是在同一数量级的，即在 5 M pps（packet per second，数据包每秒）左右。
-在核心数量增加方面，由于多核 SoC 大多采用分布式先到先服务调度（d-FCFS）模型，如果软件不使用核间工作窃取（work stealing）等技术，处理器间负载的不均衡会随核心数量的增加变得越来越严重。
-在延迟方面，由于多核 SoC 处理器间的负载不平衡，以及多核 SoC 采用通用操作系统和通用的共享内存层次带来的操作系统调度、中断和缓存不命中等非确定性延迟，多核 SoC 的延迟稳定性一般比网络处理器更低，尾延迟（tail latency）一般比网络处理器更高。
-
-因此，虽然多核 SoC 方法具有明显的优点，即具有熟悉的编程模型和良好的应用兼容性，但在更高的网络速度下，单流性能、更高的延迟和更差的可扩展性需要另一种解决方案。
-
 
 \subsection{可重构硬件（FPGA）}
 \label{smartnic-fpga}
 
-FPGA (Field Programmable Gate Array) 是一种硬件可重构的体系结构，常年来被用作专用芯片（ASIC）的小批量替代品，被广泛应用于原型设计，逻辑电路模拟，以及高端路由器等领域。
+FPGA 是一种硬件可重构的体系结构，常年来被用作专用芯片（ASIC）的小批量替代品，被广泛应用于原型设计，逻辑电路模拟，以及高端路由器等领域。
 近年来FPGA在数据中心大规模部署，以同时提供强大的计算能力和足够的灵活性。
 微软和百度在有效利用 FPGA 加速云计算方面做了很多工作。例如微软在 Azure 云平台上已经全面部署了FPGA模块 \cite{putnam2014reconfigurable,caulfield2016cloud}。百度将 FPGA 用于数据压缩 \cite{ouyang2010fpga}、数据库 SQL 处理 \cite{baidu-fpga-sql}、深度学习 \cite{ouyang2014sda} 和其他丰富的应用场景 \cite{ouyang2017xpu}。
 2016年，Intel公司以167亿美元的价格收购FPGA巨头Altera公司，以保持其在数据中心领域的领导地位，并探索CPU与FPGA结合的异构服务器计算架构。
 
-
-FPGA（Field Programmable Gate Array，可编程门阵列）是一种可以重新定制（reconfigurable）的集成电路元器件。直观上来说，FPGA 就是一个可以用编程的方法重新组合的一大堆电子元器件。这些元器件包括逻辑门（如与，或，非门），寄存器（Register），加法器，静态内存（SRAM）等等，用户可以定制它们之间的连接从而组成不同的电路。如今的FPGA除了基本元件，还加入了越来越多的DSP和硬核（hard IP），以提高乘法、浮点运算和访问外围设备的性能。FPGA的优点是技术比较成熟，开发门槛相对其它集成电路（如ASIC）较低，部署后依然可以修改，缺点是性能比专用芯片差。
+直观上来说，FPGA 就是一个可以用编程的方法重新组合的一大堆电子元器件。这些元器件包括逻辑门（如与，或，非门），寄存器（Register），加法器，静态内存（SRAM）等等，用户可以定制它们之间的连接从而组成不同的电路。如今的FPGA除了基本元件，还加入了越来越多的DSP和硬核（hard IP），以提高乘法、浮点运算和访问外围设备的性能。FPGA的优点是技术比较成熟，开发门槛相对其它集成电路（如ASIC）较低，部署后依然可以修改，缺点是性能比专用芯片差。
 图 \ref{clicknp:fig:fpga} 显示了本文使用的FPGA板的逻辑图。
 
 

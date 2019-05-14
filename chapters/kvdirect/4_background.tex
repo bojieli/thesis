@@ -216,6 +216,7 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或分布式原子广播保持一致性 \cite{szepesi2014designing}，这两者都会产生通信开销和同步延迟 \cite {mitchell2013using,dragojevic2014farm}。
 因此，大多数基于RDMA的键值存储 \cite {mitchell2013using,dragojevic2014farm,kalia2014using}建议仅使用单面RDMA进行GET操作。对于PUT操作，它们会回退到服务器CPU。写入密集型工作负载的吞吐量仍然是CPU核心的瓶颈。
 
+\iffalse
 \subsection{FPGA 可编程网卡}
 \label{kvdirect:sec:programmable-nic}
 
@@ -232,6 +233,7 @@ RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或
 由于网络速度和CPU网络处理能力的不匹配日益增加，带有FPGA的可编程网卡 \cite {vfp,greenberg2015sdn,li2016clicknp,caulfield2016cloud} 现在可以在数据中心进行大规模部署。
 本文使用的可编程网卡的核心是FPGA，带有嵌入式网卡芯片以连接到网络。
 可编程网卡通常带有板载DRAM作为数据包缓冲区和用于网卡固件的运行时内存\cite {li2016clicknp}，但DRAM通常不足以容纳整个键值存储。
+\fi
 
 \subsection{远程直接键值访问面临的挑战}
 \label{kvdirect:sec:challenge}
