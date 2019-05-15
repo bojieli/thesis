@@ -123,22 +123,25 @@ RDMA 提供了两类通信原语，第一类是双边（two-sided）操作，与
 除了主机之间的网络通信，主机内的进程间通信也很重要。一些工作 \cite {belay2017ix,peter2016arrakis,rsockets} 让主机内的进程间通信绕行 RDMA 网卡。但由于 PCIe 总线的限制，RDMA 网卡的延迟和吞吐量都比主机内的共享内存差很多。因此，第 \ref{chapter:socksdirect} 章使用共享内存实现主机内的进程间通信。
 
 
-为了加速键值存储系统，近年来的工作 \cite {kalia2014using,kalia2016design,kalia2014using,kalia2016design} 利用 RDMA 网卡基于硬件的网络协议栈，使用双边RDMA作为键值存储客户端和服务器之间的远程过程调用机制，进一步提高每核吞吐量并减少延迟，如图 \ref{intro:fig:memaccess-a} 所示。尽管这些工作进一步降低了网络通信的开销，但如第 \ref{background:sec:software} 节所讨论的，这些系统仍然使用 CPU 进行数据结构处理，性能受限。
+为了加速键值存储系统，近年来的工作 \cite {kalia2014using,kalia2016design,kalia2014using,kalia2016design} 利用 RDMA 网卡基于硬件的网络协议栈，使用双边RDMA作为键值存储客户端和服务器之间的远程过程调用机制，进一步提高每核吞吐量并减少延迟，如图 \ref{intro:fig:memaccess-a} 所示。尽管这些工作进一步降低了网络通信的开销，但如第 \ref{background:sec:software} 节所讨论的，这些系统仍然使用服务器端的 CPU 进行数据结构处理，性能受限。
 
 
 \begin{figure*}[t]
 	\centering
-	\subfloat[软件 / 双面 RDMA。\label{intro:fig:memaccess-a}]
+	\subfloat[软件 / 双边 RDMA。\label{intro:fig:memaccess-a}]
 	{\includegraphics[width=.4\textwidth,page=1]{cropped_access.pdf}}
-	\subfloat[单侧 RDMA。\label{intro:fig:kvdirect-b}]
+	\subfloat[单边 RDMA。\label{intro:fig:kvdirect-b}]
 	{\includegraphics[width=.4\textwidth,page=2]{cropped_access.pdf}}
 	\caption{键值存储系统的架构。线表示数据路径。一个键值操作（细线）可能需要多个基于地址的存储器访问（粗线）。黑色背景的方框表示键值数据结构处理发生的位置。}
 	\label{intro:fig:kvdirect}
 \end{figure*}
 
-另一种不同的方法是利用单侧RDMA，如图 \ref{intro:fig:kvdirect-b} 所示。 Pilaf~ \cite {mitchell2013using} 和FaRM~ \cite {dragojevic2014farm} 采用单向RDMA读取进行GET操作，FaRM实现了使网络饱和的吞吐量。 Nessie~ \cite {szepesi2014designing}，DrTM~ \cite {wei2015fast}，DrTM + R~ \cite {chen2016fast} 和FaSST~ \cite {kalia2016fasst} 利用分布式事务来实现单向RDMA的GET和PUT。但是，PUT操作的性能受到一致性保证的不可避免的同步开销的影响，受到RDMA原语的限制 \cite {kalia2016design}。此外，客户端CPU涉及KV处理，将每个核心的吞吐量限制在客户端的大约10~Mops。
-相比之下，本文将RDMA原语扩展到键值操作，同时保证服务器端的一致性，使KVS客户端完全透明，同时实现高吞吐量和低延迟，即使对于PUT操作也是如此。
+另一种不同的方法是利用单边 RDMA，把服务器端 CPU 的数据结构处理转移到客户端，如图 \ref{intro:fig:kvdirect-b} 所示。客户端通过单边 RDMA 发起对服务器端共享内存的读写请求，服务器端的网卡直接访问内存而无需经过 CPU。
+但是，使用共享内存模式访问数据结构往往需要多个网络往返（例如先查询索引后访问数据），增加了访问延迟，浪费了网络带宽。
+此外，这种模式对写入密集型的工作负载不友好。当多个客户端试图操作同一个数据结构（例如分配内存或修改同一个键值对）时，必须加锁或在客户端间进行同步，带来额外的延迟和带宽开销。
 
+
+\iffalse
 利用支持 P4 \cite{bosshart2014p4} 的可编程交换机 \cite{barefoot-tofino} 来加速键值存储系统也是近年来研究的热点。
 SwitchKV~\cite {li2016fast} 利用基于内容的路由将请求路由到基于缓存键的后端节点，NetCache~ \cite {netcache-sosp17} 进一步将访问频繁的键值缓存在交换机中。
 NetChain~\cite{jin2018netchain} 在网络交换机中实现了一个高一致性、容错的键值存储。
@@ -151,7 +154,7 @@ NetPaxos \cite{dang2015netpaxos,dang2016paxos} 和 \cite{dang2016network} 把传
 Eris~\cite{eris} 提出使用网络交换机作为序列号发生器，在网络中实现并发控制，实现了快速事务处理。
 Hyperloop~\cite{kim2018hyperloop} 在存储节点上利用可编程网卡把写操作写入非易失性内存中的缓冲区，并立即向计算节点回复确认消息，再由存储节点上的软件异步处理非易失性内存中的写操作。这消除了写操作等待存储节点软件处理的延迟。
 Google Spanner~\cite{corbett2013spanner} 利用全球同步的 GPS 时钟实现了跨地理区域复制的高性能数据库。
-
+\fi
 
 
 \subsection{设计新硬件}
@@ -165,18 +168,7 @@ Google Spanner~\cite{corbett2013spanner} 利用全球同步的 GPS 时钟实现�
 
 为了尽可能减少计算节点上用于虚拟网络的 CPU 核，以微软 Azure 云为代表的云服务商在数据中心的每台服务器上部署了一块可编程网卡，用以加速虚拟网络 \cite{smartnic}。
 为了在提供高性能的同时保持一定的可编程性和灵活性，业界提出了专用芯片（ASIC）、网络处理器（Network Processor）、多核通用处理器片上系统（SoC）、现场可编程门阵列（FPGA）等可编程网卡架构，将在 \ref{smartnic-architecture} 节中详细讨论。
-学术界也提出了多种可编程网卡架构。
-例如，FlexNIC \cite{kaufmann2016high} 提供了调度、卸载和包分类等新网卡功能。
-基于专用芯片的柜顶交换机和可编程网卡灵活性较差，而基于通用处理器的可编程网卡和 GPU 有一定的性能局限性。
-FPGA 在性能和灵活性间达到了折中，因此微软采用了基于 FPGA 的可编程网卡 \cite{putnam2014reconfigurable}，将在第 \ref{chapter:background} 章中详细介绍。
-
-一些早期的工作已探索在 FPGA 上构建键值存储系统。但是其中一些只使用片上数据存储（大约几MB内存） \cite {liang16fpl} 或板载 DRAM（例如8 GB内存） \cite {istvan2013flexible,chalamalasetti2013fpga,istvan2015hash}，因此存储容量有限。
-工作 \cite {blott2015scaling} 专注于提高系统容量而不是吞吐量，并采用 SSD 作为板载 DRAM 的二级存储。
-工作 \cite {liang16fpl,chalamalasetti2013fpga} 只能存储固定大小的键值对，这样的键值存储系统只能用于一些特定的应用，不够通用。
-工作 \cite {blott13hotcloud,lavasani2014fpga} 使用主机 DRAM 存储哈希表，而工作 \cite {tokusashi2016multilevel} 使用网卡 DRAM 作为主机 DRAM 的缓存，但它们没有针对网络和 PCIe DMA 带宽进行优化，导致性能不佳。
-本文第 \ref{chapter:kvdirect} 章充分利用了网卡 DRAM 和主机 DRAM，使基于FPGA的键值存储系统通用，并且能够进行大规模部署。此外，精心的软硬件协同设计，以及对PCIe和网络的优化，将性能推向了硬件极限。
-
-
+FPGA 在性能和灵活性间达到了折中，因此微软采用了基于 FPGA 的可编程网卡 \cite{putnam2014reconfigurable}。
 
 FPGA 长期被用于实现网络路由器和交换机。
 NetFPGA \cite{lockwood2007netfpga} 提出了一个在 FPGA 上实现路由器的开放硬件平台。
@@ -189,22 +181,8 @@ NetFPGA \cite{lockwood2007netfpga} 提出了一个在 FPGA 上实现路由器的
 
 近年来，为了让软件开发人员使用FPGA，FPGA厂商提出了基于OpenCL的编程工具链~\cite{aoc,sdaccel}，提供了类似GPU的编程模型，如图 \ref{intro:fig:opencl} 所示。软件开发人员可以把用OpenCL语言编写的核（kernel）卸载到FPGA上。但是，这种方法中多个并行执行的核间需要通过板上共享内存进行通信，而FPGA上的DRAM共享内存吞吐量和延迟都不理想，共享内存还会成为通信瓶颈。其次，FPGA与CPU之间的通信模型是类似GPU的批处理模型，这使得处理延迟较高（约1毫秒），不适用于需要微秒级延迟的网络数据包处理。
 
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.7\textwidth]{figures/opencl.pdf}
-	\caption{基于 OpenCL 的 FPGA 编程工具链。}
-	\label{intro:fig:opencl}
-\end{figure}
-
-
-Click2NetFPGA~\cite {Click2NetFPGA} 利用高层次综合工具，直接将 Click 模块化路由器 \cite {kohler2000click} 的 C++ 代码编译到 FPGA 来提供模块化架构。
-然而，Click2NetFPGA 的性能的系统设计存在若干瓶颈（例如，内存和数据包 I/O），它们也没有优化代码以确保完全流水线处理，因此比本文达到的性能低两个数量级。
-此外，Click2NetFPGA 不支持 FPGA / CPU 联合处理，因此无法在数据平面运行时更新配置或读取状态。
-
 本文第 \ref{chapter:clicknp} 章将提出一个让软件开发人员可用，且网络数据包处理性能高的模块化 FPGA 编程框架。
-
-
+在此基础上，本文第 \ref{chapter:kvdirect} 章将利用可编程网卡，将 RDMA 的共享内存读写原语扩展到键值操作原语，用可编程网卡实现键值操作。
 
 
 

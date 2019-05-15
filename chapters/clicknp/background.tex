@@ -85,28 +85,37 @@ NP-Click \cite{shah2004np} 在网络处理器上实现了 Click 编程框架。
 因此，应该支持CPU和FPGA之间的细粒度处理分离。这需要CPU和FPGA之间的高性能通信。
 
 
-现有的FPGA高级编程工具都不能满足上述所有要求。
-大多数高层次综合（High Level Synthesis，HLS）工具，例如 Vivado HLS~\cite{vivado}，只是硬件描述语言工具链的辅助工具。
-这些工具不是直接将程序编译成FPGA映像，而是仅生成硬件模块，即IP核，必须手动嵌入在硬件描述语言项目和连接到其它硬件描述语言模块，这是大多数软件程序员无法完成的任务。
+FPGA 长期被用于实现网络路由器和交换机。
+NetFPGA \cite{lockwood2007netfpga} 提出了一个在 FPGA 上实现路由器的开放硬件平台。
+近年来，FPGA 也被用于加速网络功能 \cite {rubow2010chimpp,lavasani2012compiling}。
+早在 Click 模块化路由器 \cite{kohler2000click} 编程框架被提出的第二年，Xilinx 就提出了用 FPGA 实现 Click 的 Cliff \cite{kulkarni2004mapping}，需要硬件开发人员使用硬件描述语言把一个 Click 元件实现为一个硬件模块。
+此后，CUSP \cite{schelle2005cusp} 和 Chimpp \cite {rubow2010chimpp} 提出了一系列改进，简化了硬件模块的互连，提高了软硬件协同处理、软件仿真的能力。
+然而，上述工作使用 Verilog、VHDL 等硬件描述语言编程 FPGA。众所周知，硬件描述语言难以调试、编写和修改，给软件人员使用 FPGA 带来了很大挑战。
 
-但是，Altera OpenCL可以直接将OpenCL程序编译为FPGA~ \cite {aoc}。
-但是，OpenCL编程模型直接源自GPU编程，并且不是用于数据包处理的模块化。
-此外，OpenCL不支持CPU和FPGA之间的联合数据包处理：
-首先，主机程序和FPGA内核之间的通信必须始终通过板载DDR内存。 这增加了非平凡的延迟，并且还导致板载内存成为瓶颈。
-其次，OpenCL内核函数需要宿主机上的软件程序显式\textit {调用}。
+为了提高 FPGA 的开发效率，FPGA厂商提供了高层次综合（HLS）工具~\cite{vivado,intel-hls}，可以把受限的 C 代码编译成硬件模块。学术界和工业界提出了 Bluespec \cite{bluespec}、Lime \cite{auerbach2010lime} 和 Chisel \cite{bachrach2012chisel} 等高效硬件开发语言 \cite{bacon2013fpga,singh2011implementing,wester2015transformation}，但它们需要开发者具有足够的硬件设计知识。Gorilla \cite {lavasani2012compiling} 为 FPGA 上的数据包交换提出了一种领域特定的高级语言。但这些工具只是硬件开发工具链的补充，程序员仍然需要手动将从C语言生成的硬件模块插入到硬件描述语言的项目中，且 FPGA 与主机 CPU 之间的通信也需要自行处理。高层次综合工具和高效硬件开发语言可以提高硬件开发人员的工作效率，但仍然不足以让软件开发人员使用 FPGA。
+
+Click2NetFPGA~\cite {Click2NetFPGA} 利用高层次综合工具，直接将 Click 模块化路由器 \cite {kohler2000click} 的 C++ 代码编译到 FPGA 来提供模块化架构。
+然而，Click2NetFPGA 的性能的系统设计存在若干瓶颈（例如，内存和数据包 I/O），它们也没有优化代码以确保完全流水线处理，因此比本文达到的性能低两个数量级。
+此外，Click2NetFPGA 不支持 FPGA / CPU 联合处理，因此无法在数据平面运行时更新配置或读取状态。
+
+近年来，为了让软件开发人员使用FPGA，FPGA厂商提出了基于OpenCL的编程工具链~\cite{aoc,sdaccel}，提供了类似GPU的编程模型，如图 \ref{intro:fig:opencl} 所示。软件开发人员可以把用OpenCL语言编写的核（kernel）卸载到FPGA上。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.7\textwidth]{figures/opencl.pdf}
+	\caption{基于 OpenCL 的 FPGA 编程工具链。}
+	\label{intro:fig:opencl}
+\end{figure}
+
+
+但是，这种方法中多个并行执行的核间需要通过板上共享内存进行通信，而FPGA上的DRAM吞吐量和延迟都不理想，共享内存还会成为通信瓶颈。
+其次，FPGA与CPU之间的通信模型是类似GPU的批处理模型，主机程序和FPGA内核之间的通信必须始终通过板载DDR内存。这使得处理延迟较高（约1毫秒），不适用于需要微秒级延迟的网络数据包处理。
+第三，OpenCL内核函数需要宿主机上的软件程序显式\textit {调用}。
 在内核终止之前，主机程序无法控制内核行为，例如设置新参数，也不能读取任何内核状态。
 但是网络功能面临着连续的数据包流，应该始终在运行。
+第四，OpenCL不支持CPU和FPGA之间的联合数据包处理，CPU上的数据包处理只能在 OpenCL 框架以外进行。
 
-FPGA是一项成熟的技术，最近已经部署用于加速数据中心服务，包括网络功能 \cite {putnam2014reconfigurable,smartnic,rubow2010chimpp,lavasani2012compiling}。
-众所周知，FPGA的可编程性很低，有丰富的前人工作提供了高级编程抽象 \cite {bluespec,auerbach2010lime,bacon2013fpga,singh2011implementing,bachrach2012chisel,wester2015transformation}。
-Gorilla \cite {lavasani2012compiling} 为FPGA上的数据包交换提出了一种特定于域的高级语言。
-Cliff \cite{kulkarni2004mapping}、CUSP \cite{schelle2005cusp} 和 Chimpp \cite {rubow2010chimpp} 将Click模型引入硬件描述语言来开发模块化路由器。
-\name 沿此方向工作，与以前的工作互补。
-\name 致力于数据中心的网络功能，通过提供高度灵活的模块化架构和利用商业高层次综合工具解决可编程性问题。
-
-Click2NetFPGA~\cite {Click2NetFPGA}通过直接将Click模块化路由器 \cite {kohler2000click}程序编译到FPGA中来提供模块化架构。
-然而，\cite {Click2NetFPGA}的性能比本文报告的要低得多（两个数量级），因为它们的系统设计存在几个瓶颈（例如，内存和数据包I/O），它们也是错过几个重要的优化以确保完全流水线处理（如\S \ref {clicknp:sec:optimization}中所述）。
-此外，\cite {Click2NetFPGA}不支持FPGA / CPU联合处理，因此无法在数据平面运行时更新配置或读取状态。
 
 
 

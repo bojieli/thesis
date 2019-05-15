@@ -10,16 +10,15 @@
 另一种不同的方法是利用单侧RDMA。 Pilaf~ \cite {mitchell2013using}和FaRM~ \cite {dragojevic2014farm}采用单向RDMA读取进行GET操作，FaRM实现了使网络饱和的吞吐量。 Nessie~ \cite {szepesi2014designing}，DrTM~ \cite {wei2015fast}，DrTM + R~ \cite {chen2016fast}和FaSST~ \cite {kalia2016fasst}利用分布式事务来实现单向RDMA的GET和PUT。但是，PUT操作的性能受到一致性保证的不可避免的同步开销的影响，受到RDMA原语的限制 \cite {kalia2016design}。此外，客户端CPU涉及键值处理，将每个核心的吞吐量限制在客户端的大约10~Mops。
 相比之下，\oursys{} 将RDMA原语扩展到键值操作，同时保证服务器端的一致性，使键值存储客户端完全透明，同时实现高吞吐量和低延迟，即使对于PUT操作也是如此。
 
-作为一种灵活且可定制的硬件，FPGA现已广泛部署在数据中心规模 \cite {putnam2014reconfigurable,caulfield2016cloud}中，并且针对可编程性进行了大幅改进 \cite {bacon2013fpga,li2016clicknp}。一些早期的工作已探索在FPGA上构建键值存储。但是其中一些是不实用的，限制片上数据存储（大约几MB内存） \cite {liang16fpl}或板载DRAM（通常是8GB内存） \cite {istvan2013flexible,chalamalasetti2013fpga,istvan2015hash}。
- \cite {blott2015scaling}专注于提高系统容量而不是吞吐量，并采用SSD作为板载DRAM的二级存储。
- \cite {liang16fpl,chalamalasetti2013fpga}限制它们在固定大小键值对中的使用，这只能用于特殊用途，而不是一般的键值存储。
-\cite {blott13hotcloud,lavasani2014fpga}使用主机DRAM存储哈希表，而\cite {tokusashi2016multilevel}使用网卡 DRAM作为主机DRAM的缓存，但它们没有针对网络和PCIe DMA带宽进行优化，导致性能不佳。
-\oursys{} 充分利用了网卡 DRAM和主机DRAM，使基于FPGA的键值存储系统通用，并且能够进行大规模部署。此外，精心的硬件和软件协同设计，以及对PCIe和网络的优化，将本文的性能推向了物理限制，推进了最先进的解决方案。
+作为一种灵活且可定制的硬件，FPGA现已广泛部署在数据中心规模 \cite {putnam2014reconfigurable,caulfield2016cloud}中，并且针对可编程性进行了大幅改进 \cite {bacon2013fpga,li2016clicknp}。
+一些早期的工作已探索在 FPGA 上构建键值存储系统。但是其中一些只使用片上数据存储（大约几MB内存） \cite {liang16fpl} 或板载 DRAM（例如8 GB内存） \cite {istvan2013flexible,chalamalasetti2013fpga,istvan2015hash}，因此存储容量有限。
+工作 \cite {blott2015scaling} 专注于提高系统容量而不是吞吐量，并采用 SSD 作为板载 DRAM 的二级存储。
+工作 \cite {liang16fpl,chalamalasetti2013fpga} 只能存储固定大小的键值对，这样的键值存储系统只能用于一些特定的应用，不够通用。
+工作 \cite {blott13hotcloud,lavasani2014fpga} 使用主机 DRAM 存储哈希表，而工作 \cite {tokusashi2016multilevel} 使用网卡 DRAM 作为主机 DRAM 的缓存，但它们没有针对网络和 PCIe DMA 带宽进行优化，导致性能不佳。
+\oursys{} 充分利用了网卡 DRAM和主机DRAM，使基于FPGA的键值存储系统通用，并且能够进行大规模部署。此外，精心的硬件和软件协同设计，以及对PCIe和网络的优化，将本文的性能推向了物理极限。
 
-二级索引是通过其他键检索数据的重要功能
-比数据存储系统中的主键 \cite {escriva2012hyperdex,kejriwal2016slik}。 SLIK~ \cite {kejriwal2016slik}在键值存储系统中使用B +树算法支持多个二级键。探索如何支持二级索引以帮助 \oursys{} 迈向通用数据存储系统将会很有趣。 SwitchKV~ \cite {li2016fast}利用基于内容的路由将请求路由到基于缓存键的后端节点，NetCache~ \cite {netcache-sosp17}进一步将键值缓存在交换机中。这种负载平衡和缓存也将使系统受益。
+数据存储系统中二级索引是通过主键以外地其他键检索数据的重要功能 \cite {escriva2012hyperdex,kejriwal2016slik}。 SLIK~ \cite {kejriwal2016slik}在键值存储系统中使用 B+ 树算法支持多个二级键。探索如何支持二级索引以帮助 \oursys{} 迈向通用数据存储系统将会很有趣。 SwitchKV~ \cite {li2016fast}利用基于内容的路由将请求路由到基于缓存键的后端节点，NetCache~ \cite {netcache-sosp17}进一步将键值缓存在交换机中。这种负载平衡和缓存也将使系统受益。
 Eris~ \cite {eris}利用网络序列发生器来实现高效的分布式事务，这可以为客户端同步的单侧RDMA方法带来新的生命。
-
 
 %\textbf{TODO}
 
