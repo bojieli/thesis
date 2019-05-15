@@ -247,6 +247,24 @@ Linux 系统中的进程迁移较为复杂，因为来自不同进程的状态�
 
 基于现有 CPU 和 PCIe 体系结构实现基于直接内存映射的内存解聚存在一系列技术挑战。幸运的是，CPU 厂商已经意识到了同样的问题。我们期待随着 CCIX 等主机内互连协议的实现，直接内存映射的可编程网卡与 CPU 之间将达到更好的吞吐量和延迟，并且直接内存映射区域可以像主机内存一样运行所有指令。
 
+
+\subsubsection{分布式系统与数据中心网络协同设计}
+\label{future:system-network-codesign}
+
+
+为了在键值存储系统中支持事务（transaction），近年来学术界有数据中心网络与共识协议（consensus protocol）共同设计的趋势。
+传输顺序在共识协议中至关重要，因此近年来的快速 Paxos~\cite{lamport2006fast,kemme1999processing,moraru2013there,pedone1998optimistic} 协议采用尽力而为的方法提高传输的有序性。
+进一步的工作是在网络中提供先入先出（FIFO）和全序（total ordering）的传输顺序保证。
+Speculative Paxos~\cite{ports2015designing} 和 NOPaxos~\cite{li2016just} 利用可编程交换机作为中心化的序列号发生器或序列化点。
+NetPaxos \cite{dang2015netpaxos,dang2016paxos} 和 \cite{dang2016network} 把传统 Paxos 协议放在网络交换机中实现。
+Eris~\cite{eris} 提出使用网络交换机作为序列号发生器，在网络中实现并发控制，实现了快速事务处理。
+
+除了共识协议，分布式事务的其他方面也可以受益于数据中心网络的协同设计。
+Hyperloop~\cite{kim2018hyperloop} 在存储节点上利用可编程网卡把写操作写入非易失性内存中的缓冲区，并立即向计算节点回复确认消息，再由存储节点上的软件异步处理非易失性内存中的写操作。这消除了写操作等待存储节点软件处理的延迟。
+Google Spanner~\cite{corbett2013spanner} 利用全球同步的 GPS 时钟实现了跨地理区域复制的高性能数据库。
+
+
+
 \subsubsection{结合在线事务、批量和流式处理的数据库}
 \label{future:reactdb}
 
@@ -267,21 +285,6 @@ Linux 系统中的进程迁移较为复杂，因为来自不同进程的状态�
 \subsubsection{数据驱动的系统自动调优}
 \label{future:data-driven-system}
 
-
-\subsubsection{分布式系统与数据中心网络协同设计}
-\label{future:system-network-codesign}
-
-
-为了在键值存储系统中支持事务（transaction），近年来学术界有数据中心网络与共识协议（consensus protocol）共同设计的趋势。
-传输顺序在共识协议中至关重要，因此近年来的快速 Paxos~\cite{lamport2006fast,kemme1999processing,moraru2013there,pedone1998optimistic} 协议采用尽力而为的方法提高传输的有序性。
-进一步的工作是在网络中提供先入先出（FIFO）和全序（total ordering）的传输顺序保证。
-Speculative Paxos~\cite{ports2015designing} 和 NOPaxos~\cite{li2016just} 利用可编程交换机作为中心化的序列号发生器或序列化点。
-NetPaxos \cite{dang2015netpaxos,dang2016paxos} 和 \cite{dang2016network} 把传统 Paxos 协议放在网络交换机中实现。
-Eris~\cite{eris} 提出使用网络交换机作为序列号发生器，在网络中实现并发控制，实现了快速事务处理。
-Hyperloop~\cite{kim2018hyperloop} 在存储节点上利用可编程网卡把写操作写入非易失性内存中的缓冲区，并立即向计算节点回复确认消息，再由存储节点上的软件异步处理非易失性内存中的写操作。这消除了写操作等待存储节点软件处理的延迟。
-Google Spanner~\cite{corbett2013spanner} 利用全球同步的 GPS 时钟实现了跨地理区域复制的高性能数据库。
-
-数据中心网络内的汇聚……
 
 
 \iffalse
