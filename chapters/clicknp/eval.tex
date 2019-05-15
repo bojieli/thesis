@@ -1,11 +1,9 @@
 %!TEX root=main.tex
-\section{应用}
+\section{应用与性能评估}
 \label{clicknp:sec:application}
 \label{clicknp:sec:eval}
 
-\subsection{测试床与方法}
-
-为了评估 \name 的灵活性，我们基于 \name 开发了五个常见的网络功能，可以在我们的测试床中运行。
+为了评估 \name 的灵活性，我们基于 \name 开发了几个常见的网络功能，可以在我们的测试床中运行。
 表 \ref {clicknp:tab:applications} 总结了每个网络功能中包含的元件数量和总代码行数，包括所有元件规范和配置文件。
 经验证实，\name 的模块化架构极大地改善了代码重用并简化了新网络功能的构建。
 如表 \ref {clicknp:tab:elements} 所示，在许多应用程序中有很多机会重用一个元件，例如，本文（A1-5）中所有五个网络功能都使用了L4\_Parser。
@@ -22,6 +20,8 @@
 当数据包通过网络功能时，它们被循环回到PktCap抓包工具，该PktCap与PktGen位于同一FPGA中。
 然后可以通过从数据包的接收时间中减去生成时间戳来确定延迟。
 由PktGen和PktCap引起的延迟通过直接环回（无网络功能）进行预校准，并从数据中删除。
+
+下面依次介绍基于 \name 的网络功能。
 
 \egg{
 To measure 网络功能 processing latency, we forward packets to an \textit{Echo} server using the second port. 
