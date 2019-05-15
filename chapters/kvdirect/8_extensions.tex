@@ -94,7 +94,7 @@ KV-Direct的目标是利用数据中心的现有硬件来卸载重要的工作�
 如表 \ref {kvdirect:tab:optimal-load-dispatch-throughput} 所示，即使网卡 DRAM的大小只是主机内存的一小部分，吞吐量增益也很大。
 
 
-\begin{table}[t]
+\begin{table}[htbp]
 	\centering
 	\caption{不同网卡 DRAM / PCIe吞吐率（垂直）和网卡 /主机内存大小比（水平）下长尾工作负载的最佳负载分配比。}
 	\label{kvdirect:tab:optimal-load-dispatch}
@@ -117,9 +117,9 @@ KV-Direct的目标是利用数据中心的现有硬件来卸载重要的工作�
 \end{table}
 
 
-\begin{table}[t]
+\begin{table}[htbp]
 	\centering
-	\caption{与简单分区相比，负载分派的相对吞吐量。 列标题与表格相同~\ref{kvdirect:tab:optimal-load-dispatch}。}
+	\caption{与简单分区相比，负载分派的相对吞吐量。行列标题与表 \ref{kvdirect:tab:optimal-load-dispatch} 相同。}
 	\label{kvdirect:tab:optimal-load-dispatch-throughput}
 	\small
 	\begin{tabular}{|l|r|r|r|r|r|r|}
