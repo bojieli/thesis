@@ -17,6 +17,10 @@
 工作 \cite {blott13hotcloud,lavasani2014fpga} 使用主机 DRAM 存储哈希表，而工作 \cite {tokusashi2016multilevel} 使用网卡 DRAM 作为主机 DRAM 的缓存，但它们没有针对网络和 PCIe DMA 带宽进行优化，导致性能不佳。
 \oursys{} 充分利用了网卡 DRAM和主机DRAM，使基于FPGA的键值存储系统通用，并且能够进行大规模部署。此外，精心的硬件和软件协同设计，以及对PCIe和网络的优化，将本文的性能推向了物理极限。
 
+利用支持 P4 \cite{bosshart2014p4} 的可编程交换机 \cite{barefoot-tofino} 来加速键值存储系统也是近年来研究的热点。
+SwitchKV~\cite {li2016fast} 利用基于内容的路由将请求路由到基于缓存键的后端节点，NetCache~ \cite {netcache-sosp17} 进一步将访问频繁的键值缓存在交换机中。
+NetChain~\cite{jin2018netchain} 在网络交换机中实现了一个高一致性、容错的键值存储。
+
 数据存储系统中二级索引是通过主键以外地其他键检索数据的重要功能 \cite {escriva2012hyperdex,kejriwal2016slik}。 SLIK~ \cite {kejriwal2016slik}在键值存储系统中使用 B+ 树算法支持多个二级键。探索如何支持二级索引以帮助 \oursys{} 迈向通用数据存储系统将会很有趣。 SwitchKV~ \cite {li2016fast}利用基于内容的路由将请求路由到基于缓存键的后端节点，NetCache~ \cite {netcache-sosp17}进一步将键值缓存在交换机中。这种负载平衡和缓存也将使系统受益。
 Eris~ \cite {eris}利用网络序列发生器来实现高效的分布式事务，这可以为客户端同步的单侧RDMA方法带来新的生命。
 
