@@ -9,7 +9,7 @@
 \fi
 
 本文实现了一个\name 编译器，作为\name 工具链的前端（\S \ref {clicknp:subsec:toolchain}）。
-对于宿主程序，使用Visual C++作为后端。进一步集成了Altera OpenCL SDK（v15.1）\cite {aoc}和Xilinx Vivado 高层次综合（v2015.4）\cite {vivado}作为FPGA程序的后端。
+对于宿主程序，使用Visual C++作为后端。进一步集成了Altera OpenCL SDK（v15.1）\cite {aoc}和Xilinx Vivado HLS（v2015.4）\cite {vivado}作为FPGA程序的后端。
 \name 编译器包含约 1 万行 C++、flex 和 bison 代码，它们解析配置文件和元件声明，执行第 \ref {clicknp:sec:optimization} 节所述的优化，并生成特定于每个商业高层次综合工具的代码。
 使用 Altera OpenCL 时，每个\name 元件都被编译成 \textit {kernel}，元件之间的连接被转换为Altera 扩展通道（channel）。
 使用Xilinx Vivado HLS 时，将每个元件编译成IP内核，并使用AXI流（stream）来实现元件之间的连接。
