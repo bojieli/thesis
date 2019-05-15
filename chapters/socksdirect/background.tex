@@ -337,75 +337,6 @@ TCP拥塞控制中的ACK时钟 \cite {mprdma}要求及时响应收到的数据�
 但是，对于RDMA 网卡，需要精确计时的数据包处理由网卡硬件处理。
 因此，\libipc {}运行每个套接字操作完成并使用轮询等待阻塞操作。
 
-\begin{sidewaystable*}[t]
-	\centering
-	\caption{高性能套接字系统的比较。}
-	\label{socksdirect:tab:related-work}
-	\scalebox{0.8}{
-		\begin{tabularx}{1.25\textwidth}{l|X|X|X|X|X|X|X|X|X|X|}
-			\hline
-			& FastSocket & MegaPipe / StackMap & IX & Arrakis & SandStorm / mTCP & LibVMA & OpenOnload & Rsocket / SDP & FreeFlow & SocksDirect \\
-			\hline
-			\hline
-			类别 & \multicolumn{2}{c|}{内核优化} & \multicolumn{5}{c|}{用户态 TCP/IP 协议栈} & \multicolumn{3}{c|}{卸载到 RDMA 网卡} \\
-			%\hline
-			%Changes needed for deployment & New kernel & New kernel & New kernel & New kernel & Lib+driver & Lib+driver & Lib+driver & Lib+driver & Lib+driver +daemon & Lib+driver +daemon \\
-			\hline
-			\hline
-			\multicolumn{11}{c|}{兼容性} \\
-			\hline
-			\hline
-			对现有应用程序透明 & \yes &   & \yes & \yes &   & \yes & \yes & \yes & \yes & \yes \\
-			\hline
-			\texttt{epoll} (Nginx, Memcached 等) & \yes & \yes & \yes & \yes & \yes & \yes & \yes & & & \yes \\
-			\hline
-			与普通 TCP/IP 对端兼容 &	\yes & \yes & \yes & \yes & \yes & \yes & \yes & & & \yes \\
-			\hline
-			主机内通信 & \yes & \yes & & \yes & & & & & \yes & \yes \\
-			\hline
-			多个应用程序监听同一端口 & \yes & \yes & & & & & & \yes & \yes & \yes \\
-			\hline
-			完整的 fork 支持 & \yes & \yes & & & & & \yes & & & \yes \\
-			\hline
-			容器热迁移 & \yes & \yes & & & & & & & & \yes \\
-			\hline
-			\hline
-			\multicolumn{11}{c|}{隔离性} \\
-			\hline
-			\hline
-			访问控制策略 & 内核 & & 内核 & 内核 & & & & 内核 & 守护进程 & 守护进程 \\
-			\hline
-			容器 / 虚拟机间的隔离 & \yes & & \yes & \yes & & & & \yes & \yes & \yes \\
-			\hline
-			QoS（性能隔离） & 内核 & 内核 & 内核 & 网卡 & 网卡 & 网卡 & 网卡 & 网卡 & 守护进程 & 网卡 \\
-			\hline
-			\hline
-			\multicolumn{11}{c|}{消除性能开销} \\
-			\hline
-			\hline
-			数据面上的系统调用 & & & 批处理 & \yes & 批处理 & \yes & \yes & \yes & \yes & $<$16KB 消息 \\
-			\hline
-			套接字文件描述符锁 & & & & & & & & & & \yes \\
-			\hline
-			传输协议 & & & & & & & & \yes & \yes & \yes \\
-			\hline
-			缓冲区管理 & & & & & & & & & & \yes \\
-			\hline
-			I/O 多路复用与中断处理 & & 改进 & \yes & \yes & 改进 & \yes & \yes & \yes & \yes & \yes \\
-			\hline
-			进程唤醒 & & & & & & & & & & \yes \\
-			\hline
-			数据复制 & & \yes & & & \yes & & & & & $\ge$16KB 消息 \\
-			\hline
-			内核文件描述符分配 & & \yes &  &  & \yes & & & & & \yes \\
-			\hline
-			TCB 管理与连接分派 & \yes & \yes & \yes & \yes & \yes & & & & & \yes \\
-			\hline
-		\end{tabularx}
-	}
-\end{sidewaystable*}
-
- 
 
 
 \parab {进程唤醒。}
@@ -480,6 +411,76 @@ LOS~ \cite {huang2017high}将文件描述符空间划分为用户和内核部分
 \label{socksdirect:subsec:related-work}
 
 学术界和业界都提出了许多高性能套接字系统，如表 \ref {socksdirect:tab:related-work}所示。
+
+
+\begin{sidewaystable}[htbp]
+	\centering
+	\caption{高性能套接字系统的比较。}
+	\label{socksdirect:tab:related-work}
+	\scalebox{0.7}{
+		\begin{tabularx}{1.4\textwidth}{l|X|X|X|X|X|X|X|X|X|X|}
+			\hline
+			& FastSocket & MegaPipe / StackMap & IX & Arrakis & SandStorm / mTCP & LibVMA & OpenOnload & Rsocket / SDP & FreeFlow & SocksDirect \\
+			\hline
+			\hline
+			类别 & \multicolumn{2}{c|}{内核优化} & \multicolumn{5}{c|}{用户态 TCP/IP 协议栈} & \multicolumn{3}{c|}{卸载到 RDMA 网卡} \\
+			%\hline
+			%Changes needed for deployment & New kernel & New kernel & New kernel & New kernel & Lib+driver & Lib+driver & Lib+driver & Lib+driver & Lib+driver +daemon & Lib+driver +daemon \\
+			\hline
+			\hline
+			\multicolumn{11}{c|}{兼容性} \\
+			\hline
+			\hline
+			对现有应用程序透明 & \yes &   & \yes & \yes &   & \yes & \yes & \yes & \yes & \yes \\
+			\hline
+			\texttt{epoll} (Nginx, Memcached 等) & \yes & \yes & \yes & \yes & \yes & \yes & \yes & & & \yes \\
+			\hline
+			与普通 TCP/IP 对端兼容 &	\yes & \yes & \yes & \yes & \yes & \yes & \yes & & & \yes \\
+			\hline
+			主机内通信 & \yes & \yes & & \yes & & & & & \yes & \yes \\
+			\hline
+			多个应用程序监听同一端口 & \yes & \yes & & & & & & \yes & \yes & \yes \\
+			\hline
+			完整的 fork 支持 & \yes & \yes & & & & & \yes & & & \yes \\
+			\hline
+			容器热迁移 & \yes & \yes & & & & & & & & \yes \\
+			\hline
+			\hline
+			\multicolumn{11}{c|}{隔离性} \\
+			\hline
+			\hline
+			访问控制策略 & 内核 & & 内核 & 内核 & & & & 内核 & 守护进程 & 守护进程 \\
+			\hline
+			容器 / 虚拟机间的隔离 & \yes & & \yes & \yes & & & & \yes & \yes & \yes \\
+			\hline
+			QoS（性能隔离） & 内核 & 内核 & 内核 & 网卡 & 网卡 & 网卡 & 网卡 & 网卡 & 守护进程 & 网卡 \\
+			\hline
+			\hline
+			\multicolumn{11}{c|}{消除性能开销} \\
+			\hline
+			\hline
+			数据面上的系统调用 & & & 批处理 & \yes & 批处理 & \yes & \yes & \yes & \yes & $<$16KB 消息 \\
+			\hline
+			套接字文件描述符锁 & & & & & & & & & & \yes \\
+			\hline
+			传输协议 & & & & & & & & \yes & \yes & \yes \\
+			\hline
+			缓冲区管理 & & & & & & & & & & \yes \\
+			\hline
+			I/O 多路复用与中断处理 & & 改进 & \yes & \yes & 改进 & \yes & \yes & \yes & \yes & \yes \\
+			\hline
+			进程唤醒 & & & & & & & & & & \yes \\
+			\hline
+			数据复制 & & \yes & & & \yes & & & & & $\ge$16KB 消息 \\
+			\hline
+			内核文件描述符分配 & & \yes &  &  & \yes & & & & & \yes \\
+			\hline
+			TCB 管理与连接分派 & \yes & \yes & \yes & \yes & \yes & & & & & \yes \\
+			\hline
+		\end{tabularx}
+	}
+\end{sidewaystable}
+
 
 
 \parab {内核网络堆栈优化:}第一类工作是优化内核TCP / IP堆栈。 FastSocket~ \cite {lin2016scalable}，Affinity-Accept~ \cite {pesterev2012improving}，FlexSC~ \cite {soares2010flexsc}和零拷贝套接字 \cite {thadani1995efficient,chu1996zero,linux-zero-copy}实现良好的兼容性和隔离性。

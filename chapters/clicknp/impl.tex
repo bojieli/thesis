@@ -26,6 +26,8 @@ FPGA板具有PCIe Gen2 x8接口，4GB板载DDR内存和两个40G以太网端口�
 到撰写本文时，我们还没有获得Xilinx硬件平台。
 因此，主系统评估基于使用\name + OpenCL的Altera平台，使用Vivado 高层次综合生成的报告（例如频率和面积成本）来了解\name + Vivado的性能。
 
+
+
 \subsection{\name 元件库}
 \label{clicknp:subsec:lib}
 
@@ -34,8 +36,46 @@ FPGA板具有PCIe Gen2 x8接口，4GB板载DDR内存和两个40G以太网端口�
 这些元件涵盖了网络功能的大量基本操作，包括数据包解析，校验和计算，封装/解封，哈希表，最长前缀匹配（LPM），速率限制，加密和数据包调度。
 由于\name 的模块化体系结构，每个元件的代码大小都是适中的。
 元件的平均代码行数（Line of Code，LoC）是80，最复杂的元件 \textit {PacketBuffer} 有196行C代码。
-本章末尾的整页表 \ref {clicknp:tab:elements} 显示了在 \name 中实现的一组选定的关键元件。
-除了元件名称，还标记了使用该元件的演示网络功能（A1 至 A5，在 \S \ref {clicknp:sec:application} 中讨论）。
+
+
+\begin{sidewaystable}[htbp]
+	\centering
+	\caption{\name 中的一些网络元件。}
+	\label{clicknp:tab:elements}
+	\small
+	\begin{tabular}{l|l|l|l|l|l|l|r|r}
+		\toprule
+		&	&	& \multicolumn{4}{c|}{性能} & \multicolumn{2}{c}{资源占用 (\%)} 			\\
+		\cline{4-7} \cline{8-9}  
+		
+		元件 	& 配置 & 优化 & \tabincell{c}{最高频率\\ (MHz)} & 峰值吞吐量 & 加速比 (FPGA/CPU) & 延迟（时钟周期） & LE & BRAM \\
+		\midrule
+		L4\_Parser (A1-5)  & N/A & REG & 221.93 & 113.6 Gbps & 31.2x / 41.8x & 11 & 0.8\% & 0.2\% \\
+		IPChecksum (A1-4) & N/A & UL & 226.8 & 116.1 Gbps & 33.1x / 55.1x & 18 & 2.3\% & 1.3\% \\
+		NVGRE\_Encap (A1,4) & N/A & REG, UL & 221.8 & 113.6 Gbps & 35.5x / 42.9x & 9 & 1.5\% & 0.6\% \\
+		\midrule
+		AES\_CTR (A3) & 16 字节块大小 & UL & 217.0 & 27.8 Gbps & 79.9x / 255x & 70 & 4.0\% & 23.1\% \\
+		SHA1 (A3) & 64B 字节块大小 & MS, UL & 220.8 & 113.0 Gbps & 157.5x / 83.1x & 105 & 7.9\% & 6.6\% \\
+		\midrule
+		\midrule
+		CuckooHash (A2) & 128K 个条目 & MS, UL, DW & 209.7 & 209.7 Mpps & 43.6x / 57.5x & 38 & 2.0\% & 65.5\% \\
+		HashTCAM (A2) & 16 x 1K 个条目 & MS, UL, DW & 207.4 & 207.4 Mpps & 155.9x / 696x & 48 & 18.7\% & 22.0\% \\
+		LPM\_Tree (A2) & 16K 个条目 & MS, UL, DW & 221.8 & 221.8 Mpps & 34.5x / 45.2x & 181 & 4.3\% & 13.2\% \\
+		FlowCache (A4) & 4 路组相连，16K 条目 & MS, DW & 105.6 & 105.6 Mpps & 55.8x / 21.5x & 27 & 5.6\% & 46.9\% \\
+		\midrule
+		
+		SRPrioQueue (A5) & 32 个数据包的缓冲区 & REG, UL & 214.5 & 214.5 Mpps & 150.3x / 28.6x & 41 & 2.6\% & 0.6\% \\
+		RateLimiter (A1,5) & 16K flows & MS, DW & 141.5 & 141.5 Mpps & 7.0x / 65.3x & 14 & 16.9\% & 14.1\% \\
+		\bottomrule
+		
+		\multicolumn{9}{l} {\textbf{优化方法。} REG=Using Registers 使用寄存器; MS=Memory Scattering 内存散射; UL=Unroll Loop 循环展开; DW=Delay Write 延迟写入。} \\
+		\multicolumn{9}{l} {\parbox{\textwidth}{\textbf{性能提升} 一列对比了应用第 \S\ref{clicknp:sec:optimization}  节的优化后和优化前的 FPGA 性能。也列出了与 CPU 实现间的性能对比。}}
+		
+	\end{tabular} 
+\end{sidewaystable}
+
+表 \ref {clicknp:tab:elements} 显示了在 \name 中实现的一组选定的关键元件。
+除了元件名称，还标记了使用该元件的演示网络功能（在 \S \ref {clicknp:sec:application} 中讨论）。
 之前在 \S \ref {clicknp:subsec:paral_in_elem} 中讨论的优化技术最小化了内存依赖性，并平衡了流水线阶段。
 第3列总结了每个元件使用的优化技术。
 对于表 \ref {clicknp:tab:elements} 顶部的元件，元件中的处理逻辑需要访问数据包的每个字节。其中吞吐量以Gbps显示。
@@ -54,7 +94,7 @@ FPGA板具有PCIe Gen2 x8接口，4GB板载DDR内存和两个40G以太网端口�
 这是合理的，因为大多数数据包操作都很简单。
 HashTCAM和RateLimiter具有适度的逻辑资源使用，因为这些元件具有更大的仲裁逻辑。
 但是，BRAM的使用很大程度上依赖于元件的配置。 例如，BRAM使用率随流表中支持的条目数呈线性增长。
-总而言之，本文使用的FPGA芯片有足够的容量来支持包含少量元件的有意义的网络功能（\S \ref{clicknp:sec:application}）。
+总而言之，本文使用的FPGA芯片有足够的容量来支持包含少量元件的有意义的网络功能。
 
 
 
