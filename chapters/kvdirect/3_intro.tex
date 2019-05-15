@@ -87,7 +87,7 @@
 顾名思义，\oursys{} 直接获取数据并在主机内存中应用更新来为键值请求提供服务，绕过主机CPU（图 \ref {kvdirect:fig:memaccess-c}）。
 本章利用单侧基于RDMA的键值系统的洞察力来绕过CPU，同时将计算逻辑卸载到基于FPGA的网卡，以确保服务器端的一致性，从而通过减少网络流量和减少同步开销实现显着的性能提升此外，客户端对所有键值操作都变得透明。
 \oursys{} 将RDMA原语从内存操作（READ和WRITE）扩展到键值操作（GET，PUT，DELETE和ATOMIC操作）。与基于单面RDMA的系统相比，\oursys{} 处理服务器端的一致性和同步问题，从而消除了客户端的计算负荷并减少了网络流量。
-此外，为了支持基于矢量的操作并减少网络流量，\oursys{} 还提供了新的矢量原语UPDATE，REDUCE和FILTER，允许用户定义活动消息（active message）\cite {eicken1992active}并将某些计算委托给可编程网卡。
+此外，为了支持基于向量的操作并减少网络流量，\oursys{} 还提供了新的向量原语UPDATE，REDUCE和FILTER，允许用户定义活动消息（active message）\cite {eicken1992active}并将某些计算委托给可编程网卡。
 
 由于键值操作已卸载到可编程网卡，因此设计重点是优化网卡和主机内存之间的PCIe流量。 \oursys{} 采用一系列优化来充分利用PCIe带宽和隐藏延迟。首先，本章设计了一个新的哈希表和内存分配器，以利用FPGA中可用的并行性，并最大限度地减少PCIe DMA请求的数量。平均而言，\oursys{} 每次READ操作接近一个PCIe DMA，每个WRITE操作两个PCIe DMA。其次，为了保证从属键值操作之间的一致性，\oursys{} 包括一个无序执行引擎来跟踪操作依赖性，同时最大化独立请求的吞吐量。第三，\oursys{} 通过在FPGA中实现基于硬件的负载调度程序和缓存组件来充分利用板载DRAM带宽和容量，利用可编程网卡上可用的板载DRAM缓冲区。
 
