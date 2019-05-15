@@ -43,7 +43,7 @@
 KV-Direct的主要用例是启用远程直接键值访问，而无需服务器上的CPU开销。
 在某些情况下，可能需要构建一个具有每服务器最大吞吐量的专用键值存储。
 通过模拟，\cite {li2016full}显示了在具有四个（当前不可用的）60核CPU的单个服务器中实现十亿键值运行的可能性。
-如本章末尾的表 \ref{kvdirect:tab:kvs-compare} 所示，在服务器上有10个KV-Direct 网卡，使用商用服务器可以轻松实现10亿键值 op / s性能。
+如表 \ref{kvdirect:tab:kvs-compare} 所示，在服务器上有10个KV-Direct 网卡，使用商用服务器可以轻松实现10亿键值 op / s性能。
 
 如图 \ref{kvdirect:fig:photo}，服务器消耗357瓦的功率（在墙壁上测量）以达到1.22~Gop / s GET或0.61~Gop / s PUT 的性能。
 
