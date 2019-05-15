@@ -22,7 +22,7 @@
 首先，RDMA 网卡使用网卡内存作为缓存来保持每个连接状态。有数千个并发连接，性能受到频繁缓存未命中的影响 \cite {mprdma,kaminsky2016design,kalia2018datacenter}。
 因为 RDMA 传统上部署在中小型集群中，传统 RDMA 网卡上的内存容量较小。
 随着近年来大规模的 RDMA 部署 \cite {guo2016rdma}，商用网卡拥有更大的内存来存储数千个连接 \cite {kalia2018datacenter}，而本文使用的可编程网卡拥有数千兆字节的DRAM~ \cite {mellanox-innova,mellanox-bluefield,smartnic}。
-因此，我们预测未来的数据中心不会为网卡缓存未命中问题担心过多。
+因此，本文预测未来的数据中心不会为网卡缓存未命中问题担心过多。
 第二个问题是本文的测试平台中建立RDMA连接需要大约 $30 \mu s$，这对于短连接很重要。此过程仅涉及本地CPU和网卡之间的通信，因此这个连接建立延迟是可以优化的。
 
 本节基于可编程网卡和第 \ref{chapter:socksdirect} 章的网络数据包处理平台和第 \ref{chapter:kvdirect} 章的内存键值存储，实现了一个连接数可扩放的 RDMA 网卡。

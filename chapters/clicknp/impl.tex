@@ -8,11 +8,11 @@
 \textbf{图：编译生成的 OpenCL 代码示例，（1）只包含顺序和选择结构，不包含分支结构，（2）非阻塞（每个流水级有最坏时钟周期数的保证）。可以避免 handler 阻塞 signal。}
 \fi
 
-我们实现了一个\name 编译器，作为\name 工具链的前端（\S \ref {clicknp:subsec:toolchain}）。
+本文实现了一个\name 编译器，作为\name 工具链的前端（\S \ref {clicknp:subsec:toolchain}）。
 对于宿主程序，使用Visual C++作为后端。进一步集成了Altera OpenCL SDK（v15.1）\cite {aoc}和Xilinx Vivado 高层次综合（v2015.4）\cite {vivado}作为FPGA程序的后端。
-\name 编译器包含4,925行C ++代码，它们解析配置文件和元件声明，在\S \ref {clicknp:sec:optimization}中执行优化，并生成特定于每个商业高层次综合工具的代码。
-使用Altera OpenCL时，每个\name 元件都被编译成\textit {kernel}，元件之间的连接被转换为Altera扩展通道。
-使用Xilinx Vivado 高层次综合时，将每个元件编译成IP内核，并使用AXI流来实现元件之间的连接。
+\name 编译器包含约 1 万行 C++、flex 和 bison 代码，它们解析配置文件和元件声明，执行第 \ref {clicknp:sec:optimization} 节所述的优化，并生成特定于每个商业高层次综合工具的代码。
+使用 Altera OpenCL 时，每个\name 元件都被编译成 \textit {kernel}，元件之间的连接被转换为Altera 扩展通道（channel）。
+使用Xilinx Vivado HLS 时，将每个元件编译成IP内核，并使用AXI流（stream）来实现元件之间的连接。
 元件也可以编译为CPU二进制文件，管理器线程将为每个主机元件创建一个工作线程。
 主机和FPGA元件之间的每个连接都映射到PCIe I / O通道的\textit {插槽}（\S \ref {clicknp:subsec:pcie}）。
 
@@ -23,7 +23,7 @@
 本章的硬件平台基于Altera Stratix V FPGA和Catapult shell \cite {putnam2014reconfigurable}。
 Catapult shell还包含一个OpenCL特定的运行时，因此\name role可以通过此运行时层与shell通信。
 FPGA板具有PCIe Gen2 x8接口，4GB板载DDR内存和两个40G以太网端口。
-到撰写本文时，我们还没有获得Xilinx硬件平台。
+撰写本文时，作者还没有获得Xilinx硬件平台。
 因此，主系统评估基于使用\name + OpenCL的Altera平台，使用Vivado 高层次综合生成的报告（例如频率和面积成本）来了解\name + Vivado的性能。
 
 
@@ -31,7 +31,7 @@ FPGA板具有PCIe Gen2 x8接口，4GB板载DDR内存和两个40G以太网端口�
 \subsection{\name 元件库}
 \label{clicknp:subsec:lib}
 
-我们实现了一个包含近 200 个元件的\name 元件库。
+本文实现了一个包含近 200 个元件的\name 元件库。
 其中一部分（20％）直接来自Click Modular Router，但使用\name 编程框架重新编写。
 这些元件涵盖了网络功能的大量基本操作，包括数据包解析，校验和计算，封装/解封，哈希表，最长前缀匹配（LPM），速率限制，加密和数据包调度。
 由于\name 的模块化体系结构，每个元件的代码大小都是适中的。
@@ -82,7 +82,7 @@ FPGA板具有PCIe Gen2 x8接口，4GB板载DDR内存和两个40G以太网端口�
 但是，表格底部的元件只处理数据包头（元数据）。因此，使用每秒数据包来测量吞吐量更有意义。
 值得注意的是，表 \ref {clicknp:tab:elements} 中测量的吞吐量是相应元件可以实现的最大吞吐量。
 当它们在真正的网络功能中工作时，其他组件，例如以太网端口，可能是瓶颈。
-作为参考，表 \ref {clicknp:tab:elements} 将优化版本与我们最初在FPGA上的实现进行比较，而不应用\S \ref {clicknp:sec:optimization} 中讨论的技术以及CPU实现。
+作为参考，表 \ref {clicknp:tab:elements} 将优化版本与本文最初在FPGA上的实现进行比较，而不应用\S \ref {clicknp:sec:optimization} 中讨论的技术以及CPU实现。
 很明显，经过优化后，所有这些元件都可以非常有效地处理数据包，与初始的FPGA实现相比，速度提高了7倍~117倍，与一个CPU内核上的软件实现相比，速度提高了21％。
 这种性能提升来自于利用FPGA中的巨大并行性的能力。
 考虑到FPGA的功耗（大约30W）和CPU（每个核心大约5W），\name 元件的能耗效率比CPU高4到120倍。
@@ -103,7 +103,7 @@ HashTCAM和RateLimiter具有适度的逻辑资源使用，因为这些元件具�
 
 如前所述，\name 的一个关键属性是支持联合CPU / FPGA处理。
 本章通过设计高吞吐量，低延迟的PCIe I / O通道来实现这一目标。
-为此，我们扩展了OpenCL运行时，添加一个新的I / O通道，并连接到shell中的PCIe交换机。
+为此，本文扩展了OpenCL运行时，添加一个新的I / O通道，并连接到shell中的PCIe交换机。
 PCIe交换机将仲裁新添加的I / O通道与shell中的其他组件（例如DDR内存控制器）之间的访问。
 
 Catapult shell \cite {putnam2014reconfigurable}中的PCIe插槽DMA引擎将PCIe Gen2 x8链路划分为64个逻辑子通道，即\textit {slots}。

@@ -140,7 +140,7 @@ KV-Direct的目标是利用数据中心的现有硬件来卸载重要的工作�
 \end{table}
 
 
-乱序执行引擎（\S \ref {kvdirect:sec:ooo}）可以应用于需要隐藏延迟的各种应用程序，我们希望未来的RDMA 网卡能够支持更更性能的原子操作。
+乱序执行引擎（\S \ref {kvdirect:sec:ooo}）可以应用于需要隐藏延迟的各种应用程序，本文希望未来的RDMA 网卡能够支持更更性能的原子操作。
 
 在40~Gbps网络中，网络带宽限制了非批量键值吞吐量，因此本文使用客户端批处理。通过更高的网络带宽，可以减少批量大小，从而减少延迟。在200~Gbps网络中，KV-Direct网卡无需批量即可达到180~Mop / s。
 
@@ -151,7 +151,7 @@ NetCache \cite {netcache-sosp17} 在基于RMT的可编程交换机中实现键�
 
 当KV-Direct应用于端到端应用程序时，后台计算显示了潜在的性能提升。 在PageRank \cite {page1999pagerank}中，由于每次边缘遍历都可以通过一次键值操作实现，因此KV-Direct在具有10个可编程网卡的服务器上支持1.22G TEPS。 相比之下，GRAM \cite {wu2015g}支持每台服务器250M TEPS，受交错计算和随机内存访问的约束。
 
-KV-Direct支持用户定义的函数和向量操作（表 \ref {kvdirect:tab:kv-operations}），可以通过将客户端计算卸载到硬件来进一步优化PageRank。 类似的参数适用于参数服务器 \cite {li2014scaling}。我们希望未来的工作可以利用硬件加速的键值存储来提高分布式应用程序的性能。
+KV-Direct支持用户定义的函数和向量操作（表 \ref {kvdirect:tab:kv-operations}），可以通过将客户端计算卸载到硬件来进一步优化PageRank。 类似的参数适用于参数服务器 \cite {li2014scaling}。本文希望未来的工作可以利用硬件加速的键值存储来提高分布式应用程序的性能。
 
 \subsection{可编程网卡内的有状态处理}
 
