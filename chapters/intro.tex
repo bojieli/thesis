@@ -44,6 +44,7 @@
 为了降低 ``数据中心税'' 的开销，学术界和工业界提出了很多方案，大致可以分为优化软件、利用新型商用硬件和设计新硬件三类。
 
 \subsection{优化软件}
+\label{background:sec:software}
 
 传统的网络功能由部署在数据中心特定位置的专用设备实现。这些专用网络功能设备不仅价格高昂，也不够灵活，不足以支持云服务中的多租户。
 为此，云服务商部署了软件实现的虚拟网络功能。例如，Ananta \cite {ananta} 是一个部署在微软数据中心的软件负载均衡器，用于提供云规模的负载均衡服务。
@@ -91,24 +92,38 @@ RouteBricks \cite {routebricks} 等工作表明，基于多核 x86 CPU 的每台
 
 为了加速虚拟网络和网络功能，以前的工作已经提出使用 GPU \cite {packetshader}，网络处理器（Network Processor，NP） \cite {cavium,netronome} 和硬件网络交换机 \footnote{本文中，\textit{交换机}（switch）与路由器不加区分，数据中心的相关文献中通常使用\textit{交换机}一词指代网络互连设备。} \cite {duet}。
 GPU 早期主要用于图形处理，近年来扩展到具有海量数据并行性的其他应用程序。
-PacketShader \cite {packetshader} 表明使用 GPU 可以实现 40Gbps 的分组交换速度。
 GPU 适合批量操作，但是，批量操作会导致高延迟。
 网络处理器的历史则可以追溯到 20 世纪 90 年代的网络交换机。
 网络处理器由大量的嵌入式处理器核心构成，每个处理器核心的处理能力有限，而有状态连接通常由固定的处理器核心处理，从而单条连接的吞吐量有一定的局限性。
-硬件网络交换机的主要问题是灵活性和查找表容量不足 \cite {duet}。
+硬件网络交换机的主要问题是灵活性和查找表容量不足 \cite{duet}。
 
-为了降低操作系统通信原语的开销，一系列工作将套接字系统的一部分卸载到网卡硬件上。
-TCP 卸载引擎（TCP Offload Engine，TOE） \cite {tcp-chimney-offload} 将部分或全部的 TCP / IP 协议栈卸载到网卡，但由于通用处理器的性能按摩尔定律迅速增长，这些专用硬件的性能优势有限，仅在专用领域中获得成功。
-近年来，由于数据中心的硬件趋势和应用需求，\emph {有状态}卸载的故事开始复兴 \cite {chuanxiong-rdma-keynote}。
-因此，远程直接内存访问（RDMA） \cite {infiniband2000infiniband} 在生产数据中心中广泛使用 \cite {guo2016rdma}。
-与基于软件的 TCP / IP 网络协议栈相比，RDMA 使用硬件卸载来提供超低延迟和接近零的 CPU 开销。
+为了降低操作系统通信原语的开销，一系列工作将操作系统网络协议栈的一部分卸载 \footnote{在本文中，\textit{卸载}（offload）是一个术语，表示把主机 CPU 上软件实现的功能用主机 CPU 以外的硬件实现。} 到网卡硬件上。
+TCP 卸载引擎（TCP Offload Engine，TOE） \cite {tcp-chimney-offload} 将部分或全部的 TCP/IP 协议栈卸载到网卡。
+但由于通用处理器的性能按摩尔定律迅速增长，这些专用硬件的性能优势有限，仅在专用领域中获得成功。
+取得商业成功的 TCP 卸载功能大多是无状态卸载（stateless offload） \footnote{\textit{无状态}（stateless）意味着网卡的内部存储在数据包处理过程是只读的。}，例如 TCP 校验和（checksum）的卸载。
+Infiniband \cite{infiniband2000infiniband} 技术设计了一套全新的通信原语、传输层协议、网络层协议和物理传输介质。其中通信原语和传输层协议称为远程直接内存访问（RDMA）。Infiniband 在硬件中实现了整个网络协议栈，达到了很高的吞吐量和很低的延迟，在高性能计算领域广泛使用。
+由于传输层需要维护每个连接的状态以实现拥塞控制、丢包重传、乱序重排等，Infiniband 属于有状态卸载。
+近年来，由于数据中心的硬件趋势和应用需求，有状态卸载的故事开始复兴 \cite {chuanxiong-rdma-keynote}。
+基于 Infiniband 技术的远程直接内存访问（RDMA） \cite {infiniband2000infiniband} 在数据中心广泛部署 \cite {guo2016rdma}。
+为了与数据中心现有的以太网兼容，数据中心不使用 Infiniband 物理层网络，而是将 RDMA 原语和传输层协议从 Infiniband 技术栈中剥离出来，把 RDMA 传输层数据包封装在 UDP/IP 数据包中，通过以太网传输，这称为 RoCEv2 \cite{rocev2}。
+与基于软件的 TCP/IP 网络协议栈相比，RDMA 使用硬件卸载来提供超低延迟和接近零的 CPU 开销。
+
+RDMA 通信原语与应用程序通常使用的套接字通信原语有很多不同。
+RDMA 是基于消息的，而套接字是基于字节流的。
+RDMA 需要应用程序显式注册并管理发送和接收缓冲区。
+RDMA 还需要应用程序管理发送、接收和事件队列，并适时向网卡发送流控（flow control）通知。
+RDMA 提供了两类通信原语，第一类是双边（two-sided）操作，与套接字类似，发送端调用 send，接收端调用 recv。与套接字不同的是，RDMA 的接收端应用程序需要事先声明所要接收的消息，为网卡准备好接收缓冲区。
+另一类是单边（one-sided）操作，提供了共享内存的原语，即直接读写远程内存，或在远程内存上执行原子操作。
+因此，RDMA 编程比套接字复杂很多，一个用套接字收发的示例程序仅需数十行代码，而同样功能的 RDMA 程序需要数百行代码。
 为了使套接字应用程序能够使用 RDMA，RSocket 等工作 \cite {rsockets,socketsdirect,russell2008extended} 将套接字操作转换为 RDMA 原语。
 它们具有相似的设计，其中 RSocket 的开发最活跃，是套接字转换 RDMA 的事实标准。
 但是，RSocket 的性能和兼容性都不令人满意。
 第 \ref{chapter:socksdirect} 章将提出一个与现有应用兼容，并能充分利用 RDMA 网卡性能的套接字系统。
 
+除了主机之间的网络通信，主机内的进程间通信也很重要。一些工作 \cite {belay2017ix,peter2016arrakis,rsockets} 让主机内的进程间通信绕行 RDMA 网卡。但由于 PCIe 总线的限制，RDMA 网卡的延迟和吞吐量都比主机内的共享内存差很多。因此，第 \ref{chapter:socksdirect} 章使用共享内存实现主机内的进程间通信。
 
-为了加速键值存储系统，近年来的工作 \cite {kalia2014using,kalia2016design,kalia2014using,kalia2016design} 利用 RDMA 网卡基于硬件的网络协议栈，使用双面RDMA作为KVS客户端和服务器之间的RPC机制进一步提高每核吞吐量并减少延迟，如图 \ref{intro:fig:memaccess-a} 所示。尽管这些工作进一步降低了网络通信的开销，但如上一节所讨论的，这些系统仍然受到 CPU 的并行性限制。
+
+为了加速键值存储系统，近年来的工作 \cite {kalia2014using,kalia2016design,kalia2014using,kalia2016design} 利用 RDMA 网卡基于硬件的网络协议栈，使用双边RDMA作为键值存储客户端和服务器之间的远程过程调用机制，进一步提高每核吞吐量并减少延迟，如图 \ref{intro:fig:memaccess-a} 所示。尽管这些工作进一步降低了网络通信的开销，但如第 \ref{background:sec:software} 节所讨论的，这些系统仍然使用 CPU 进行数据结构处理，性能受限。
 
 
 \begin{figure*}[t]
