@@ -52,11 +52,11 @@ NP-Click \cite{shah2004np} 在网络处理器上实现了 Click 编程框架。
 
 与CPU或GPU相比，FPGA通常具有更低的时钟频率和更小的存储器带宽。
 例如，FPGA的典型时钟频率约为200MHz，比CPU慢一个数量级（2至3~GHz）。
-同样，FPGA的单块存储器或外部DRAM的带宽通常为2至10~GBps，而内存带宽约为Intel XEON CPU的40~GBps，GPU为100~GBps。
+同样，FPGA的单块存储器或外部DRAM的带宽通常为2至10~GBps，而Intel Xeon CPU的DRAM带宽约为60~GBps，GPU的GDDR5或HBM带宽可高达数百 GBps。
 但是，CPU或GPU只有有限的内核，这限制了并行性。 FPGA内置了大量的并行性。
 现代FPGA可能拥有数百万个LE，数百个K位寄存器，数十个M位BRAM和数千个DSP模块。从理论上讲，它们中的每一个都可以并行工作。
 因此，FPGA芯片内部可能会同时运行数千个并行的``\textit {核}''。
-虽然单个BRAM的带宽可能有限，但如果并行访问数千个BRAM，则总内存带宽可以是多TBps！
+虽然单个BRAM的带宽可能有限，但如果并行访问数千个BRAM，则总内存带宽可达数TBps！
 因此，为了实现高性能，程序员必须充分利用这种大规模的并行性。
 
 传统上，FPGA使用诸如Verilog和VHDL之类的硬件描述语言进行编程。

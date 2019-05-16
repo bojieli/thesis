@@ -159,20 +159,23 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 没有向量支持的键值存储要求客户端为向量中的每个元素发出一个键值存储操作，或者将整个向量作为一个大键值对，取回客户端并执行操作。
 键值存储如果支持向量数据类型和操作，就可以大大减少网络通信和 CPU 计算开销。
 
-\subsection{高性能键值存储系统的阿基里斯之踵}
+\subsection{现有键值存储系统的性能瓶颈}
 \label{kvdirect:sec:state-of-the-art-kvs}
 
-构建高性能键值存储是优化计算机系统中各种软件和硬件组件的重要工作。
-键值处理的特点是，最先进的高性能键值存储系统基本上分为三类：
-在 键值存储 服务器的 CPU 上
-(图~\ref{kvdirect:fig:memaccess-a}),
-在 键值存储 客户端上
-(图~\ref{kvdirect:fig:memaccess-b})
-或者在硬件加速器上
-(图~\ref{kvdirect:fig:memaccess-c})。
+构建高性能键值存储需要全局优化计算机系统中各种软件和硬件组件。
+按照数据结构在哪里处理，目前最先进的高性能键值存储系统基本上分为三类：
+在键值存储服务器的 CPU 上（图~\ref{kvdirect:fig:memaccess-a}）、在键值存储客户端上（图~\ref{kvdirect:fig:memaccess-b}）或者在硬件加速器上（图~\ref{kvdirect:fig:memaccess-c}）。
 
 
-\begin{figure}[t]
+当网络开销被缩减到极限时，高性能键值存储系统的吞吐量瓶颈可归因于键值操作中的计算和随机存储器访问中的延迟。
+基于CPU的键值存储需要花费CPU周期来进行键比较和哈希槽计算。
+此外，键值存储哈希表比CPU高速缓存大几个数量级，因此存储器访问等待时间由实际访问模式的高速缓存未命中等待时间决定。
+
+
+测量表明，当代计算机的 64 字节随机读取延迟大约为 100~ns \footnote{此随机读取延迟假定使用 4~KiB 正常页面大小，把 TLB 不命中和数据缓存行（cache line）不命中的延迟都考虑在内。}。CPU 核心可以同时发出多个内存访问指令，受核心中加载存储单元（load-store unit）数量的限制（如3至4个） \cite {gharachorloo1992hiding,han2010packetshader,zhang2015mega} \footnote{尽管 CPU 微体系结构中每个核心可能有数十个加载存储单元，但 64 字节随机访存会产生多次 TLB 不命中和数据缓存行不命中，因此本文的实际测量中，一个访存延迟内只能完成 3 至 4 个随机访存操作。}。如图 \ref{kvdirect:fig:cpu-mem} 和表 \ref{kvdirect:tab:kv-cpu-throughput} 所示，在本文实验使用的CPU中，每个核心每秒最大吞吐量为29.3~M随机64B访问。另一方面，访问64字节键值对的操作通常需要大约100~ns计算或大约500条指令，这是无法放进指令窗口的 \footnote{指令窗口是 CPU 乱序执行引擎可以重排的最大指令数量。如果一个访存指令之后有超过指令窗口数量的计算指令，而访存延迟大于执行指令窗口数量的计算指令的时间，那么由于指令窗口的限制，流水线在执行指令窗口数量的计算指令后就需要暂停（stall），等待访存结果返回，才能继续执行后续的计算指令。在我们使用的 CPU 上，指令窗口的大小的测量值约为 100 至 200。}。当随机访存与计算交错时，由于指令窗口不足以覆盖访存延迟，CPU内核的性能降低到每秒5.5~M 键值操作（Mops）。一种优化方法是在一次发出内存访问之前，将多个键值存储操作的计算汇聚在一起，批量进行内存访问 \cite {li2016full,narula2014phase}。此优化可以将本文使用的CPU的每核心键值操作吞吐量提高到7.9~MOps，这仍远低于主机DRAM的随机64B吞吐量。
+
+
+\begin{figure}[htbp]
 	\centering
 	\subfloat[单核。\label{kvdirect:fig:cpu-mem-single}]
 	{\includegraphics[width=.5\textwidth,page=1]{cpu_random_mem_single_core.pdf}}
@@ -181,13 +184,6 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 	\caption{CPU 随机内存访问性能。}
 	\label{kvdirect:fig:cpu-mem}
 \end{figure}
-
-当推到极限时，在高性能键值存储系统中，吞吐量瓶颈可归因于键值操作中的计算和随机存储器访问中的延迟。
-基于CPU的键值存储需要花费CPU周期来进行键比较和哈希槽计算。
-此外，键值存储哈希表比CPU高速缓存大几个数量级，因此存储器访问等待时间由实际访问模式的高速缓存未命中等待时间决定。
-
-
-测量表明，当代计算机的64字节随机读取延迟大约为1~ns。当CPU内核落入指令窗口时，CPU核心可以同时发出多个内存访问指令，受核心中加载存储单元数量的限制（如3至4个） \cite {gharachorloo1992hiding,han2010packetshader,zhang2015mega}。如图 \ref{kvdirect:tab:kv-cpu-throughput} 所示，在本文实验使用的CPU中，每个核心每秒最大吞吐量为29.3~M随机64B访问。另一方面，访问64字节键值对的操作通常需要大约100~ns计算或大约500条指令，这太大而不适合指令窗口（测量为100至200）。当与计算交错时，CPU内核的性能降低到每秒5.5~M 键值操作（Mops）。优化是通过在一次发出内存访问之前将多个操作的计算聚类在一起来批量键值存储中的内存访问\cite {li2016full,narula2014phase}。这将本文使用的CPU的每核心吞吐量提高到7.9~MOps，这仍远低于主机DRAM的随机64B吞吐量。
 
 
 \begin{table}[htbp]
