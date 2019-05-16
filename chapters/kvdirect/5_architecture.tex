@@ -62,14 +62,14 @@ filter ($k, \lambda(v) \rightarrow$ bool) $\rightarrow [v]$ & 在向量 $k$ 中�
 \label{kvdirect:fig:kvprocessor-arch}
 \end{figure}
 
-如图\ref {kvdirect:fig:kvprocessor-arch}所示，键值处理器从板载网卡接收数据包，解码向量操作并缓冲保留站中的键值操作（\S \ref {kvdirect:sec:ooo}）。
-接下来，乱序执行引擎（\S \ref {kvdirect:sec:ooo}）从保留站向操作解码器发出独立的键值操作。
-根据操作类型，键值处理器查找哈希表（\S \ref {kvdirect:sec:hashtable}）并执行相应的操作。
-为了最小化内存访问次数，较小的键值对在哈希表中内联（inline）存储，其他的键值对存储在slab内存分配器（\S \ref {kvdirect:sec:slab}）的动态分配内存中。
-哈希索引和slab分配的内存都由统一的内存访问引擎（\S \ref {kvdirect:sec:dram-cache}）管理，它通过PCIe DMA访问主机内存并缓存部分主机内存。板载DRAM。
-在键值操作完成之后，结果被发送回无序执行引擎（\S \ref {kvdirect:sec:ooo}）以在保留站中找到并执行匹配的键值操作。
+如图 \ref {kvdirect:fig:kvprocessor-arch} 所示，键值处理器从板载网卡接收数据包，解码向量操作并缓冲保留站 \footnote{保留站（reservation station）是计算机体系结构中的概念，存储待执行的操作，并调度合适的操作并发执行。} 中的键值操作（第 \ref {kvdirect:sec:ooo} 节）。
+接下来，乱序执行引擎（第 \ref {kvdirect:sec:ooo} 节）从保留站向操作解码器发出独立的键值操作。
+根据操作类型，键值处理器查找哈希表（第 \ref {kvdirect:sec:hashtable} 节）并执行相应的操作。
+为了最小化内存访问次数，较小的键值对在哈希表中内联（inline）存储，其他的键值对存储在slab内存分配器（第 \ref {kvdirect:sec:slab} 节）的动态分配内存中。
+哈希索引和slab分配的内存都由统一的内存访问引擎（第 \ref {kvdirect:sec:dram-cache} 节）管理，它通过PCIe DMA访问主机内存并缓存部分主机内存。板载DRAM。
+在键值操作完成之后，结果被发送回无序执行引擎（第 \ref {kvdirect:sec:ooo} 节）以在保留站中找到并执行匹配的键值操作。
 
-正如\S \ref {kvdirect:sec:challenge}中所讨论的，PCIe操作吞吐量的稀缺性要求键值处理器在DMA访问上节俭。
+正如第 \ref {kvdirect:sec:challenge} 节所讨论的，PCIe操作吞吐量的稀缺性要求键值处理器在DMA访问上节俭。
 对于GET操作，至少需要读取一次内存。
 对于PUT或DELETE操作，对于哈希表，一次读取和一次写入最小。
 基于日志的数据结构可以实现每个PUT一次写入，但它牺牲了GET性能。
@@ -78,9 +78,9 @@ KV-Direct仔细设计哈希表，以便在每次查找和插入时实现接近�
 \subsection{哈希表}
 \label{kvdirect:sec:hashtable}
 
-为了存储可变大小的键值，键值存储分为两部分。 第一部分是哈希索引（图\ref {kvdirect:fig:hashtable}），它包含固定数量的\textit {哈希桶}。 每个哈希桶包含几个\textit {哈希槽}和一些元数据。 内存的其余部分是动态分配的，由slab分配器（\S \ref {kvdirect:sec:slab}）管理。
+为了存储可变大小的键值，键值存储分为两部分。 第一部分是哈希索引（图 \ref {kvdirect:fig:hashtable}），它包含固定数量的\textit {哈希桶}。 每个哈希桶包含几个\textit {哈希槽}和一些元数据。 内存的其余部分是动态分配的，由slab分配器（第 \ref {kvdirect:sec:slab} 节）管理。
 初始化时配置的\textit {哈希索引比率}确定为哈希索引分配的内存百分比。
-哈希索引比率的选择将在\S \ref {kvdirect:sec:hashtable-eval}中讨论。
+哈希索引比率的选择将在第 \ref {kvdirect:sec:hashtable-eval} 节讨论。
 
 
 \begin{figure}[htbp]
