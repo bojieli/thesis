@@ -204,11 +204,11 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 \end{table}
 
 
-观察键值处理中CPU的有限容量，最近的工作是：利用片面RDMA将键值处理卸载到客户端，并有效地将键值存储服务器用作共享内存池。
-尽管RDMA网卡提供了高消息率（8 至 150~Mops \cite {kalia2016design}），但要找到RDMA原语和键值操作之间的有效匹配是一项挑战。
-对于写入（PUT或原子）操作，可能需要多个网络往返和多个存储器访问来查询哈希索引，处理哈希冲突并分配可变大小的存储器。
-RDMA不支持交易。客户端必须相互同步，以确保使用RDMA原子或分布式原子广播保持一致性 \cite{szepesi2014designing}，这两者都会产生通信开销和同步延迟 \cite {mitchell2013using,dragojevic2014farm}。
-因此，大多数基于RDMA的键值存储 \cite {mitchell2013using,dragojevic2014farm,kalia2014using}建议仅使用单面RDMA进行GET操作。对于PUT操作，它们会回退到服务器CPU。写入密集型工作负载的吞吐量仍然是CPU核心的瓶颈。
+观察到键值处理中CPU的有限容量，最近的工作利用单边 RDMA 将键值处理卸载到客户端。
+尽管 RDMA 网卡提供了高消息吞吐量（8 至 150~Mops \cite {kalia2016design}），但要找到 RDMA 原语和键值操作之间的高效匹配是一项挑战。
+对于写入（PUT或原子）操作，可能需要多个网络往返和多次内存访问来查询哈希索引，处理哈希冲突并分配可变大小的存储器。
+RDMA不支持事务。为了保持数据结构的一致性，客户端必须相互同步，使用RDMA原子操作或分布式原子广播（distributed atomic broadcast） \cite{szepesi2014designing}。这两种方案都会产生通信开销和同步延迟 \cite {mitchell2013using,dragojevic2014farm}。
+因此，大多数基于RDMA的键值存储 \cite {mitchell2013using,dragojevic2014farm,kalia2014using} 建议仅使用单边 RDMA 进行 GET（只读）操作。对于写入（PUT 或原子）操作，它们会回退到使用服务器 CPU 处理。因此，写入密集型工作负载的吞吐量仍然受限于服务器 CPU 的瓶颈。
 
 \iffalse
 \subsection{FPGA 可编程网卡}
