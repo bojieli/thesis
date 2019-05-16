@@ -123,6 +123,13 @@ There has been research on leveraging the reconfigurability of the 网卡 for ne
 KV-Direct extends the application of programmable 网卡s to a novel area: key-value stores.
 }
 
+\subsection{键值存储}
+\label{kvdirect:sec:kvs}
+
+顾名思义，键值存储（key-value storage）保存了若干键值对（key-value pair）组成的无序集合。其中的键（key）和值（value）都是可变长度的任意字符串。在一个键值存储中，相同的键只能出现一次。键值存储的基本操作是 GET 和 PUT。GET 操作输入一个键，输出该键对应的值。PUT 操作输入一个键值对，将其保存到键值存储中。如果有相同的键，则将原有键值对删除，再保存新的键值对。
+为了高效地支持读写操作，键值存储通常基于哈希表实现。不论是 GET 还是 PUT 操作，都首先计算键的哈希值，并在哈希表中查找之。对于 PUT 操作，可能需要为新的键值对分配内存，并释放同一个键的原有键值对占用的内存。
+在分布式系统中，键值存储通常作为服务，接收来自网络客户端的 GET 和 PUT 操作，并将处理结果通过网络发送回客户端。
+
 \subsection{键值存储的工作负载变化}
 \label{kvdirect:sec:workload-shift}
 
@@ -133,6 +140,7 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 从历史上看，诸如 Memcached \cite {fitzpatrick2004distributed} 的键值存储作为Web服务的对象缓存系统获得了普及。
 在内存计算的时代，键值存储超越了缓存，成为在分布式系统中存储共享数据结构的基础架构服务。
 许多数据结构可以在键值哈希表中表示，例如，NoSQL 数据库中的数据索引 \cite {chang2008bigtable}，机器学习中的模型参数 \cite {li2014scaling}，图计算中的节点和边 \cite {shao2013trinity,xiao17tux2} 和分布式同步中的序列号发生器 \cite {kalia2016design,eris}。
+未来，键值存储 \cite{jonas2019cloud} 还将用于
 
 工作负载从对象缓存转移到通用数据结构存储意味着键值存储的几个新的设计目标。
 

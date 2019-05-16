@@ -70,6 +70,7 @@
 \label{kvdirect:fig:memaccess}
 \end{figure*}
 
+\iffalse
 内存中键值存储是许多数据中心中的关键分布式系统组件。历史上，诸如 Memcached \cite {fitzpatrick2004distributed}的键值存储作为 Web 服务的对象缓存系统获得了普及。亚马逊 \cite {decandia2007dynamo} 和 Facebook \cite {atikoglu2012workload,nishtala2013scaling} 等大型网络服务提供商已大规模部署了分布式键值存储。最近，随着基于内存的计算成为数据中心的一个主要趋势 \cite{ousterhout2010case,dragojevic2014farm}，键值存储开始超越缓存并成为在分布式系统中存储共享数据结构的基础架构。
 
 许多数据结构可以在键值哈希表中表示，例如，NoSQL数据库中的数据索引 \cite {chang2008bigtable}，机器学习中的模型参数 \cite {li2014scaling}，图计算中的点和边 \cite {shao2013trinity,xiao17tux2} 和分布式同步中的序列发生 器\cite {kalia2016design}。对于大多数这些应用，键值存储的性能是直接决定系统效率的关键因素。由于其重要性，多年来已投入大量研究工作来改善键值存储性能。
@@ -82,17 +83,30 @@
 可编程网卡的核心是现场可编程门阵列（FPGA），其具有用于连接到网络的嵌入式网卡芯片和用于连接到服务器的PCIe连接器。
 可编程网卡最初设计用于启用网络虚拟化\cite {vfp,li2016clicknp}。
 但是，许多人发现FPGA资源可以用来卸载CPU的一些工作负载，并显着降低CPU资源的使用量\cite {ouyang14hotchips,MaZC17fpga,huang16socc,cong16dac}。本章采用这种一般方法。
+\fi
 
-本章提出\oursys{}，一个新的内存键值系统，利用数据中心的可编程网卡。
-顾名思义，\oursys{} 直接获取数据并在主机内存中应用更新来为键值请求提供服务，绕过主机CPU（图 \ref {kvdirect:fig:memaccess-c}）。
-本章利用单侧基于RDMA的键值系统的洞察力来绕过CPU，同时将计算逻辑卸载到基于FPGA的网卡，以确保服务器端的一致性，从而通过减少网络流量和减少同步开销实现显着的性能提升此外，客户端对所有键值操作都变得透明。
-\oursys{} 将RDMA原语从内存操作（READ和WRITE）扩展到键值操作（GET，PUT，DELETE和ATOMIC操作）。与基于单面RDMA的系统相比，\oursys{} 处理服务器端的一致性和同步问题，从而消除了客户端的计算负荷并减少了网络流量。
-此外，为了支持基于向量的操作并减少网络流量，\oursys{} 还提供了新的向量原语UPDATE，REDUCE和FILTER，允许用户定义活动消息（active message）\cite {eicken1992active}并将某些计算委托给可编程网卡。
+内存键值存储是数据中心的关键分布式系统组件。
+本章提出 \oursys{}，一个基于可编程网卡的内存键值系统。
+顾名思义，\oursys{} 的可编程网卡从网络上接收并处理键值操作请求，并直接在主机内存中应用更新，绕过主机CPU（图 \ref {kvdirect:fig:memaccess-c}）。
+\oursys{} 将RDMA原语从内存操作（读和写）扩展到键值操作（GET，PUT，DELETE和原子操作）。
+此外，为了支持基于向量的操作并减少网络流量，\oursys{} 还提供了新的向量原语UPDATE，REDUCE和FILTER，允许用户定义活动消息（active message）\cite {eicken1992active} 并将某些计算委托给可编程网卡。
 
-由于键值操作已卸载到可编程网卡，因此设计重点是优化网卡和主机内存之间的PCIe流量。 \oursys{} 采用一系列优化来充分利用PCIe带宽和隐藏延迟。首先，本章设计了一个新的哈希表和内存分配器，以利用FPGA中可用的并行性，并最大限度地减少PCIe DMA请求的数量。平均而言，\oursys{} 每次READ操作接近一个PCIe DMA，每个WRITE操作两个PCIe DMA。其次，为了保证从属键值操作之间的一致性，\oursys{} 包括一个无序执行引擎来跟踪操作依赖性，同时最大化独立请求的吞吐量。第三，\oursys{} 通过在FPGA中实现基于硬件的负载调度程序和缓存组件来充分利用板载DRAM带宽和容量，利用可编程网卡上可用的板载DRAM缓冲区。
+在可编程网卡内进行键值处理的设计重点是优化网卡和主机内存之间的PCIe流量。
+\oursys{} 采用一系列优化来充分利用PCIe带宽和隐藏延迟。
+首先，\oursys{} 设计了一个新的哈希表和内存分配器，以利用FPGA的并行性，并最大限度地减少PCIe DMA请求的数量。
+平均而言，\oursys{} 每次 GET 操作仅使用接近一次 PCIe DMA 操作，每次 PUT 操作仅使用两次 PCIe DMA 操作。
+其次，为了保证键值存储的一致性，\oursys{} 设计了一个乱序执行引擎来跟踪操作依赖性，同时最大化独立请求的吞吐量。
+第三，\oursys{} 在 FPGA 中实现了基于硬件的负载分派程序和缓存组件，以充分利用板载 DRAM 带宽和容量。
 
-单网卡 \oursys{} 系统能够实现每秒高达180~M 键值的操作（Ops），相当于36个CPU核心的吞吐量\cite {li2016full}。与最先进的CPU 键值存储实现相比，\oursys{} 可将尾延迟降低至10 $\mu$s，同时将功率效率提高3倍。而且，\oursys{} 可以通过多个网卡实现接近线性的可扩展性。在服务器中使用10个可编程网卡，本章在单个商品服务器中每秒实现12.2亿键值操作，这比现有系统提高了一个数量级。
+基于上述优化，单网卡 \oursys{} 系统能够实现每秒高达 180~M 次键值操作，相当于 36 个 CPU 核心的吞吐量 \cite {li2016full}。
+与最先进的 CPU 键值存储系统相比，\oursys{} 可将尾延迟降低至 10 $\mu$s，同时将能耗效率提高3倍。
+而且，\oursys{} 可以通过多个网卡实现接近线性的可扩展性。通过在单台商品服务器中使用 10 个可编程网卡，性能可达每秒 12.2 亿键值操作，这比现有系统提高了一个数量级。
 
-\oursys{} 支持高达180~Mops的一般原子操作，等于正常的键值操作，并且明显优于最先进的基于RDMA的系统中报告的数量：2.24~Mops \cite {kalia2014using}。原子操作的性能主要是乱序执行引擎的结果，该引擎可以有效地跟踪键值操作之间的依赖性，而不会阻塞管道。
+\oursys{} 还支持高达 180~Mops 的通用原子操作，明显优于目前最先进的基于 RDMA 的系统中报告的性能：2.24~Mops \cite {kalia2014using}。原子操作的高性能主要归功于乱序执行引擎。乱序执行引擎可以高效地跟踪键值操作之间的依赖性，而不会阻塞流水线。
 
-本章的其余部分安排如下。 \S \ref {kvdirect:sec:background}显示了背景，阐明了设计目标和挑战。 \S \ref {kvdirect:sec:architecture}描述了\oursys{} 的设计。 \S \ref {kvdirect:sec:evaluation}是对\oursys{} 的评估。 \S \ref {kvdirect:sec:extensions}讨论了进一步的扩展。\S \ref {kvdirect:sec:related} 将讨论相关工作，并在\S \ref {kvdirect:sec:conclusion}中得出结论。
+本章的其余部分安排如下。第 \ref {kvdirect:sec:background} 节介绍背景，并阐明设计目标和挑战。
+第 \ref {kvdirect:sec:architecture} 节描述 \oursys{} 的设计。
+第 \ref {kvdirect:sec:evaluation} 节评估 \oursys{} 的性能。
+第 \ref {kvdirect:sec:extensions} 节讨论进一步的扩展。
+第 \ref {kvdirect:sec:related} 节讨论相关工作。
+第 \ref {kvdirect:sec:conclusion} 节总结。
