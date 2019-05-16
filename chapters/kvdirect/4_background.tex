@@ -233,11 +233,11 @@ RDMA不支持事务。为了保持数据结构的一致性，客户端必须相�
 \label{kvdirect:sec:challenge}
 
 KV-Direct将键值处理从CPU移动到服务器中的可编程网卡（图\ref {kvdirect:fig:memaccess-c}）。
-与RDMA相同，KV-Direct 网卡通过PCIe访问主机内存。 PCIe是一种分组交换网络，具有大约500 ns的往返延迟和每Gen3 x8端点7.87~GB / s的理论带宽。
-在延迟方面，对于可编程网卡，由于FPGA中的额外处理延迟，缓存的PCIe DMA读取延迟为800~ns。
-对于随机非缓存DMA读取，由于DRAM访问，DRAM刷新和PCIe DMA引擎中的PCIe响应重新排序，存在额外的250~ns平均延迟（图\ref {kvdirect:fig:dma-lat}）。
-在吞吐量方面，每个DMA读或写操作都需要一个带有26字节头的PCIe传输层数据包（TLP）和用于64位寻址的填充。
-对于以64字节粒度访问主机内存的PCIe Gen3 x8 网卡，理论吞吐量因此为5.6~GB / s或87~Mops。
+与RDMA相同，KV-Direct 网卡通过PCIe访问主机内存。 PCIe是一种分组交换网络，具有大约500 ns的往返延迟和每Gen3 x8端点7.87~GB/s的理论带宽。
+在延迟方面，对于可编程网卡，由于本文使用的 FPGA 硬核中有大约 300~ns 的额外处理延迟，PCIe DMA 读取已被 CPU 缓存的主机内存，延迟为800~ns。
+随机DMA读取未被缓存的主机内存时，由于DRAM访问、DRAM刷新和PCIe DMA引擎中的PCIe响应重新排序，存在额外的250~ns平均延迟（图\ref {kvdirect:fig:dma-lat}）。
+在吞吐量方面，每个DMA读或写操作都需要一个带有26字节头的PCIe传输层数据包（TLP）和用于64位寻址的填充（padding）。
+对于以64字节粒度访问主机内存的PCIe Gen3 x8 网卡，理论吞吐量因此为5.6~GB/s或87~Mops。
 
 \begin{figure}[t]
 	\centering
@@ -249,7 +249,7 @@ KV-Direct将键值处理从CPU移动到服务器中的可编程网卡（图\ref 
 	\label{kvdirect:fig:dma-perf}
 \end{figure}
 
-为了使用64字节DMA请求使PCIe Gen3 x8饱和，考虑到1050~ns的延迟，需要92个并发DMA请求。
+为了使用64字节DMA请求使PCIe Gen3 x8的吞吐量饱和，考虑到1050~ns的延迟，需要92个并发DMA请求。
 实际上，有两个因素进一步限制了DMA请求的并发性。
 首先，基于PCIe信用的流量控制限制了每种DMA类型的正在处理请求的数量。服务器中的PCIe root complex（根节点）为DMA读取通告了88个TLP发布的头部信用，为DMA读取通告了84个TLP非发布的头部信用。
 其次，DMA读取需要分配唯一的PCIe标记来识别可能无序的DMA响应。
