@@ -2,7 +2,7 @@
 \label{kvdirect:sec:architecture}
 \label{kvdirect:sec:kv-operations}
 
-KV-Direct 将远程直接内存访问（RDMA）原语扩展到 \textit {远程直接键值访问}，如表 \ref {kvdirect:tab:kv-operations} 所述。
+KV-Direct 将远程直接内存访问（RDMA）原语扩展到 \textit {远程直接键值访问}原语，如表 \ref {kvdirect:tab:kv-operations} 所述。
 客户端将\textit {KV-Direct 操作}发送到键值存储服务器，而可编程网卡处理请求并发送回结果，绕过CPU。
 键值存储服务器上的可编程网卡是一个重新配置为\textit {键值处理器}的FPGA。
 
