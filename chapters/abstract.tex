@@ -1,9 +1,9 @@
 % !TeX root = ../main.tex
 
 \begin{abstract}
-数据中心是支持当今世界各种互联网服务的基础设施，面临硬件和应用两方面的挑战。硬件方面，通用处理器的性能提升逐渐放缓；应用方面，大数据与人工智能对算力的需求与日俱增。不同于容易并行的 Web 服务，大数据与人工智能需要各计算节点间更多的通信，这推动了数据中心网络性能的快速提高，也对共享数据存储的性能提出了更高的要求。然而，数据中心的网络和存储基础设施主要使用通用处理器的软件处理，其性能落后于快速增长的网络、存储、定制化计算硬件性能，日益成为系统的瓶颈。与此同时，在云化的数据中心中，灵活性也是一项重要需求。为此，近年来，可编程网卡在数据中心被广泛部署，利用现场可编程门阵列（FPGA）等定制化硬件加速虚拟网络服务。
+数据中心是支持当今世界各种互联网服务的基础设施，面临硬件和应用两方面的挑战。硬件方面，通用处理器的性能提升逐渐放缓；应用方面，大数据与机器学习对算力的需求与日俱增。不同于容易并行的 Web 服务，大数据与机器学习需要各计算节点间更多的通信，这推动了数据中心网络性能的快速提高，也对共享数据存储的性能提出了更高的要求。然而，数据中心的网络和存储基础设施主要使用通用处理器的软件处理，其性能落后于快速增长的网络、存储、定制化计算硬件性能，日益成为系统的瓶颈。与此同时，在云化的数据中心中，灵活性也是一项重要需求。为了同时提供高性能和灵活性，近年来，可编程网卡在数据中心被广泛部署，利用现场可编程门阵列（FPGA）等定制化硬件加速虚拟网络。
 
-本文旨在探索基于可编程网卡的高性能数据中心系统。可编程网卡在加速虚拟网络之外，还可以加速网络功能、数据结构、操作系统等。为此，本文用 FPGA 可编程网卡实现云计算数据中心计算、网络、存储节点的全栈加速。
+本文旨在探索基于可编程网卡的高性能数据中心系统。可编程网卡在加速虚拟网络之外，还可以加速网络功能、数据结构、操作系统等。为此，本文用 FPGA 可编程网卡实现云计算数据中心计算、网络、内存存储节点的全栈加速。
 
 首先，本文提出用可编程网卡加速云计算中的虚拟网络功能，设计和实现了首个在商用服务器中用 FPGA 加速的高灵活性、高性能网络功能处理平台 ClickNP。众所周知，FPGA 编程对软件工程师很不友好。为了简化 FPGA 编程，设计了类 C 的 ClickNP 语言和模块化的编程模型，并开发了一系列优化技术，以充分利用 FPGA 的海量并行性；实现了 ClickNP 开发工具链，可以与多种商用高层次综合工具集成；基于 ClickNP 设计和实现了 200 多个网络元件，并用这些元件组建起多种网络功能。相比基于 CPU 的软件网络功能，ClickNP 的吞吐量提高了 10 倍，延迟降低到 1/10；且具有可忽略的 CPU 开销，可以为云计算中的每个计算节点节约 20\% 的 CPU 核。
 
@@ -18,16 +18,16 @@
 	
 Data centers are the infrastructure that hosts Internet services all around the world, which are basically composed of compute, storage and network systems.
 On one hand, performance improvement of general processors is slowing down.
-On the other hand, big data and artificial intelligence impose increasing computational power requirements.
-Different from Web services that are easy to parallelize, big data and artificial intelligence require more communication among compute nodes, which pushes the performance of data center network to improve rapidly, as well proposes higher requirements for shared data storage performance.
+On the other hand, big data and machine learning impose increasing computational power requirements.
+Different from Web services that are easy to parallelize, big data and machine learning require more communication among compute nodes, which pushes the performance of data center network to improve rapidly, as well proposes higher requirements for shared data storage performance.
 However, networking and storage infrastructure services in data centers still mainly use software processing on general processors, whose performance lags behind the rapidly increasing performance of hardware in networking, storage and customized computing.
 As a result, software processing becomes a bottleneck in data center systems.
 In the meantime, in cloud data centers, flexibility is also of great importance.
-To this end, recent years witnessed large scale deployment of programmable NICs (Network Interface Cards) in data centers, which use customized hardware such as FPGAs to accelerate network virtualization services.
+To provide high performance and flexibility at the same time, recent years witnessed large scale deployment of programmable NICs (Network Interface Cards) in data centers, which use customized hardware such as FPGAs to accelerate network virtualization services.
 
 This thesis aims to explore high performance data center systems with programmable NICs.
 Except for accelerating network virtualization, programmable NICs can accelerate network functions, data structures and operating systems as well.
-For this purpose, a system is proposed that uses FPGA-based programmable NIC for full stack acceleration of compute, network and storage nodes in cloud data centers.
+For this purpose, a system is proposed that uses FPGA-based programmable NIC for full stack acceleration of compute, network and in-memory storage nodes in cloud data centers.
 
 First, virtualized network functions in the cloud can be accelerated with programmable NICs. This thesis proposes ClickNP, the first FPGA accelerated network function processing platform on commodity servers with high flexibility and high performance.
 It is well known that FPGA programming is unfriendly to software developers.
