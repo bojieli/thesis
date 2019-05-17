@@ -75,10 +75,10 @@ NP-Click \cite{shah2004np} 在网络处理器上实现了 Click 编程框架。
 
 \textbf {模块化。} 网络功能平台应该支持\textit {模块化架构}进行数据包处理。以前关于虚拟化网络功能的经验表明，正确的模块化架构可以很好地捕获数据包处理中的许多常见功能~\cite {kohler2000click,martins2014clickos}，使它们易于在各种网络功能中重用。
 
-\textbf {高性能和低延迟。} 数据中心的网络功能应该以40 / 100~Gbps的线路速率处理大量数据包，具有超低延迟。以前的工作已经显示~\cite {rollback-mb}，即使网络功能添加的几百微秒的延迟也会对服务体验产生负面影响。
+\textbf {高性能、低延迟。} 数据中心的网络功能应该以40 / 100~Gbps的线路速率处理大量数据包，具有超低延迟。以前的工作已经显示~\cite {rollback-mb}，即使网络功能添加的几百微秒的延迟也会对服务体验产生负面影响。
 
-\textbf {支持联合CPU / FPGA数据包处理。} FPGA 不是灵丹妙药。
-正如第 2 章所讨论的，并非所有任务都适用于FPGA。例如，自然顺序的算法和具有非常大的内存占用和低局部性的处理应该在CPU中处理得更好。
+\textbf {支持 CPU/FPGA 联合数据包处理。} FPGA 不是灵丹妙药。
+正如第 \ref{chapter:background} 章所讨论的，并非所有任务都适用于FPGA。例如，自然顺序的算法和具有非常大的内存占用和低局部性的处理应该在CPU中处理得更好。
 此外，FPGA具有严格的区域约束。
 这意味着您无法将任意大的逻辑放入芯片中。
 在没有数据平面中断的情况下动态交换FPGA配置非常困难，因为重新配置时间可能需要几秒到几分钟，具体取决于FPGA的大小。
@@ -104,7 +104,7 @@ Click2NetFPGA~\cite {Click2NetFPGA} 利用高层次综合工具，直接将 Clic
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.7\textwidth]{../figures/opencl.pdf}
-	\caption{基于 OpenCL 的 FPGA 编程工具链。}
+	\caption{OpenCL 核之间以及核与网络、主机的通信方式：共享内存。}
 	\label{intro:fig:opencl}
 \end{figure}
 
@@ -116,10 +116,17 @@ Click2NetFPGA~\cite {Click2NetFPGA} 利用高层次综合工具，直接将 Clic
 但是网络功能面临着连续的数据包流，应该始终在运行。
 第四，OpenCL不支持CPU和FPGA之间的联合数据包处理，CPU上的数据包处理只能在 OpenCL 框架以外进行。
 
+由于网络数据包处理是流式处理，并行执行的核之间应当通过管道（FIFO）而非共享内存来通信，如图 \ref{intro:fig:element_conn} 所示。FPGA 内的处理逻辑与网络和主机之间也应当通过管道来通信。
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=1.0\textwidth]{image/element_conn.pdf}
+	\caption{ClickNP 核之间以及核与网络、主机的通信方式：管道（FIFO）。}
+	\label{intro:fig:element_conn}
+\end{figure}
 
 
-
-下文将介绍\name{}，一种新颖的FPGA加速网络功能平台，满足上述四个要求。
+下文将介绍 \name{}，一种新颖的FPGA加速网络功能平台，满足灵活性、模块化、高性能、低延迟和 CPU/FPGA 联合处理的要求。
 
 \egg{
 Today's data centers rely on a wide range of network functions to implement network virtualization, ensure security (e.g. firewalls and intrusion detection/prevention systems), perform measurements and improve performance (e.g. traffic scheduling). As data centers are moving towards 40 Gbps bandwidth at end hosts, where the line-rate is 60 M packets per second for minimum-sized packets, higher throughput requirement is imposed upon network processors. Furthermore, as data center services are evolving rapidly, programmability becomes indispensable for network processors. However, existing network processors has a large mismatch to the performance and programmability requirements.

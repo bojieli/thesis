@@ -62,18 +62,18 @@ filter ($k, \lambda(v) \rightarrow$ bool) $\rightarrow [v]$ & 在向量 $k$ 中�
 \label{kvdirect:fig:kvprocessor-arch}
 \end{figure}
 
-如图 \ref {kvdirect:fig:kvprocessor-arch} 所示，键值处理器从板载网卡接收数据包，解码向量操作并缓冲保留站 \footnote{保留站（reservation station）是计算机体系结构中的概念，存储待执行的操作，并调度合适的操作并发执行。} 中的键值操作（第 \ref {kvdirect:sec:ooo} 节）。
-接下来，乱序执行引擎（第 \ref {kvdirect:sec:ooo} 节）从保留站向操作解码器发出独立的键值操作。
+如图 \ref {kvdirect:fig:kvprocessor-arch} 所示，键值处理器从板载网卡接收数据包，解码向量操作并将键值操作缓冲在保留站 \footnote{保留站（reservation station）是计算机体系结构中的概念，存储待执行的操作，并调度合适的操作并发执行。} 中（第 \ref {kvdirect:sec:ooo} 节）。
+接下来，乱序执行引擎（第 \ref {kvdirect:sec:ooo} 节）从保留站发送可并发执行的键值操作到键值操作译码器。
 根据操作类型，键值处理器查找哈希表（第 \ref {kvdirect:sec:hashtable} 节）并执行相应的操作。
-为了最小化内存访问次数，较小的键值对在哈希表中内联（inline）存储，其他的键值对存储在slab内存分配器（第 \ref {kvdirect:sec:slab} 节）的动态分配内存中。
-哈希索引和slab分配的内存都由统一的内存访问引擎（第 \ref {kvdirect:sec:dram-cache} 节）管理，它通过PCIe DMA访问主机内存并缓存部分主机内存。板载DRAM。
-在键值操作完成之后，结果被发送回无序执行引擎（第 \ref {kvdirect:sec:ooo} 节）以在保留站中找到并执行匹配的键值操作。
+为了最小化内存访问次数，较小的键值对在哈希表中内联（inline）存储，其他的键值对存储在 slab 内存分配器（第 \ref {kvdirect:sec:slab} 节）的动态分配内存中。
+哈希索引和slab分配的内存都由统一的内存访问引擎（第 \ref {kvdirect:sec:dram-cache} 节）管理，它通过PCIe DMA访问主机内存并将部分主机内存缓存在板载DRAM中。
+键值操作完成后，结果被发送回乱序执行引擎（第 \ref {kvdirect:sec:ooo} 节），在保留站中寻找依赖它的键值操作并执行之。
 
-正如第 \ref {kvdirect:sec:challenge} 节所讨论的，PCIe操作吞吐量的稀缺性要求键值处理器在DMA访问上节俭。
-对于GET操作，至少需要读取一次内存。
-对于PUT或DELETE操作，对于哈希表，一次读取和一次写入最小。
-基于日志的数据结构可以实现每个PUT一次写入，但它牺牲了GET性能。
-KV-Direct仔细设计哈希表，以便在每次查找和插入时实现接近理想的DMA访问，以及内存分配器。每次动态内存分配平摊下来，只需不到0.1次DMA操作。
+正如第 \ref {kvdirect:sec:challenge} 节所讨论的，PCIe 吞吐量的稀缺性要求键值处理器节约 DMA 访问。
+对于 GET 操作，至少需要读取一次内存。
+对于 PUT 或 DELETE 操作，对于哈希表数据结构，至少需要一次读取和一次写入。
+基于日志的数据结构可以实现每个 PUT 平摊下来少于一次的写入操作，但它牺牲了 GET 性能。
+KV-Direct 仔细设计哈希表，以便在每次查找和插入时实现接近理想的 DMA 访问。KV-Direct 也仔细设计了内存分配器，使每次动态内存分配平摊下来，只需不到 0.1 次 DMA 操作。
 
 \subsection{哈希表}
 \label{kvdirect:sec:hashtable}
