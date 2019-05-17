@@ -1,6 +1,27 @@
-\section{连接数可扩放的 RDMA 网卡实现}
+\section{讨论：连接数可扩放性}
 \label{socksdirect:sec:discussion}
 
+
+使用商用 RDMA 网卡时，\sys {} 对大量连接的可伸缩性受共享内存和RDMA的限制。
+为了表明 \libipc {} 和监视器不是瓶颈，本节在两个重用RDMA QP和共享内存的进程之间创建了很多连接。使用 \libipc {} 的应用程序线程每秒可以创建1.4~M个新连接，这是Linux的20倍和mTCP的2倍 \cite {jeong2014mtcp}。监视器每秒可以创建5.3~M个连接。
+
+由于主机内的进程数量有限，因此SHM连接的数量可能不会很大。
+但是，一台主机可能连接到许多其他主机，RDMA的可扩展性成为一个问题。
+RDMA 的可扩展性归结为两个问题。
+首先，RDMA 网卡使用网卡内存作为缓存来保持每个连接状态。当有数千个并发连接时，性能受到频繁缓存未命中的影响 \cite {mprdma,kaminsky2016design,kalia2018datacenter}。
+因为 RDMA 传统上部署在中小型集群中，传统 RDMA 网卡上的内存容量较小。
+随着近年来大规模的 RDMA 部署 \cite {guo2016rdma}，商用网卡拥有更大的内存来存储数千个连接 \cite {kalia2018datacenter}，而本文使用的可编程网卡拥有数千兆字节的DRAM~ \cite {mellanox-innova,mellanox-bluefield,smartnic}。
+因此，本文预测未来的数据中心不会为网卡缓存未命中问题担心过多。下一节将基于可编程网卡，提出一个连接数可扩放的传输层实现框架。
+第二个问题是本文的测试平台中建立RDMA连接需要大约 $30 \mu s$，这对于短连接很重要。此过程仅涉及本地CPU和网卡之间的通信，因此这个连接建立延迟是可以优化的。
+
+除了大量并发连接，服务质量保证（Quality of Service，QoS）也是数据中心的重要需求。
+传统网络协议栈在操作系统内核实现服务质量保证。
+而对于本章使用的硬件传输协议，将数据平面性能隔离和拥塞控制卸载到 RDMA 网卡上是一个越来越流行的研究方向 \cite {peter2016arrakis,zhu2015congestion,lu2017memory,mprdma,mittal2018revisiting}，因为数据中心的网卡正变得越来越可编程  \cite{smartnic,cavium,kaufmann2015flexnic,mellanox-innova,mellanox-bluefield}，而且公有云已经在虚拟机之外的网络功能中提供了 QoS \cite {li2016clicknp,panda2016netbricks,floem-osdi18}。
+
+连接数可扩放性需要存储每连接的状态。核心挑战是存储并高效访问大量连接的状态。接下来的两节提出两种方案：在可编程网卡中或主机 CPU 的用户态库中存储连接状态并实现传输层处理。
+
+\subsection{基于可编程网卡的传输层}
+\label{socksdirect:sec:smartnic}
 
 %\textbf{Communicating with TCP/IP peers.}
 %We use a user-space networking stack to communicate with regular TCP/IP peers, but the compatibility may be limited~\cite{yasukata2016stackmap}.
@@ -13,20 +34,21 @@
 %We provide a socket option to enable applications to delegate operations to the monitor and use user-space networking stack even if the peer supports RDMA.
 %An application can choose to use RDMA for latency sensitive and throughput demanding connections, and user-space networking stack for others.
 
-使用商用 RDMA 网卡时，\sys {} 对大量连接的可伸缩性受共享内存和RDMA的限制。
-为了表明 \libipc {} 和监视器不是瓶颈，本节在两个重用RDMA QP和共享内存的进程之间创建了很多连接。使用 \libipc {} 的应用程序线程每秒可以创建1.4~M个新连接，这是Linux的20倍和mTCP的2倍 \cite {jeong2014mtcp}。监视器每秒可以创建5.3~M个连接。
 
-由于主机内的进程数量有限，因此SHM连接的数量可能不会很大。
-但是，一台主机可能连接到许多其他主机，RDMA的可扩展性成为一个问题。
-这归结为两个问题。
-首先，RDMA 网卡使用网卡内存作为缓存来保持每个连接状态。有数千个并发连接，性能受到频繁缓存未命中的影响 \cite {mprdma,kaminsky2016design,kalia2018datacenter}。
-因为 RDMA 传统上部署在中小型集群中，传统 RDMA 网卡上的内存容量较小。
-随着近年来大规模的 RDMA 部署 \cite {guo2016rdma}，商用网卡拥有更大的内存来存储数千个连接 \cite {kalia2018datacenter}，而本文使用的可编程网卡拥有数千兆字节的DRAM~ \cite {mellanox-innova,mellanox-bluefield,smartnic}。
-因此，本文预测未来的数据中心不会为网卡缓存未命中问题担心过多。
-第二个问题是本文的测试平台中建立RDMA连接需要大约 $30 \mu s$，这对于短连接很重要。此过程仅涉及本地CPU和网卡之间的通信，因此这个连接建立延迟是可以优化的。
+
+
+
 
 本节基于可编程网卡和第 \ref{chapter:socksdirect} 章的网络数据包处理平台和第 \ref{chapter:kvdirect} 章的内存键值存储，实现了一个连接数可扩放的 RDMA 网卡。
 实现连接数可扩放的主要挑战是在缓存不命中率很高时，高吞吐量地存取主机内存中的连接状态，并能隐藏存取延迟。这正是第 \ref{chapter:kvdirect} 章所解决的问题，因此本节基于高性能键值存储实现了可扩放的连接状态存储。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=1.0\textwidth]{images/scalable_rdma.pdf}	
+	\caption{基于可编程网卡的连接数可扩放 RDMA。}
+	\label{socksdirect:fig:scalable-rdma}
+\end{figure}
 
 基于可编程网卡的 RDMA 网卡架构如图 \ref{socksdirect:fig:scalable-rdma} 所示。
 RDMA 网卡需要处理来自主机的控制和数据传输命令（工作请求，work request），还需要处理来自网络的数据包。
@@ -44,16 +66,51 @@ RDMA 网卡需要处理来自主机的控制和数据传输命令（工作请求
 
 上述处理流程的性能挑战是单个时钟周期内很难完成一个工作请求的有状态处理（如拥塞控制），而同一个连接的工作请求不能并行处理，从而降低了单连接吞吐量。解决方案是将工作请求的处理流水线（pipeline）化，每个流水级（stage）处理连接状态的不同部分，因此流水级之间没有数据依赖。在每个流水级内设置第 \ref{chapter:kvdirect} 章的数据转发（data forwarding）机制，使尚未写回请求调度器的状态更新对后续的工作请求可见。这样，同一个连接有依赖关系的多个工作请求可以在不同的流水级间并发处理。对于这类可以通过流水线和数据转发解决的依赖，请求调度器就不必记录依赖关系，而是认为所有此类请求都是不相关的。
 
+图 \ref{socksdirect:fig:eval-connnum-tput} 显示了不同并发连接数量下的单核吞吐量。
+
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=1.0\textwidth]{images/scalable_rdma.pdf}	
-	\caption{基于可编程网卡的连接数可扩放 RDMA。}
-	\label{socksdirect:fig:scalable-rdma}
+	\subfloat[单机内吞吐量。]{                    
+		%\begin{minipage}{0.4\textwidth}
+		\centering
+		\includegraphics[width=0.5\textwidth]{eval/microbenchmark/connnum-ipc-tput.pdf}
+		\label{socksdirect:fig:eval-connnum-ipc-tput}
+		%\end{minipage}
+	}
+	\subfloat[跨主机吞吐量。]{
+		%\begin{minipage}{0.4\textwidth}
+		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/connnum-network-tput.pdf}
+		\label{socksdirect:fig:eval-connnum-network-tput}
+		%\end{minipage}
+	}
+	
+	\caption{不同并发连接数量下的单核吞吐量。}
+	\label{socksdirect:fig:eval-connnum-tput}
 \end{figure}
 
-除了大量并发连接，服务质量保证（Quality of Service，QoS）也是数据中心的重要需求。
-传统网络协议栈在操作系统内核实现服务质量保证。
-而对于本章使用的硬件传输协议，将数据平面性能隔离和拥塞控制卸载到 RDMA 网卡上是一个越来越流行的研究方向 \cite {peter2016arrakis,zhu2015congestion,lu2017memory,mprdma,mittal2018revisiting}，因为数据中心的网卡正变得越来越可编程  \cite{smartnic,cavium,kaufmann2015flexnic,mellanox-innova,mellanox-bluefield}，而且公有云已经在虚拟机之外的网络功能中提供了 QoS \cite {li2016clicknp,panda2016netbricks,floem-osdi18}。
+
+\subsection{基于 CPU 的传输层}
+
+实现连接数可扩放性的另一种方案是在主机 CPU 上实现传输层协议，从而网卡无需为每个连接存储状态，只需实现无状态卸载。
+用户态协议栈与网卡之间使用收发数据包接口，而非 RDMA 消息接口。
+我们利用 DPDK 等高性能数据包处理框架实现主机 CPU 与网卡间的高效通信。
+基于 LibVMA 实现……
+
+
+
+
+
+
+
+
+
+\section{讨论：应用、协议栈与网卡间的接口抽象}
+\label{socksdirect:sec:api-discussion}
+
+应用程序与用户态协议栈之间使用套接字接口。协议栈与网卡间使用 RDMA 接口。任务划分？
+
+
+
 
 
 

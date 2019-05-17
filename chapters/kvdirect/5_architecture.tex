@@ -200,7 +200,7 @@ Cuckoo哈希\cite {pagh2004cuckoo}和跳房子哈希（Hopscotch Hash）\cite {h
 \label{kvdirect:sec:slab}
 
 链式哈希槽和非内联键值需要动态内存分配。
-为此，选择slab内存分配器\cite {bonwick1994slab}来实现每个分配和释放的$O（1）$平均内存访问。主slab分配器逻辑在主机CPU上运行，并通过PCIe与键值处理器通信。
+为此，选择slab内存分配器\cite {bonwick1994slab}来实现每个分配和释放的$O(1)$平均内存访问。主slab分配器逻辑在主机CPU上运行，并通过PCIe与键值处理器通信。
 Slab分配器将分配大小四舍五入到最接近的2的幂，称为\textit {slab 大小}。
 它为每个可能的slab大小（32,64，\ldots，512字节）和全局 \textit {分配位图}维护\textit {空闲 slab 池}，以帮助将小的空闲slab合并回更大的slab。
 每个空闲slab池是一个\textit {slab 条目}数组，由一个地址字段和一个slab类型字段组成，表示slab条目的大小。

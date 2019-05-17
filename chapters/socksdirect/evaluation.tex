@@ -181,26 +181,5 @@ Linux吞吐量从1到7个核心线性扩展，并在环回或具有更多核心�
 	%\end{minipage}
 \end{figure}
 
-\iffalse
-\begin{figure*}[htbp]
-	\centering
-	\subfloat[单机内吞吐量。]{                    
-		%\begin{minipage}{0.4\textwidth}
-		\centering
-		\includegraphics[width=0.5\textwidth]{eval/microbenchmark/connnum-ipc-tput.pdf}
-		\label{socksdirect:fig:eval-connnum-ipc-tput}
-		%\end{minipage}
-	}
-	\subfloat[跨主机吞吐量。]{
-		%\begin{minipage}{0.4\textwidth}
-		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/connnum-network-tput.pdf}
-		\label{socksdirect:fig:eval-connnum-network-tput}
-		%\end{minipage}
-	}
-	
-	\caption{不同并发连接数量下的单核吞吐量。}
-	\label{socksdirect:fig:eval-connnum-tput}
-\end{figure*}
-\fi
 
 %Finally, we benchmark the throughput and latency after \texttt{fork} and other corner-case operations. Initially, there is only one pair of sender and receiver. At time $T_0$, receiver forks, and the parent process keeps receiving. At time $T_1$, the child process begins to receives takes over the socket. At time $T_2$, sender forks, and only the parent sends. At time $T_3$, the child sender also starts sending. We find that both throughput and latency resume to initial maximal performance within 1~ms after each event.

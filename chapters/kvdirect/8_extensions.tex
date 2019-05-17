@@ -72,19 +72,24 @@ KV-Direct的主要用例是启用远程直接键值访问，而无需服务器�
 \end{figure}
 
 
-\subsection{SSD 持久化存储}
+\subsection{基于 SSD 的持久化存储}
 
-\textbf{TODO}
-
-兼容的操作系统虚拟盘 + 高速块设备操作 API + 高速 KV 操作 API
-
+基于内存数据结构存储断电后数据会丢失。为了持久化，本节利用 SATA SSD 实现了持久化键值存储。由于服务器上的 SSD 数量是有限的，且操作系统和应用程序也运行在 SSD 上，需要对 SSD 进行虚拟化。
+如图 \ref{kvdirect:fig:ssd}，可编程网卡将 SSD 虚拟化成两个虚拟 AHCI HBA 设备。其中的主虚拟存储设备透明地
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=0.8\textwidth]{ssd.pdf}
+	\includegraphics[width=0.9\textwidth]{ssd.pdf}
 	\caption{SSD 持久化存储架构。}
 	\label{kvdirect:fig:ssd}
 \end{figure}
+
+
+
+\subsection{分布式键值存储}
+
+把键值分布到其他节点上……
+
 
 \section{讨论}
 \label{kvdirect:sec:discussion}
