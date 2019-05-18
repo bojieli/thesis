@@ -996,7 +996,21 @@ FPGA 是一种硬件可重构的体系结构，常年来被用作专用芯片（
 微软和百度在有效利用 FPGA 加速云计算方面做了很多工作。例如微软在 Azure 云平台上已经全面部署了FPGA模块 \cite{putnam2014reconfigurable,caulfield2016cloud}。百度将 FPGA 用于数据压缩 \cite{ouyang2010fpga}、数据库 SQL 处理 \cite{baidu-fpga-sql}、深度学习 \cite{ouyang2014sda} 和其他丰富的应用场景 \cite{ouyang2017xpu}。
 2016年，Intel公司以167亿美元的价格收购FPGA巨头Altera公司，以保持其在数据中心领域的领导地位，并探索CPU与FPGA结合的异构服务器计算架构。
 
-直观上，FPGA 是一个可以用编程的方法重新组合的一大堆电子元器件。这些元器件包括逻辑门（如与，或，非门），寄存器（Register），加法器，静态内存（SRAM）等等，用户可以定制它们之间的连接从而组成不同的电路。如今的FPGA除了基本元件，还加入了越来越多的DSP和硬核（hard IP），以提高乘法、浮点运算和访问外围设备的性能。FPGA的优点是技术比较成熟，开发门槛相对其它集成电路（如ASIC）较低，部署后依然可以修改，缺点是性能比专用芯片差。
+直观上，FPGA 是一个可以用编程的方法重新组合的一大堆电子元器件。这些元器件包括逻辑门（如与，或，非门），寄存器（Register），加法器，静态内存（SRAM）等等，用户可以定制它们之间的连接从而组成不同的电路。图 \ref{clicknp:fig:logic-block} 展示了 FPGA 的基本计算单元，即由可编程的逻辑门和寄存器组成的逻辑元件。
+
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.7\textwidth]{chapters/clicknp/image/logic-block.pdf}
+	\caption{FPGA 的基本计算单元 -- 逻辑元件（logic element）。}
+	\label{clicknp:fig:logic-block}
+\end{figure}
+
+
+
+如今的 FPGA 除了基本元件，还加入了越来越多的DSP和硬核（hard IP），以提高乘法、浮点运算和访问外围设备的性能。
+FPGA 上的硬核可以支持 DDR、Ethernet、PCIe 等，以连接板上 DRAM、数据中心网络、主机 PCIe 插槽等。
 图 \ref{clicknp:fig:fpga} 显示了本文使用的FPGA板的逻辑图。
 
 
