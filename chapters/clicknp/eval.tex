@@ -192,16 +192,6 @@ IPSec数据面需要使用AES-256-CTR加密和SHA-1身份验证处理IPSec数据
 由于这两个数据块没有依赖关系，因此可以并行处理它们。
 为了实现这一点，本文设计了一个名为 \textit {reservo} 的新元件（保留站的简称），它可以缓冲多达64个数据包，并为SHA-1元件调度独立的块。在计算了一个数据包的签名之后，\textit {reservo} 元件将它发送到将SHA-1 HMAC附加到数据包的下一个元件。
 
-
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.8\textwidth]{image/ReservationStation}
-	\caption{保留站。}
-	\label{clicknp:fig:reservo}
-\end{figure}
-
-
 还有一件棘手的事情。
 虽然SHA-1元件具有固定的延迟，但数据包的总延迟是不同的，即与数据包大小成比例。
 当在SHA-1计算中调度多个分组时，这些分组可能是无序的，例如，大分组后面的较小分组可能更早地完成。
@@ -255,7 +245,7 @@ MUX服务器中需要按流状态。
 但是，访问DDR内存很慢。
 为了提高性能，在BRAM中创建了一个带有16K高速缓存行的4路关联流缓存。最近最少使用（LRU）算法用于替换流缓存中的条目。
 
-在本章的实现中，传入的数据包首先传递一个\textit {解析器}（parser）元件，该元件提取5元组并将它们发送到\textit {流缓存}（flow cache）元件。
+如图 \ref{clicknp:fig:L4LB}，传入的数据包首先传递一个\textit {解析器}（parser）元件，该元件提取5元组并将它们发送到\textit {流缓存}（flow cache）元件。
 如果在流缓存中找不到流，则将数据包的元数据转发到全局流表，该表读取DDR中的完整表。
 如果仍然没有匹配的条目，则该数据包是流的第一个数据包，并且请求被发送到\textit {DIPAlloc}元件，以根据负载平衡策略为该流分配DIP。
 确定DIP后，将一个条目插入到流表中。
@@ -273,7 +263,7 @@ CPU上的\textit {DIPAlloc}，是联合CPU-FPGA处理的另一个例子。
 
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=1.0\textwidth]{image/L4LoadBalance}
+	\includegraphics[width=0.8\textwidth]{image/L4LoadBalancer}
 	\caption{L4 负载均衡器的元件架构。}
 	\label{clicknp:fig:L4LB}
 \end{figure}
@@ -342,24 +332,24 @@ pFabric显示在数据中心中实现接近最佳的流完成时间。
 
 
 
-
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=0.8\textwidth]{image/ShiftRegPrioQueue}
+	\includegraphics[width=0.8\textwidth]{image/PriorityQueue}
 	\caption{移位寄存器优先级队列。}
 	\label{clicknp:fig:ShiftRegPrioQueue}
 \end{figure}
 
+
 本文使用不同的方式来实现pFabric调度程序，它更容易并行化。
 该方案基于\textit{移位寄存器优先级队列}（shift register priority queue） \cite {moon2000scalable}。
-条目以非增加优先级顺序保存在$K$个寄存器中。
+如图 \ref{clicknp:fig:ShiftRegPrioQueue}，条目以非增加优先级顺序保存在$K$个寄存器中。
 出列时，所有条目都向右移动并弹出头部。这只需要1个周期。
 对于入队操作，新数据包的元数据将转发到所有条目。
 现在，对于每个条目，可以在条目中的分组，新分组和相邻条目中的分组之间执行本地比较。
 由于所有局部比较都可以并行进行，因此入队操作也可以在1个周期内完成。
 入队和出队操作可以进一步并行化。
 因此，可以在一个周期中处理分组。
-
+图 \ref{clicknp:fig:pfabric-arch} 显示了 pFabric 流调度器的元件架构。
 
 
 \begin{figure}[htbp]
@@ -369,7 +359,6 @@ pFabric显示在数据中心中实现接近最佳的流完成时间。
 	\label{clicknp:fig:pfabric-arch}
 \end{figure}
 
-例如，可以使用\name 轻松实现pFabric调度程序\cite {pfabric}，并将其应用于本文的测试平台。
 本实验修改了一个软件TCP流生成器\cite {mqecn}，以便在数据包有效负载中放置流优先级，即流的总大小。
 本实验根据\cite {pfabric}中的数据挖掘工作负载生成流，并使用\textit {RateLimit}元件将限制出口端口进一步设置为10~Gbps。
 应用pFabric根据流优先级调度出口缓冲区中的流量。
@@ -385,13 +374,149 @@ pFabric显示在数据中心中实现接近最佳的流完成时间。
 
 \subsection{容错的 LTE SPGW}
 
-\subsection{端口扫描检测}
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=1.0\textwidth]{image/EPC_arch}
+	\caption{LTE 核心网（EPC）加速架构。}
+	\label{clicknp:fig:epc-arch}
+\end{figure}
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=1.0\textwidth]{image/EPC_element}
+	\caption{LTE SPGW 的元件结构。}
+	\label{clicknp:fig:epc-element}
+\end{figure}
+
+300-byte states per flow (bearer connection).
+FPGA BRAM caches 4K flow states.
+On-board DRAM holds 10M flow states.
+
+Capacity:
+10M concurrent bearer connections.
+Data plane (user traffic):
+Throughput: 40M pps (normal case), 20M pps (worst case), can saturate 40 Gbps network in normal case.
+Latency: 4 us (95\% percentile).
+Control plane
+1M add/remove bearers per second.
+CPU-FPGA latency: 1 us (95\% percentile).
+Dump all connection states in 0.8 second.
 
 \subsection{HTTPS RSA 加速}
 
-\subsection{正则表达式匹配}
+我们的Hackathon项目是使用可重新配置的硬件将HTTPS服务器加速20倍。
+
+HTTPS是用于与Web服务进行安全连接的协议。互联网上对用户隐私的日益关注导致大多数Microsoft Web服务通过HTTPS提供访问。在过去的5年中，HTTPS流量的比例每6个月增长40％，现在占所有网络连接的40％以上。
+
+HTTPS提供三件事来确保安全性。首先，它在连接设置期间验证Web服务器的实体。其次，它加密用户和Web服务器之间的数据传输。第三，它检查数据的完整性。在这三种机制中，第一认证部分是计算密集程度最高的部分。
+
+如果没有HTTPS，单个CPU核心每秒可处理超过7,000个请求。使用HTTPS，由于连接设置中的TLS握手，吞吐量下降了35倍。 TLS握手的高计算开销一直是高流量网站部署HTTPS以确保安全性的主要障碍。
+
+在TLS握手中，Web服务器使用私钥执行解密。对于2048位私钥，解密涉及大约800万个整数乘法运算。 CPU核心需要逐个执行乘法运算。 FPGA是一种可重新配置的硬件，具有数千个可并行操作的乘法单元。但是，CPU上的程序可以任意长，而FPGA的存储程序资源非常有限。 TLS证书解析和协议处理很复杂，但需要比解密少得多的计算。因此，我们修改OpenSSL库以将解密卸载到FPGA，并将其他部分保留在CPU上。
+
+我们在Catapult FPGA平台上构建加速器，该平台已部署在Microsoft数据中心。 Catapult FPGA将Bing搜索排名提升了20倍，Azure网络提升了10倍以上。在这个Hackathon中，我们将FPGA应用于HTTPS加速。我们的初步实现可以支持每秒12,000次解密，比单CPU核心快20倍。在功效方面，FPGA的功耗比CPU低3倍。
+
+除了高性能和高功效外，我们的加速器设计还有两个优点。首先，FPGA主要使用低级硬件描述语言编程，这些语言难以编程且难以调试。我们利用Microsoft Research Asia的ClickNP框架，使用高级语言对FPGA进行编程。使用高级语言，软件开发人员还可以编写加速器代码，并且开发效率提高了几倍。
+
+其次，我们以模块化和可扩展的方式构建加速器。加速器需要与数据中心中的其他加速器共同定位，并且私钥大小经过多年的增长以提高安全性。在解密的每个步骤中有多个算法，其中一些算法较慢但占用的资源较少，其中一些算法速度较快但需要更多资源。我们的设计自动探索设计空间，并为给定的资源约束和私钥大小生成具有最佳吞吐量的硬件。
+
+总而言之，我们在可重新配置硬件上的HTTPS加速器将加速HTTPS Web服务器的连接设置20倍。该加速器基于已部署在Microsoft数据中心的Catapult FPGA，因此不需要额外的硬件。借助在数据中心部署的HTTPS加速器，Microsoft将能够以显着降低的成本为最终用户和云客户提供安全的Web服务。
+
+
+
+
+
+
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=1.0\textwidth]{image/https_accelerator}
+	\caption{HTTPS 加速器的元件结构。}
+	\label{clicknp:fig:https-accelerator}
+\end{figure}
+
+\begin{figure}[htbp]
+	\centering
+	\subfloat[修改前的同步调用模式。]{
+		\includegraphics[height=0.3\textwidth]{image/HTTPS_nginx_orig}
+		\label{clicknp:fig:https-nginx-orig}
+	}
+	\hspace{0.02\textwidth}
+	\subfloat[修改后的异步调用模式。]{
+		\includegraphics[height=0.3\textwidth]{image/https_nginx_new}
+		\label{clicknp:fig:https-nginx-new}
+	}
+	\caption{为隐藏加速器计算延迟，对 OpenSSL 软件的异步修改。}
+\end{figure}
+
+CPU   Stratix V     Arria 10
+1.2k  6K            12K
+0.85ms 3.5ms        1.75ms
+
+900 HTTPS without FPGA
+3.5k HTTPS with FPGA
 
 \subsection{神经网络推理}
+
+神经网络图
+
+三种类型的 sparse 矩阵，每个是 128 维向量。input sample 每种类型有 ncol 个 feature，要取出来相加。相加之后经过非线性模块，如 tanh(x + bias)。128 * 3 个 feature。再加上 128 个 dense feature，共 640 个 dense feature。
+
+三层 dense：
+640*128: no skip
+128*640: relu(tree + bias + residue)
+640*64: no skip
+64*640: relu(tree + bias + residue)
+
+\begin{table}[htbp]
+	\centering
+	\caption{不同稠密层并行度下神经网络推理的延迟。}
+	\label{clicknp:tab:neural-network}
+	\small
+	\begin{tabular}{l|r}
+		\toprule
+		稠密层并行度 & 每样本延迟 ($\mu$s) \\
+		\midrule
+		8 & 188.2 \\
+		16 & 98.2 \\
+		32 & 49.3 \\
+		64 & 26.1 \\
+		128 & 17.5 \\
+		256 & 资源不足 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+
+Throughput (10,000 samples in a batch): 17.5 us per sample
+
+Throughput bottleneck is DenseLayers
+Latency (1 sample in a batch): 29.6 us
+PCIe I/O: 4 us (PCIe I/O has much lower latency than OpenCL API (1.8 ms))
+Sparse layers: 5 us
+Rowstack: 3 us
+Dense layers: 17.5 us
+
+Latency breakdown of the 17.5 us version (170.9 MHz):
+1.	Computation. 640*128, 128*640, 640*64, 64*640 takes 5*128 + 1*640 + 5*64 + 1*640 = 2240 cycles (13.1 us).
+
+
+2.	Communication. This is overlapped with computation.
+3.	Denselayers pipeline latency. 144 cycles per layer, total 576 cycles (3.4 us).
+
+
+The 4 layers have 640*128 + 128*640 + 640*64 + 64*640 = 245760 float multiplications. 
+
+The latency breakdown is:
+1.	Computation. 640*128, 128*640, 640*64, 64*640 takes 1280 + 1280 + 640 + 640 = 3840 cycles (this 18.8 us is base latency)
+2.	Communication. Input, output and channel transfer takes 640 + 128 + 640 + 64 + 640 = 2112 cycles
+3.	Dense\_layers pipeline latency. 139 cycles per layer, total 556 cycles.
+The total latency is 6508 cycles (31.9 us), slightly higher than 30.9 us measured latency. This is because computation, communication and pipeline latency are overlapped in the pipeline.
+
+
 
 \egg{
 \textbf{Stateful L4 load balancer.} We compare our ClickNP implementation with Linux Virtual Server (LVS) \cite{lvs} using both real-world traffic trace on a L4 load balancer \cite{gandhi2014duet} and synthetic traces to simulate adversary scenarios.
