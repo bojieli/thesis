@@ -51,11 +51,21 @@ KV-Direct的主要用例是启用远程直接键值访问，而无需服务器�
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.9\textwidth]{figure/kvdirect_photo.jpg}
-	\caption{以 357 瓦功耗实现 12.2 亿次 键值 操作每秒的 10 卡 KV-Direct 系统。}
+	\caption{以 357 瓦功耗实现 12.2 亿次键值操作每秒的 10 卡 KV-Direct 系统。}
 	\label{kvdirect:fig:photo}
 \end{figure}
 
-为了使两个Xeon E5 CPU的80个PCIe Gen3通道饱和，用带有10个PCIe Gen3 x8插槽的 SuperMicro X9DRX+-F 主板替换了基准测试服务器的主板（\S\ref {kvdirect:sec:eval}） 。
+为了使两个Xeon E5 CPU的80个PCIe Gen3通道饱和，用带有10个PCIe Gen3 x8插槽的 SuperMicro X9DRX+-F 主板替换了基准测试服务器的主板，PCIe 拓扑如图 \ref{kvdirect:fig:pcie_topology} 所示。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.5\textwidth]{figure/pcie_topology.PNG}
+	\caption{10 卡 KV-Direct 系统的 PCIe 拓扑图。}
+	\label{kvdirect:fig:pcie_topology}
+\end{figure}
+
+
 使用PCIe x16到x8转换器连接每个插槽上的10个可编程网卡，每个网卡上只启用一个PCIe Gen3 x8链路，因此每个网卡的吞吐量低于图 \ref {kvdirect:fig:ycsb-tput}。
 每个网卡在主机内存中拥有一个独占内存区域，并提供不相交的键分区。
 多个网卡遇到与多核键值存储实现相同的负载不平衡问题。
