@@ -16,9 +16,6 @@
 元件也可以编译为CPU二进制文件，管理器线程将为每个主机元件创建一个工作线程。
 主机和FPGA元件之间的每个连接都映射到PCIe I / O通道的\textit {插槽}（\S \ref {clicknp:subsec:pcie}）。
 
-\iffalse
-\textbf{图：ClickNP element，channel，signal 菊花链，command hub 的示例}
-\fi
 
 本章的硬件平台基于Altera Stratix V FPGA和Catapult shell \cite {putnam2014reconfigurable}。
 Catapult shell还包含一个OpenCL特定的运行时（BSP）。\name 用户逻辑通过 BSP 与shell通信。
@@ -149,9 +146,23 @@ Catapult shell \cite {putnam2014reconfigurable}中的PCIe插槽DMA引擎将PCIe 
 PCIe通道可以在中断或轮询模式下工作。
 
 
+\iffalse
+\textbf{图：ClickNP element，channel，signal 菊花链，command hub 的示例}
+\fi
+
 在FPGA中，一个名为\textit {CmdHub}的特殊元件由\name 编译器自动生成，使用FIFO缓冲区将数据从不同的插槽重定向到相应的FPGA元件。
 \textit {CmdHub}还用于将控制信号从管理器线程分发到FPGA元件。
 为了识别目标元件，在信号消息中嵌入元件ID，并且\textit {CmdHub}可以读取ID并再次通过FIFO缓冲器将信号消息转发到相应的元件。
+
+ClickNP 支持灵活的 I/O 操作。如图 \ref{clicknp:fig:pcie-io} 所示。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{image/pcie-io}
+	\caption{PCIe I/O 通道的架构。}
+	\label{clicknp:fig:pcie-io}
+\end{figure}
 
 图 \ref {clicknp:fig:pcie} 显示了具有不同插槽数和批量大小的PCIe I / O通道的基准。
 作为基线，还测量了OpenCL全局内存操作的性能 - 到目前为止，这是OpenCL \cite {opencl}中为CPU / FPGA通信提供的唯一方法。
