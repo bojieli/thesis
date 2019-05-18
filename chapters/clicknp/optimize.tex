@@ -192,60 +192,14 @@ S2: A[idx].cnt ++;
 \textbf{新内容：元件之间共享内存，存储类型标识符 global / static / register。}
 \fi
 
-\egg{
 \begin{figure}
-\lstset{style=numbers}
 
-\lstset{ emph={%
- element, init, state, handler, signal,include,state\_machine, goto_state
-}, emphstyle={\bfseries},
-morekeywords={get_input_port,read_input_port,from_tor, to_tor, set_port_output, host, begin, VLAN, IPv4, GRE} 
-}
-\centering
-
-\begin{tabular}{c|c}
-% left
-\begin{tabular}[t]{c}
-\scriptsize 
-\begin{lstlisting}[escapechar=@]
-struct hash_entry
-{
-    ulong key;
-    ulong val;
-} A[100];
-
-.handler {
-   ...
-   idx = hash (h);
-   @\textbf{k = A[idx].key;}@
-   @\textbf{v = A[idx].val;}@
-   if (h == k) 
-      ret = v;
-   ...
-}
-\end{lstlisting} \\
-\normalsize (a) \vspace{10pt} \\
-\includegraphics[width=.2\textwidth]{mix.jpg} \\
-\normalsize (b) \vspace{10pt} \\
 \includegraphics[width=.15\textwidth]{fsm1.jpg} \\
-\normalsize (d) \\
-\end{tabular}
-&
-\raisebox{-150pt}{
-\begin{tabular}{c}
-\input{fsmlst} \\
-\normalsize (c) \vspace{10pt} \\
 \includegraphics[width=.2\textwidth]{fsm2.jpg} \\
-\normalsize (e) \\
-\end{tabular}
-}
 
-\end{tabular}
-
-\caption{Memory scattering (a, b) and FSM expansion (c-e). }
-\label{clicknp:fig:memscattering}
+\caption{FSM expansion. }
+\label{clicknp:fig:fsm-expansion}
 \end{figure}
-}
 
 \subsubsection{平衡流水级}
 理想情况下，一个处理管道中的每个阶段应当具有相同的速度。即，在一个时钟周期处理数据。
@@ -333,7 +287,6 @@ S2:} else {
 \end{figure}
 
 
-\egg{
 \smalltitle{Expand code.} \name\ provides several tools to help programmers to expand code, trading off FPGA area for speed.
 One common code expansion is to unroll loops. Additionally, \name\ provides \textit{.repeat} directive to expand code according to
 a template.
@@ -345,23 +298,4 @@ Second, it also expends the FSM to get more parallelism.
 For example, Figure~\ref{clicknp:fig:memscattering}(d) shows the parsing tree that is described according to the code piece in Figure~\ref{clicknp:fig:memscattering}(c).
 But \name\ compiler can automatically expends the FSM to an equivalent, but much flattened FSM, as shown in Figure~\ref{clicknp:fig:memscattering}(e). Now every header can be parsed in one cycle -- all parsing paths can be evaluated in parallel, 
 instead of up to 4 cycles (Figure~\ref{clicknp:fig:memscattering}(d)).
-}
 
-\egg{
-\subsubsection{Explict pipeline control}
-\label{clicknp:subsubsec:pipeline-control}
-
-While commercial 高层次综合 tools can automatically generate pipeline structure, it is not always perfect. 
-One issue that we are facing occasionally is that 高层次综合 tools may too aggressively use large block of combinational logic 
-to implement operations in a handler function.
-Although packing more operations in a combinational logic makes all these operations be evaluated in parallel in one clock,
-it may also reduce the clock frequency of the FPGA as the frequency is restricted by the delay of the logic block, and larger
-the block, longer the delay.
-%
-For example, Figure~\ref{clicknp:fig:pipeline-control}(a) shows such an example. The code snippet selects the maximal value from
-a set of registers (as we will show later, this is a foundation for priority scheduling).
-Since all data are in registers, most 高层次综合 tools will aggressively use a large block of combinational logic to implement, so that
-all \textbf{if} operations are evaluated in one clock cycle. However, this will cause a low frequency of xxx MHz. 
-As shown in Figure~
-
-}
