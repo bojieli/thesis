@@ -64,34 +64,6 @@ RDMA 网卡需要处理来自主机的控制和数据传输命令（工作请求
 
 上述处理流程的性能挑战是单个时钟周期内很难完成一个工作请求的有状态处理（如拥塞控制），而同一个连接的工作请求不能并行处理，从而降低了单连接吞吐量。解决方案是将工作请求的处理流水线（pipeline）化，每个流水级（stage）处理连接状态的不同部分，因此流水级之间没有数据依赖。在每个流水级内设置第 \ref{chapter:kvdirect} 章的数据转发（data forwarding）机制，使尚未写回请求调度器的状态更新对后续的工作请求可见。这样，同一个连接有依赖关系的多个工作请求可以在不同的流水级间并发处理。对于这类可以通过流水线和数据转发解决的依赖，请求调度器就不必记录依赖关系，而是认为所有此类请求都是不相关的。
 
-图 \ref{socksdirect:fig:eval-connnum-tput} 显示了不同并发连接数量下的单核吞吐量。
-测试前预先建立指定数量的连接，然后轮流（round-robin）使用这些连接以乒乓（ping-pong）的模式收发数据。
-\sys{} 可以用 4 GB 的可编程网卡 DRAM 内存支持 100 M 条并发连接，并且在如此高的并发度下吞吐量不降低。
-作为对比，RDMA、LibVMA 和 Linux 的性能随连接数量的增加而迅速降低。
-对于 RDMA，性能在超过 512 条并发连接后迅速降低，这是由于 RDMA 传输层状态占满了网卡缓冲区。
-尽管 LibVMA 和 Linux 并不使用 RDMA 作为传输层，它们为每条连接维护缓冲区，因此在数千条并发连接时会导致 CPU 缓存和 TLB 不命中。
-此外，LibVMA 在网卡中为每个连接安装了一条连接重定向规则（flow steering rule），这也会导致网卡缓存不命中。
-
-\begin{figure}[htbp]
-	\centering
-	\subfloat[单机内吞吐量。]{                    
-		%\begin{minipage}{0.4\textwidth}
-		\centering
-		\includegraphics[width=0.5\textwidth]{eval/microbenchmark/connnum-ipc-tput.pdf}
-		\label{socksdirect:fig:eval-connnum-ipc-tput}
-		%\end{minipage}
-	}
-	\subfloat[跨主机吞吐量。]{
-		%\begin{minipage}{0.4\textwidth}
-		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/connnum-network-tput.pdf}
-		\label{socksdirect:fig:eval-connnum-network-tput}
-		%\end{minipage}
-	}
-	
-	\caption{不同并发连接数量下的单核吞吐量。}
-	\label{socksdirect:fig:eval-connnum-tput}
-\end{figure}
-
 
 \subsection{基于 CPU 的传输层}
 
@@ -124,13 +96,12 @@ Each message in the ring buffer consists of an 8-byte header and a variably size
 \begin{figure}[htbp]
 	\centering
 	\subfloat[传统队列结构。]{
-		\includegraphics[width=0.4\textwidth]{images/fork_linux}
+		\includegraphics[width=0.6\textwidth]{images/fork_linux}
 	}
-	
+
 	\subfloat[多套接字共享队列结构。]{
-		\includegraphics[width=0.4\textwidth]{images/fork_rdwr}
+		\includegraphics[width=0.6\textwidth]{images/fork_rdwr}
 	}
-	
 	\caption{队列结构的比较。 假设发送者和接收者各有两个线程。 首先，\ sys {}在每对发送方和接收方线程之间创建对等队列。 我们不是用锁来保护队列，而是将每个文件描述符指定给接收者线程以确保排序。 其次，来自所有连接（文件描述符）的数据通过共享队列进行多路复用，而不是每个文件描述符一个队列。}
 	\label{socksdirect:fig:fork-rdwr}
 \end{figure}
@@ -188,6 +159,34 @@ A receiver will always retrieve messages in the emergency queue immediately.
 %Upon \texttt{recv}, the payload buffer is remapped to application.
 
 
+
+图 \ref{socksdirect:fig:eval-connnum-tput} 显示了不同并发连接数量下的单核吞吐量。
+测试前在两个主机间预先建立指定数量的连接，然后轮流（round-robin）使用这些连接以乒乓（ping-pong）的模式收发数据。
+\sys{} 可以用 4 GB 的可编程网卡 DRAM 内存支持 100 M 条并发连接，并且在如此高的并发度下吞吐量不降低。
+作为对比，RDMA、LibVMA 和 Linux 的性能随连接数量的增加而迅速降低。
+对于 RDMA，性能在超过 512 条并发连接后迅速降低，这是由于 RDMA 传输层状态占满了网卡缓冲区。
+尽管 LibVMA 和 Linux 并不使用 RDMA 作为传输层，它们为每条连接维护缓冲区，因此在数千条并发连接时会导致 CPU 缓存和 TLB 不命中。
+此外，LibVMA 在网卡中为每个连接安装了一条连接重定向规则（flow steering rule），这也会导致网卡缓存不命中。
+
+\begin{figure}[htbp]
+	\centering
+	\subfloat[单机内吞吐量。]{                    
+		%\begin{minipage}{0.4\textwidth}
+		\centering
+		\includegraphics[width=0.5\textwidth]{eval/microbenchmark/connnum-ipc-tput.pdf}
+		\label{socksdirect:fig:eval-connnum-ipc-tput}
+		%\end{minipage}
+	}
+	\subfloat[跨主机吞吐量。]{
+		%\begin{minipage}{0.4\textwidth}
+		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/connnum-network-tput.pdf}
+		\label{socksdirect:fig:eval-connnum-network-tput}
+		%\end{minipage}
+	}
+	
+	\caption{不同并发连接数量下的单核吞吐量。}
+	\label{socksdirect:fig:eval-connnum-tput}
+\end{figure}
 
 
 
