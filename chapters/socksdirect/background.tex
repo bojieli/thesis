@@ -33,72 +33,11 @@
 %	\label{socksdirect:fig:socket-comparison}
 %\end{figure}
 
-\iffalse
-\begin{table*}[htbp]
-	\centering
-	\begin{tabular}{ll|ll|ll|ll}
-		\hline
-		\multicolumn{2}{c|}{Initialization} &
-		\multicolumn{2}{c|}{Connection Mgmt} &
-		\multicolumn{2}{c|}{Data Transmission} &
-		\multicolumn{2}{c}{Process Mgmt} \\
-		\hline
-		API & Cat. &
-		API & Cat. &
-		API & Cat. &
-		API & Cat. \\
-		\hline
-		\hline
-		\textbf{socket} & Local &
-		\textbf{connect} & NoPart &
-		\textbf{send(to,(m)msg)} & P2P &
-		\textit{(v)fork} & NoPart \\
-		\hline
-		bind & NoPart &
-		\textbf{accept(4)} & P2P &
-		\textbf{recv(from,(m)msg)} & P2P &
-		\textit{pthread\_create} & NoPart \\
-		\hline
-		listen & NoPart &
-		\textbf{\textit{fcntl, ioctl}} & Local &
-		\textbf{\textit{write(v)}} & P2P &
-		\textit{clone} & NoPart \\
-		\hline
-		socketpair & Local &
-		\textbf{(get,set)sockopt} & Local &
-		\textbf{\textit{read(v)}} & P2P &
-		\textit{execve} & NoPart \\
-		\hline
-		getsockname  & Local &
-		\textbf{\textit{close}, shutdown} & P2P &
-		\textbf{\textit{memcpy}} & Local &
-		\textit{exit} & P2P \\
-		\hline
-		\textbf{\textit{malloc}} & Local &
-		getpeername & Local &
-		\textit{(p)select} & P2P &
-		\textit{sleep} & P2P \\
-		\hline
-		\textbf{\textit{realloc}} & Local &
-		\textit{dup(2)} & P2P &
-		\textit{(p)poll} & P2P &
-		\textit{daemon} & P2P \\
-		\hline
-		\textit{epoll\_create} & Local &
-		\textbf{\textit{epoll\_ctl}} & Local &
-		\textbf{\textit{epoll\_(p)wait}} & P2P &
-		\textit{sigaction} & Local \\
-		\hline
-	\end{tabular}
-	\caption{Linux APIs that are related to socket and intercepted by \libipc{}. Categories include local, peer-to-peer (P2P) and non-partitionable (NoPart). APIs in \textit{italic} indicate usages besides socket. APIs in \textbf{bold} are called relatively more frequently.}
-	
-	\label{socksdirect:tab:socket-api}
-\end{table*}
-\fi
+套接字（socket）是应用程序，容器和主机之间的标准通信原语。
+图 \ref{socksdirect:fig:socket-pseudo-code} 示意了使用套接字原语的典型服务器应用程序的伪代码。首先，服务器
 
-\iffalse
-\begin{figure}
-\begin{lstlisting}[style=CStyle]
+\begin{figure}[htbp]
+\begin{lstlisting}[style=myCStyle]
 int lfd = socket(...); // listen file descriptor (fd)
 bind(lfd, listen_addr_and_port, ...);
 listen(lfd, BACKLOG);
@@ -130,14 +69,11 @@ while (true) { // main event loop
 }
 \end{lstlisting}
 
-\caption{Pseudo-code of a typical socket server application, showing most important socket operations. A socket connection is a FIFO byte-stream channel identified by an integer \emph{file descriptor} (文件描述符). Linux enables a readiness-driven I/O multiplexing model, in which the OS tells application which 文件描述符 are ready to receive or send, then the application may prepare buffers and issue socket operations.}
+\caption{典型套接字服务器应用程序的伪代码，显示最重要的套接字操作。 套接字连接是由整数\emph {FD}（文件描述符）标识的FIFO字节流通道。 Linux使用就绪驱动的I/O多路复用模型，其中操作系统告诉应用程序哪些文件描述符已准备好接收或发送，然后应用程序可以准备缓冲区并发出套接字操作。}
 \label{socksdirect:fig:socket-pseudo-code}
-
 \end{figure}
-\fi
 
 
-Socket（套接字）是应用程序，容器和主机之间的标准通信原语。
 现代数据中心网络具有微秒级基本延迟和数十Gbps吞吐量。 但是，传统的Linux套接字是在具有共享数据结构的操作系统内核空间中实现的，这使得套接字成为在多个主机上运行的通信密集型应用程序的众所周知的瓶颈 \cite {barroso2017attack}。 除了主机间通信之外，同一主机上的云应用程序和容器经常相互通信，使得主机内套接字通信在云时代变得越来越重要。 在压力测试下，Nginx~ \cite {reese2008nginx}，Memcached~ \cite {fitzpatrick2004distributed}和Redis~ \cite {carlson2013redis}等应用程序在内核中消耗50％到90％的CPU时间，主要处理TCP套接字操作 \cite{jeong2014mtcp}。
 
 要了解套接字的成本，首先需要了解套接字的功能。

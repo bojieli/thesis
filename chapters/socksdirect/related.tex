@@ -18,7 +18,7 @@ RDMA 的可扩展性归结为两个问题。
 传统网络协议栈在操作系统内核实现服务质量保证。
 而对于本章使用的硬件传输协议，将数据平面性能隔离和拥塞控制卸载到 RDMA 网卡上是一个越来越流行的研究方向 \cite {peter2016arrakis,zhu2015congestion,lu2017memory,mprdma,mittal2018revisiting}，因为数据中心的网卡正变得越来越可编程  \cite{smartnic,cavium,kaufmann2015flexnic,mellanox-innova,mellanox-bluefield}，而且公有云已经在虚拟机之外的网络功能中提供了 QoS \cite {li2016clicknp,panda2016netbricks,floem-osdi18}。
 
-连接数可扩放性需要存储每连接的状态。核心挑战是存储并高效访问大量连接的状态。接下来的两节提出两种方案：在可编程网卡中或主机 CPU 的用户态库中存储连接状态并实现传输层处理。
+连接数可扩放性需要存储每个连接的传输层和数据包缓冲区。针对传输层状态问题，接下来的两节提出两种方案：在可编程网卡中或主机 CPU 的用户态库中存储连接状态并实现传输层处理。针对数据包缓冲区问题，最后一节提出多套接字共享队列，将两个进程间多个连接的缓冲区合并。
 
 \subsection{基于可编程网卡的传输层}
 \label{socksdirect:sec:smartnic}
@@ -65,6 +65,12 @@ RDMA 网卡需要处理来自主机的控制和数据传输命令（工作请求
 上述处理流程的性能挑战是单个时钟周期内很难完成一个工作请求的有状态处理（如拥塞控制），而同一个连接的工作请求不能并行处理，从而降低了单连接吞吐量。解决方案是将工作请求的处理流水线（pipeline）化，每个流水级（stage）处理连接状态的不同部分，因此流水级之间没有数据依赖。在每个流水级内设置第 \ref{chapter:kvdirect} 章的数据转发（data forwarding）机制，使尚未写回请求调度器的状态更新对后续的工作请求可见。这样，同一个连接有依赖关系的多个工作请求可以在不同的流水级间并发处理。对于这类可以通过流水线和数据转发解决的依赖，请求调度器就不必记录依赖关系，而是认为所有此类请求都是不相关的。
 
 图 \ref{socksdirect:fig:eval-connnum-tput} 显示了不同并发连接数量下的单核吞吐量。
+测试前预先建立指定数量的连接，然后轮流（round-robin）使用这些连接以乒乓（ping-pong）的模式收发数据。
+\sys{} 可以用 4 GB 的可编程网卡 DRAM 内存支持 100 M 条并发连接，并且在如此高的并发度下吞吐量不降低。
+作为对比，RDMA、LibVMA 和 Linux 的性能随连接数量的增加而迅速降低。
+对于 RDMA，性能在超过 512 条并发连接后迅速降低，这是由于 RDMA 传输层状态占满了网卡缓冲区。
+尽管 LibVMA 和 Linux 并不使用 RDMA 作为传输层，它们为每条连接维护缓冲区，因此在数千条并发连接时会导致 CPU 缓存和 TLB 不命中。
+此外，LibVMA 在网卡中为每个连接安装了一条连接重定向规则（flow steering rule），这也会导致网卡缓存不命中。
 
 \begin{figure}[htbp]
 	\centering
@@ -96,6 +102,90 @@ RDMA 网卡需要处理来自主机的控制和数据传输命令（工作请求
 
 
 
+
+
+\subsection{多套接字共享队列}
+\label{socksdirect:subsec:multiplex-conn}
+
+很多应用在两个进程间建立多个套接字连接。
+
+
+
+
+%\textbf{Multiplex connections in event-driven applications.}
+To reduce memory footprint and improve locality of memory accesses, we use one queue to multiplex all connections between a pair of threads. Each data item in the queue is marked with its 文件描述符. By using a single queue, we reduce per-socket memory footprint, random memory accesses and cache misses.
+
+\textbf{Message format.}
+As shown in Figure~\ref{socksdirect:fig:locklessq-structure}, the main component of the queue is a \emph{data ring buffer}, where messages are stored back-to-back.
+Each message in the ring buffer consists of an 8-byte header and a variably sized payload. The header consists of an \textit{isvalid} flag, an opcode, the receiver's 文件描述符 number and the payload size. Messages are aligned to 8 bytes to ensure header write atomicity.% and accelerate payload copy.
+
+
+
+\begin{figure}[htbp]
+	\centering
+	\subfloat[传统队列结构。]{
+		\includegraphics[width=0.4\textwidth]{images/fork_linux}
+	}
+	
+	\subfloat[多套接字共享队列结构。]{
+		\includegraphics[width=0.4\textwidth]{images/fork_rdwr}
+	}
+	
+	\caption{队列结构的比较。 假设发送者和接收者各有两个线程。 首先，\ sys {}在每对发送方和接收方线程之间创建对等队列。 我们不是用锁来保护队列，而是将每个文件描述符指定给接收者线程以确保排序。 其次，来自所有连接（文件描述符）的数据通过共享队列进行多路复用，而不是每个文件描述符一个队列。}
+	\label{socksdirect:fig:fork-rdwr}
+\end{figure}
+
+\iffalse
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{images/locklessq_new}
+	
+	\caption{The structure of an inter-process queue.}
+	
+	\label{socksdirect:fig:locklessq-structure}
+\end{figure}
+\fi
+
+\textbf{Event polling.}
+We maintain a bitmap of each epoll 文件描述符 set.
+When \texttt{epoll\_wait} is called, we scan all data queues round-robin and check the 文件描述符 of each data message against the bitmap. If the 文件描述符 is in the bitmap, an event is returned to the application.
+A global cursor exists to resume data queue scanning from the last position in the last scanned queue.
+
+A per-queue cursor records the last scanned position in each queue to avoid scanning a message multiple times.
+To speedup repeated receive operations of a specific 文件描述符, we build a linked list of messages for each 文件描述符 as a side product of event polling.
+Each 文件描述符 maintains positions of the first and last scanned but unread messages of the 文件描述符.
+When a new message of the 文件描述符 is scanned, the \emph{nextptr} pointer in the last message is updated to point to the new message.
+
+To poll events from sockets and other 文件描述符 (handled by kernel) at the same time, \libipc{} creates an \textit{epoll thread} in each process to wait on all 文件描述符 handled by kernel. When it receives a kernel event, it broadcasts the event to application threads via shared memory queues. %\texttt{Epoll\_wait} in \libipc{} will return such kernel events in addition to socket events. %Note that Linux allows an event to be received by multiple threads sharing the 文件描述符.
+
+\textbf{Pick from middle of queue.}
+In order to support receiving data from a specific 文件描述符, the queue needs to support picking a message in the middle with a specific 文件描述符.
+Fortunately, this does not happen frequently. Event-driven applications typically process incoming events in a FIFO order. For \texttt{epoll\_wait} in level trigger mode, we iterate through all messages in the queue and return those in the set of registered 文件描述符. When applications call \texttt{recv}, \libipc{} would usually dequeue the message at head.
+
+To pick from middle of queue, receiver traverses messages in the ring buffer. During traversal, receiver iterates messages from \textit{head} until free space in ring buffer, determined by \textit{isvalid}. Hence, receiver cannot clear \textit{isvalid} when a non-head message is dequeued. That's why each message has an \textit{isdel} flag. When a message is dequeued from the middle, its \textit{isdel} is set. %If the message at \textit{head} has \textit{isdel} set, the receiver advances \textit{head} and repeats this step.
+
+\textbf{Head-of-line blocking.}
+%Second, if application does not receive from a 文件描述符 for a long time, data items of the 文件描述符 may fill up the queue and starve other 文件描述符.
+If application does not receive from a 文件描述符 for a long time, the empty space in queue will become fragmented.
+When data queue is full, the sender sends a message via emergency queue to trigger garbage collection in the receiver.
+The receiver scans empty space in the middle of queue and moves remaining messages, so that empty space can be returned to the sender.
+%To avoid starvation, we need at least one byte of headroom per 文件描述符. Accordingly, we design a single byte \textit{headroom slot} per 文件描述符. When data queue is full and the per-文件描述符 headroom slot is free, sender uses it and sends a notification via emergency queue. Receiver receives from data queue first, then from the headroom slot if it received a notification.
+
+\textbf{Emergency queue.}
+Control messages may need to be delivered out-of-band when the queue is full. For example, in order to close the receive direction while sending data, the shutdown message should not be blocked by unconsumed data in the queue. To this end, we add an \textit{emergency queue} alongside each data queue.
+A receiver will always retrieve messages in the emergency queue immediately.
+
+
+%\subsubsection{Zero Copy TCP}
+%\label{socksdirect:subsec:zero-copy-tcp}
+%
+%For TCP connections, we optimize the user-space TCP/IP stack to remove memory copy between \libipc{} and 网卡.
+%Because the payloads of sent and received packets need to align at 4~KiB page boundary, we leverage scatter-gather support in modern 网卡s~\cite{mellanox} to separate packet header from application payload.
+%%During initialization, \libipc{} queries IP and Ethernet MAC address from the kernel and constructs a packet header template.
+%For \texttt{send}, \libipc{} constructs a packet header to a 网卡 send work request, then fills in the payload buffer address from application. 
+%For receiving data, in background, \libipc{} issues 网卡 receive work requests with a 54-byte buffer to store Ethernet, IPv4 and TCP headers, followed by a page-aligned buffer to store payload.
+%%In corner cases where the received header length is not 54 bytes, \libipc{} reassembles the packet.
+%Upon \texttt{recv}, the payload buffer is remapped to application.
 
 
 

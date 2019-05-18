@@ -119,11 +119,7 @@ LibVMA只是将内核TCP套接字用于主机内部。
 
 \subsubsection{多核可扩放性}
 
-%Figure~\ref{socksdirect:fig:eval-connnum-tput} shows the throughput with different number of concurrent connections.
-%We establish connections between two processes before testing, then send and receive data from the connections in a round-robin order.
-%\sys  can support more than 100 million concurrent connections with 16~GiB of memory, and the throughput does not degrade under such high concurrency.
-%\sys  achieves connection stability by multiplexing connections via a single queue.
-%In comparison, the performance of RDMA, LibVMA and Linux drops quickly as the number of connections increase. There is a sharp performance drop with more than 512 RDMA connections, because the RDMA transport states saturate the 网卡 cache. Although LibVMA and Linux do not use RDMA as transport, they maintain per-文件描述符 buffers, which lead to CPU cache and TLB miss with thousands of connections. Furthermore, LibVMA installs flow steering rules to 网卡 for each connection, which also leads to 网卡 cache miss.
+
 
 
 

@@ -75,33 +75,19 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 
 其次，每个队列可以在\textit {polling}和\textit {interrupt}模式之间切换。监视器的队列始终处于轮询模式。每个队列的接收者维护一个连续空轮询的计数器。当它超过阈值时，接收器向发送器发送消息，通知队列正在进入中断模式，并在短时间后停止轮询。当发送方以中断模式写入队列时，它还会通知监视器，监视器将通知接收方恢复轮询。
 
-
 %\RED{Need a performance comparison figure of ring buffer architectures. (traditional ring buffer, new ring buffer, intra, inter, x axis: msg size, y axis: throughput)}
+
+
 
 \subsection{零拷贝}
 \label{socksdirect:subsec:zerocopy}
 
-\begin{figure}[t]
-	\centering
-	\subfloat[服务器内SHM。 1）获取物理页面并设置写入时复制; 2）通过SHM发送页面地址; 3）映射收到的页面; 4）（可选）在发送者写入/ memcpy / recv时重新映射。]{
-		\includegraphics[width=0.44\textwidth]{images/zerocopy_intra}
-		\label{socksdirect:fig:zerocopy-intra}
-	}
-	\hspace{0.02\textwidth}
-	\subfloat[服务器间RDMA。 1）获取物理页面并设置写入时复制; 2）从池中获取免费页面; 3）通过RDMA发送数据; 4）通过RDMA发送页面地址; 5）地图收到的页面; 6）将未映射的页面返回到池。]{
-		\includegraphics[width=0.42\textwidth]{images/zerocopy_inter}
-		\label{socksdirect:fig:zerocopy-inter}
-	}
-	
-	\caption{发送零拷贝页面的过程。}
-\end{figure}
 
-
-正如第 \ref {socksdirect:subsec:per-byte-overhead} 节所讨论的，零拷贝的主要挑战是维护套接字API的语义。
+零拷贝的主要挑战是维护套接字API的语义。
 幸运的是，虚拟内存提供了一个间接层，许多相关工作利用了这种\emph {页面重映射}（page remapping）技术，从而可以将物理页面从发件人的虚拟地址重新映射到接收者，而不是复制。
 Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数据页设置为写时复制。
 但是，许多应用程序经常覆盖发送缓冲区，因此写时复制机制只是将复制从\texttt {send}时间延迟到第一次覆盖时间。
-为了实现零拷贝接收，20年前，BSD~ \cite {thadani1995efficient}和Solaris~ \cite {chu1996zero}将应用缓冲区的虚拟页面重新映射到系统缓冲区的物理页面。但是，正如Table~ \ref {socksdirect:tab:operation-performance}所示，在现代CPU上，由于内核交叉和TLB刷新成本，映射一个页面的成本甚至比复制它更高。
+为了实现零拷贝接收，20年前，BSD~ \cite {thadani1995efficient}和Solaris~ \cite {chu1996zero}将应用缓冲区的虚拟页面重新映射到系统缓冲区的物理页面。但是，如表 \ref {socksdirect:tab:operation-performance} 所示，在现代CPU上，由于内核交叉和TLB刷新成本，映射一个页面的成本甚至比复制它更高。
 最近，许多高性能TCP / IP堆栈 \cite {han2012megapipe,yasukata2016stackmap}和socket-to-RDMA库 \cite {rsockets,socketsdirect}提供标准套接字API和备用零拷贝API，但它们都没有实现标准API的零拷贝。
 此外，没有现有的工作支持主机内套接字的零拷贝。
 
@@ -141,6 +127,22 @@ Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数
 \libipc {}还跟踪收到的零拷贝页面的来源。
 当页面未映射时，如果它来自另一个进程，\libipc {}会通过消息将页面返回给所有者。
 
+
+\begin{figure}[htbp]
+	\centering
+	\subfloat[服务器内SHM。 1）获取物理页面并设置写入时复制; 2）通过SHM发送页面地址; 3）映射收到的页面; 4）（可选）在发送者写入/ memcpy / recv时重新映射。]{
+		\includegraphics[width=0.44\textwidth]{images/zerocopy_intra}
+		\label{socksdirect:fig:zerocopy-intra}
+	}
+	\hspace{0.02\textwidth}
+	\subfloat[服务器间RDMA。 1）获取物理页面并设置写入时复制; 2）从池中获取免费页面; 3）通过RDMA发送数据; 4）通过RDMA发送页面地址; 5）地图收到的页面; 6）将未映射的页面返回到池。]{
+		\includegraphics[width=0.42\textwidth]{images/zerocopy_inter}
+		\label{socksdirect:fig:zerocopy-inter}
+	}
+	\caption{发送零拷贝页面的过程。}
+\end{figure}
+
+
 \textbf {通过SHM安全发送页面地址。}
 对于主机内部套接字，在用户空间队列中的消息中发送物理页面地址，如图 \ref {socksdirect:fig:zerocopy-intra} 中的步骤2所示。
 \sys{} 必须防止未经发送端允许的任意页面映射。
@@ -158,16 +160,6 @@ Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数
 %If the OS runs out of memory, \libipc{} unpins pages to reclaim memory.
 %For security, kernel validates that page numbers are in the huge-page receive buffer.
 
-%\subsubsection{Zero Copy TCP}
-%\label{socksdirect:subsec:zero-copy-tcp}
-%
-%For TCP connections, we optimize the user-space TCP/IP stack to remove memory copy between \libipc{} and 网卡.
-%Because the payloads of sent and received packets need to align at 4~KiB page boundary, we leverage scatter-gather support in modern 网卡s~\cite{mellanox} to separate packet header from application payload.
-%%During initialization, \libipc{} queries IP and Ethernet MAC address from the kernel and constructs a packet header template.
-%For \texttt{send}, \libipc{} constructs a packet header to a 网卡 send work request, then fills in the payload buffer address from application. 
-%For receiving data, in background, \libipc{} issues 网卡 receive work requests with a 54-byte buffer to store Ethernet, IPv4 and TCP headers, followed by a page-aligned buffer to store payload.
-%%In corner cases where the received header length is not 54 bytes, \libipc{} reassembles the packet.
-%Upon \texttt{recv}, the payload buffer is remapped to application.
 
 \subsection{事件通知}
 \label{socksdirect:subsec:process-mux}
@@ -302,13 +294,6 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 一个棘手的问题是接收的数据包被传递到原始套接字和内核网络堆栈，并且内核将使用RST响应，因为这样的连接不存在。
 为避免此行为，监视器会安装\emph {iptables}规则来过滤此类出站RST数据包。
 
-%\begin{figure}[htbp]
-%	\centering
-%	\includegraphics[width=0.25\textwidth]{images/conn-close-new}
-%	
-%	\caption{State machine of connection close in \libipc{}.}
-%	\label{socksdirect:fig:conn-close}
-%\end{figure}
 
 
 \subsubsection{连接关闭}
@@ -320,9 +305,17 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 \libipc{} 跟踪每个套接字的引用计数，它在fork上递增，在close时递减。
 为了推出未发送的数据，需要在对等体之间进行握手，类似于TCP close。
 因为套接字是双向的，所以\texttt {close}在发送和接收方向上相当于\texttt {shutdown}。
-当应用程序关闭连接的一个方向时，它会向对等方发送\emph {shutdown message}。
+如图 \ref{socksdirect:fig:conn-close}，当应用程序关闭连接的一个方向时，它会向对等方发送\emph {shutdown message}（关闭消息）。
 对等体以关闭消息响应。
 当\libipc {}在两个方向上收到关闭消息时，将删除套接字。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.5\textwidth]{images/conn-close-new}	
+	\caption{\libipc{} 中连接关闭的状态机。}
+	\label{socksdirect:fig:conn-close}
+\end{figure}
 
 
 \iffalse

@@ -12,28 +12,91 @@
 \end{figure}
 
 
-\iffalse
-\begin{figure}[htbp]
-	\centering
-	\subfloat[Traditional queue structure.]{
-		\includegraphics[width=0.4\textwidth]{images/fork_linux}
-	}
-	
-	\subfloat[\sys{} queue structure.]{
-		\includegraphics[width=0.4\textwidth]{images/fork_rdwr}
-	}
-	
-	\caption{Comparison of queue structures. Assume sender and receiver each has two threads. First, \sys{} creates peer-to-peer queues between each pair of sender and receiver threads. Rather than protecting the queue with locks, we designate each 文件描述符 to a receiver thread to ensure ordering. Second, data from all connections (文件描述符) are multiplexed through a shared queue, instead of one queue per 文件描述符.}
-	\label{socksdirect:fig:fork-rdwr}
-\end{figure}
-\fi
-
 
 %As shown in Figure~\ref{socksdirect:fig:architecture}, the core component of \sys{} is a user-space library \libipc{}.
 
 为了简化部署和开发 \cite {andromeda}，以及删除内核交叉开销，本章在用户空间而不是内核中实现\sys{}。
 要使用\sys{}，应用程序通过设置\texttt {LD\_PRELOAD}环境变量来加载用户空间库\libipc {}。 \libipc {}拦截标准C库中与文件描述符（文件描述符）操作相关的所有Linux API。它使用\emph {文件描述符重映射表}来区分套接字文件描述符与内核文件描述符（例如文件和设备），在用户空间中实现套接字功能并将其他功能转发到内核。
 从安全的角度来看，因为\libipc {}驻留在应用程序地址空间中，它的行为不可信。例如，如果恶意应用程序在\libipc {}中强制执行，则可能会绕过防火墙策略。此外，TCP端口是一个需要分配的全局资源 \cite {lin2016scalable,nsdi19freeflow}。因此，需要在\libipc {}之外的可信组件来强制实施访问控制和管理全局资源。
+
+\begin{table*}[htbp]
+	\centering
+	\small
+	\begin{tabular}{ll|ll}
+		\toprule
+		\multicolumn{2}{c|}{Initialization} &
+		\multicolumn{2}{c}{Connection Mgmt} \\
+		\midrule
+		API & Cat. &
+		API & Cat. \\
+		\midrule
+		\textbf{socket} & Local &
+		\textbf{connect} & NoPart \\
+
+		bind & NoPart &
+		\textbf{accept(4)} & P2P \\
+
+		listen & NoPart &
+		\textbf{\textit{fcntl, ioctl}} & Local \\
+
+		socketpair & Local &
+		\textbf{(get,set)sockopt} & Local \\
+
+		getsockname  & Local &
+		\textbf{\textit{close}, shutdown} & P2P \\
+
+		\textbf{\textit{malloc}} & Local &
+		getpeername & Local \\
+
+		\textbf{\textit{realloc}} & Local &
+		\textit{dup(2)} & P2P  \\
+
+		\textit{epoll\_create} & Local &
+		\textbf{\textit{epoll\_ctl}} & Local \\
+		\bottomrule
+		\toprule
+		\multicolumn{2}{c|}{Data Transmission} &
+		\multicolumn{2}{c}{Process Mgmt} \\
+		\midrule
+		API & Cat. &
+		API & Cat. \\
+		\midrule
+		\textbf{recv(from,(m)msg)} & P2P &
+		\textit{pthread\_create} & NoPart \\
+
+		\textbf{\textit{write(v)}} & P2P &
+		\textit{clone} & NoPart \\
+
+		\textbf{\textit{read(v)}} & P2P &
+		\textit{execve} & NoPart \\
+
+		\textbf{\textit{memcpy}} & Local &
+		\textit{exit} & P2P \\
+
+		\textit{(p)select} & P2P &
+		\textit{sleep} & P2P \\
+
+		\textit{(p)poll} & P2P &
+		\textit{daemon} & P2P \\
+
+		\textbf{\textit{epoll\_(p)wait}} & P2P &
+		\textit{sigaction} & Local \\
+		\bottomrule
+	\end{tabular}
+	\caption{Linux APIs that are related to socket and intercepted by \libipc{}. Categories include local, peer-to-peer (P2P) and non-partitionable (NoPart). APIs in \textit{italic} indicate usages besides socket. APIs in \textbf{bold} are called relatively more frequently.}
+	
+	\label{socksdirect:tab:socket-api}
+\end{table*}
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.5\textwidth]{images/libsd_architecture}
+	
+	\caption{\libipc{} 运行库的架构。}
+	\label{socksdirect:fig:libsd-architecture}
+\end{figure}
+
 
 为此，本章在每个主机上设计一个\emph {monitor}守护进程来协调控制平面操作，例如连接创建。监视器是系统服务。在每个主机中，所有加载\libipc {}的应用程序必须与主机的监视器守护程序建立共享内存（SHM）队列，从而形成控制平面。在数据平面上，应用程序构建对等队列以直接通信，从而减轻了监视器守护程序的负担。图 \ref {socksdirect:fig:architecture}显示了\sys {}的体系结构。
 
@@ -82,6 +145,40 @@ SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它�
 \label{socksdirect:subsec:fork}
 
 
+大多数套接字系统都获得了一个每文件描述符的锁，以使线程和进程共享套接字。
+以前的工作 \cite {boyd2010analysis,clements2015scalable} 表明许多套接字操作不可交换，并且不能始终避免同步。
+本章利用SHM消息传递比锁 \cite {roghanchi2017ffwd} 便宜得多的事实，并使用消息传递作为独占同步机制。
+
+
+\begin{figure}[htbp]
+	\centering
+	\subfloat[Traditional locking]{
+		\includegraphics[width=0.3\textwidth]{images/one_conn3}
+		\label{socksdirect:fig:fork-locking}
+	}
+	\hspace{0.02\textwidth}
+	\subfloat[SocksDirect peer-to-peer]{
+		\includegraphics[width=0.22\textwidth]{images/one_conn1}
+		\label{socksdirect:fig:fork-p2p}
+	}
+	\hspace{0.02\textwidth}
+	\subfloat[S2 forks to S2' and S3]{
+		\includegraphics[width=0.2\textwidth]{images/one_conn2}
+		\label{socksdirect:fig:fork-fork}
+	}
+	
+	\caption{Inter-process queue architectures for a shared socket. Dashed arrows represent non-activated queues.}
+\end{figure}
+
+
+逻辑上，套接字由两个相反方向的FIFO \emph {队列}组成，每个FIFO具有多个并发发送器和接收器。
+系统设计目标是在保持FIFO语义的同时最大化通用情况性能。
+本文观察到应用程序的如下两个特征：首先，由于成本高，高性能应用程序很少fork和创建线程。
+其次，几个进程从共享套接字发送或接收并不常见，因为套接字的字节流语义使得很难避免接收部分消息。
+需要同时发送或接收的应用程序通常使用消息代理（message broker） \cite {hintjens2013zeromq,rabbitmq2017rabbitmq,kreps2011kafka} 而非直接共享套接字。
+常见的进程间套接字共享情况是应用程序隐式地将套接字从一个进程迁移到另一个进程，例如将事务从主进程卸载到工作进程。
+
+
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.6\textwidth]{images/queue_arch}
@@ -90,16 +187,8 @@ SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它�
 	\label{socksdirect:fig:queue-arch}
 \end{figure}
 
-大多数套接字系统都获得了一个每文件描述符的锁，以使线程和进程共享套接字（第 \ref {socksdirect:subsec:per-operation-overhead} 节）。
-以前的工作 \cite {boyd2010analysis,clements2015scalable} 表明许多套接字操作不可交换，并且不能始终避免同步。
-本章利用SHM消息传递比锁 \cite {roghanchi2017ffwd} 便宜得多的事实，并使用消息传递作为独占同步机制。
 
-逻辑上，套接字由两个相反方向的FIFO \emph {队列}组成，每个FIFO具有多个并发发送器和接收器。
-系统设计目标是在保持FIFO语义的同时最大化通用情况性能。
-本文观察到应用程序的如下两个特征：首先，由于成本高，高性能应用程序很少fork和创建线程。
-其次，几个进程从共享套接字发送或接收并不常见，因为套接字的字节流语义使得很难避免接收部分消息。
-需要同时发送或接收的应用程序通常使用消息代理（message broker） \cite {hintjens2013zeromq,rabbitmq2017rabbitmq,kreps2011kafka} 而非直接共享套接字。
-常见的进程间套接字共享情况是应用程序隐式地将套接字从一个进程迁移到另一个进程，例如将事务从主进程卸载到工作进程。
+
 
 \iffalse
 Based on the observations, we propose the following requirements:
@@ -159,28 +248,6 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 \subsubsection{Fork，Exec 和线程创建}
 \label{socksdirect:subsubsec:fork_fork}
 
-
-\iffalse
-\begin{figure}[t]
-	\centering
-	\subfloat[Traditional locking]{
-		\includegraphics[width=0.15\textwidth]{images/one_conn3}
-		\label{socksdirect:fig:fork-locking}
-	}
-	\hspace{0.02\textwidth}
-	\subfloat[SocksDirect peer-to-peer]{
-		\includegraphics[width=0.11\textwidth]{images/one_conn1}
-		\label{socksdirect:fig:fork-p2p}
-	}
-	\hspace{0.02\textwidth}
-	\subfloat[S2 forks to S2' and S3]{
-		\includegraphics[width=0.1\textwidth]{images/one_conn2}
-		\label{socksdirect:fig:fork-fork}
-	}
-	
-	\caption{Inter-process queue architectures for a shared socket. Dashed arrows represent non-activated queues.}
-\end{figure}
-\fi
 
 \begin{figure}[htbp]
 	\centering
@@ -300,55 +367,3 @@ SHM传输不需要特别小心，因为fork / exec之前创建的SHM仍然在for
 %Another challenge lies in the close of a connection is that close is a broadcast operation while send/receive is sent to a specific process. Besides, fork and close are immutable operations while the scalability requirements of the system impose the constraint that all the operations run asynchronously. As a result, a rule to determine the partial order is required.
 
 %In \libipc, we make the choice that the order of fork and close is determined at the start point of the fork operation and the end point (after receiving all the ACKs). By making this choice, when a process waiting fork close ACK encounters fork message, it could send a separate close request to newly created process, which guarantees all the processes closed.
-
-\iffalse
-\subsection{Multiplex Sockets via One Queue}
-\label{socksdirect:subsec:multiplex-conn}
-
-\begin{figure}[t]
-	\centering
-	\includegraphics[width=0.4\textwidth]{images/locklessq_new}
-	
-	\caption{The structure of an inter-process queue.}
-	
-	\label{socksdirect:fig:locklessq-structure}
-\end{figure}
-
-
-%\textbf{Multiplex connections in event-driven applications.}
-To reduce memory footprint and improve locality of memory accesses, we use one queue to multiplex all connections between a pair of threads. Each data item in the queue is marked with its 文件描述符. By using a single queue, we reduce per-socket memory footprint, random memory accesses and cache misses.
-
-\textbf{Message format.}
-As shown in Figure~\ref{socksdirect:fig:locklessq-structure}, the main component of the queue is a \emph{data ring buffer}, where messages are stored back-to-back.
-Each message in the ring buffer consists of an 8-byte header and a variably sized payload. The header consists of an \textit{isvalid} flag, an opcode, the receiver's 文件描述符 number and the payload size. Messages are aligned to 8 bytes to ensure header write atomicity.% and accelerate payload copy.
-
-\textbf{Event polling.}
-We maintain a bitmap of each epoll 文件描述符 set.
-When \texttt{epoll\_wait} is called, we scan all data queues round-robin and check the 文件描述符 of each data message against the bitmap. If the 文件描述符 is in the bitmap, an event is returned to the application.
-A global cursor exists to resume data queue scanning from the last position in the last scanned queue.
-
-A per-queue cursor records the last scanned position in each queue to avoid scanning a message multiple times.
-To speedup repeated receive operations of a specific 文件描述符, we build a linked list of messages for each 文件描述符 as a side product of event polling.
-Each 文件描述符 maintains positions of the first and last scanned but unread messages of the 文件描述符.
-When a new message of the 文件描述符 is scanned, the \emph{nextptr} pointer in the last message is updated to point to the new message.
-
-To poll events from sockets and other 文件描述符 (handled by kernel) at the same time, \libipc{} creates an \textit{epoll thread} in each process to wait on all 文件描述符 handled by kernel. When it receives a kernel event, it broadcasts the event to application threads via shared memory queues. %\texttt{Epoll\_wait} in \libipc{} will return such kernel events in addition to socket events. %Note that Linux allows an event to be received by multiple threads sharing the 文件描述符.
-
-\textbf{Pick from middle of queue.}
-In order to support receiving data from a specific 文件描述符, the queue needs to support picking a message in the middle with a specific 文件描述符.
-Fortunately, this does not happen frequently. Event-driven applications typically process incoming events in a FIFO order. For \texttt{epoll\_wait} in level trigger mode, we iterate through all messages in the queue and return those in the set of registered 文件描述符. When applications call \texttt{recv}, \libipc{} would usually dequeue the message at head.
-
-To pick from middle of queue, receiver traverses messages in the ring buffer. During traversal, receiver iterates messages from \textit{head} until free space in ring buffer, determined by \textit{isvalid}. Hence, receiver cannot clear \textit{isvalid} when a non-head message is dequeued. That's why each message has an \textit{isdel} flag. When a message is dequeued from the middle, its \textit{isdel} is set. %If the message at \textit{head} has \textit{isdel} set, the receiver advances \textit{head} and repeats this step.
-
-\textbf{Head-of-line blocking.}
-%Second, if application does not receive from a 文件描述符 for a long time, data items of the 文件描述符 may fill up the queue and starve other 文件描述符.
-If application does not receive from a 文件描述符 for a long time, the empty space in queue will become fragmented.
-When data queue is full, the sender sends a message via emergency queue to trigger garbage collection in the receiver.
-The receiver scans empty space in the middle of queue and moves remaining messages, so that empty space can be returned to the sender.
-%To avoid starvation, we need at least one byte of headroom per 文件描述符. Accordingly, we design a single byte \textit{headroom slot} per 文件描述符. When data queue is full and the per-文件描述符 headroom slot is free, sender uses it and sends a notification via emergency queue. Receiver receives from data queue first, then from the headroom slot if it received a notification.
-
-\textbf{Emergency queue.}
-Control messages may need to be delivered out-of-band when the queue is full. For example, in order to close the receive direction while sending data, the shutdown message should not be blocked by unconsumed data in the queue. To this end, we add an \textit{emergency queue} alongside each data queue.
-A receiver will always retrieve messages in the emergency queue immediately.
-\fi
-
