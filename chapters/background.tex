@@ -1087,7 +1087,7 @@ GPU 不同组的计算单元可以独立地处理不同的数据包，但 GPU �
 
 %综上，在数据中心里 FPGA 的主要优势是稳定又极低的延迟，适用于流式的计算密集型任务和通信密集型任务。
 
-FPGA 也并不是万能药，主要有如下几方面的挑战，如表 \ref{background:tab:fpga-challenges} 所示。
+FPGA 也并不是万能药，主要有如下几方面的技术挑战，如表 \ref{background:tab:fpga-challenges} 所示。
 
 \begin{table}[htbp]
 	\centering
@@ -1156,6 +1156,8 @@ FPGA 内置了大量的并行性。
 第一类是加密解密等标准化操作。例如，Intel QuickAssist 加速卡 \cite{intel-qat} 基于 ASIC 的 RSA 非对称加密比第 \ref{chapter:clicknp} 章基于 FPGA 的实现，吞吐量约高 10 倍。
 第二类是查找表等常见数据结构。例如，内容寻址内存（Content-Addressable Memory，CAM）是很多并发操作调度器和数据结构的基础。CAM 在专用芯片中可以用三态门实现，而在 FPGA 中实现的效率较低。
 第 \ref{future:progammable_nic} 节的未来工作展望将提出借鉴网络处理器的架构，将这些 FPGA 内实现效率不高的操作硬化。
+
+最后需要指出，从商业和供应链的角度考虑，FPGA 存在一定的劣势。FPGA 零售价格较高，开发工具链的授权也较昂贵，因此如果应用规模不够大，硬件和工具链的平摊成本相比基于通用处理器的可编程网卡可能不具优势。对于应用规模非常大的云计算厂商，用于数据中心的 FPGA 目前仅有两家主要厂商，供应链安全有较大的变数，因此自研网络处理器或嵌入式通用处理器芯片可能是长期来看成本更低也更安全的选择。
 
 \iffalse
 \subsection{架构对比}
