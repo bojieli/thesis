@@ -144,6 +144,7 @@
 
 
 图 \ref{arch:fig:my-smartnic-current} 显示了本文使用的 Catapult 可编程网卡 \cite{putnam2014reconfigurable} 硬件架构。
+Catapult 可编程网卡由 Stratix V FPGA 和 Mellanox ConnectX-3 商用网卡构成。FPGA 有两个连接 40 Gbps 以太网络的 QSFP 接口，一个连接数据中心交换机，另一个连接可编程网卡内的商用网卡。由于本文使用的 FPGA 没有 PCIe Gen3 x16 硬核，FPGA 与主机之间通过两个 PCIe Gen3 x8 接口连接，它们共享一个 PCIe Gen3 x16 物理插槽。商用网卡有两个 40 Gbps 以太网接口，一个连接 FPGA，另一个闲置。商用网卡与主机之间通过 PCIe Gen3 x16 接口连接。
 
 
 \begin{figure}[htbp]
@@ -153,7 +154,7 @@
 	\label{arch:fig:my-smartnic-current}
 \end{figure}
 
-
+本文使用的 FPGA 有 172,600 个逻辑元件（ALM），2,014 个 20 Kb 大小的 M20K 片上内存（BRAM）以及 1,590 个可以执行 16 位乘法的数字信号处理单元（DSP）。FPGA 板上还有 4 GB 大小的 DRAM，通过一个 DDR3 通道与 FPGA 相连。
 
 
 本文第 \ref{chapter:clicknp} 章和第 \ref{chapter:kvdirect} 章使用其中的 FPGA 可重构逻辑来实现网络功能和数据结构处理；第 \ref{chapter:socksdirect} 章使用其中的商用 RDMA 网卡实现套接字原语中的硬件传输协议部分。

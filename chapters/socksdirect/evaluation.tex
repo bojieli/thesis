@@ -36,7 +36,7 @@
 \subsection{方法}
 \label{socksdirect:subsec:methodology}
 
-本节使用两个Xeon E5-2698 v3 CPU，256~GiB内存和一个Mellanox ConnectX-4网卡评估服务器上的\sys{}。服务器与Arista 7060CX-32S 100G交换机互连 \cite {arista-7060cx}。服务器使用Ubuntu 16.04和Linux 4.15，将RoCEv2用于RDMA协议，每64条消息轮询一次完成队列。
+本节使用两个Xeon E5-2698 v3 CPU，256~GiB内存和一个Mellanox ConnectX-4网卡的服务器评估 \sys{}。服务器与Arista 7060CX-32S 交换机通过 100 Gbps 以太网接口互连 \cite {arista-7060cx}。不同于第 \ref{chapter:clicknp}、\ref{chapter:kvdirect} 章，本节仅使用可编程网卡中的商用网卡部分，且商用网卡升级到了 100 Gbps，没有使用 FPGA。服务器使用Ubuntu 16.04和Linux 4.15，将RoCEv2用于RDMA协议，每64条消息轮询一次完成队列。
 每个线程都固定在CPU内核上。在收集数据之前，进行了足够的预热测试。
 对于延迟，本节使用一个乒乓应用程序报告平均往返时间，误差条代表1％和99％百分位数。
 对于吞吐量，一方保持发送数据而另一方不断接收数据。
