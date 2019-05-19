@@ -197,6 +197,13 @@ CPU 上的槽位抽象可以在中断或轮询模式下工作。
 	\label{clicknp:fig:pcie}
 \end{figure}
 
+
+\subsection{Verilog 元件}
+
+对于一些元件（如乘法器阵列和调度器），高层次综合工具难以生成高效的硬件逻辑。为了节约面积和降低延迟，这些元件需要用硬件描述语言来编写。在 \name 中，每个元件被编译成一个 OpenCL 核（kernel），它被高层次综合工具编译成一个 Verilog 模块，使用 Altera Avalon ST 或 Xilinx AXI 接口连接管道，使用 Altera Avalon MM 或 Xilinx AXI 接口连接全局内存。为了把开发者用硬件描述语言编写的 Verilog 元件集成到系统中，开发者需要编写一个接口相同的空元件作为占位符（或功能相同的高级语言元件用于 CPU 调试与测试），并用 \textbf{verilog} 关键字在 \name 配置文件中声明。编译工具链会将高层次综合工具为占位符元件生成的 Verilog 模块替换为开发者的实现。
+
+
+\iffalse
 \subsection{调试与测试}
 
 \name 提供三种方法用于调试与测试。
@@ -218,10 +225,6 @@ SignalTap
 
 断点如何实现……
 
-\subsection{Verilog 元件}
-
-对于一些元件（如乘法器阵列和调度器），高层次综合工具难以生成高效的硬件逻辑。为了节约面积和降低延迟，这些元件需要用硬件描述语言来编写。在 \name 中，每个元件被编译成一个 OpenCL 核（kernel），它被高层次综合工具编译成一个 Verilog 模块，使用 Altera Avalon ST 或 Xilinx AXI 接口连接管道，使用 Altera Avalon MM 或 Xilinx AXI 接口连接全局内存。为了把开发者用硬件描述语言编写的 Verilog 元件集成到系统中，开发者需要编写一个接口相同的空元件作为占位符（或功能相同的高级语言元件用于 CPU 调试与测试），并用 \textbf{verilog} 关键字在 \name 配置文件中声明。编译工具链会将高层次综合工具为占位符元件生成的 Verilog 模块替换为开发者的实现。
-
 \subsection{元件热迁移和高可用}
 
 \textbf{虚拟机热迁移，计算节点对应的网卡状态；网络、存储节点热迁移（升级，扩容等），网卡状态；高可用性，故障恢复……}
@@ -229,7 +232,7 @@ SignalTap
 \textbf{热升级：不丢包，的时候原来的 FPGA 不处理了，buffer 起来。把旧 FPGA 的状态迁移到新 FPGA，让交换机开始往新 FPGA 的 buffer 里灌，然后从旧 FPGA 的 buffer 里把数据倒出来在新的 FPGA 里处理，处理完后开始处理新 FPGA 自己的 buffer，迁移结束。}
 
 \textbf{高可用：状态机复制的方法，两个 FPGA 收到相同的数据包序列，只要元件内部没有随机化或与时间相关的处理逻辑，就能保证两个 FPGA 收到的数据包序列相同。检测到备份节点故障，只需启动一个新的备份节点，然后执行热升级操作。检测到主节点故障，切换输出到备份节点（可能出现少量数据包丢失或重复，TCP 可以安全地处理这些情况）。}
-
+\fi
 
 \egg{
 
