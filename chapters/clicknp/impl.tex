@@ -148,6 +148,16 @@ PCIe交换机将仲裁新添加的I / O通道与shell中的其他组件（例如
 为了识别目标元件，在信号消息中嵌入元件ID，并且\textit {CmdHub}可以读取ID并再次通过FIFO缓冲器将信号消息转发到相应的元件。
 
 \name 支持灵活的 I/O 操作。如图 \ref{clicknp:fig:pcie-io} 所示，\name 提供了基于槽位（slot）和工作队列（work queue）两种与主机 CPU 通信的抽象，还提供了裸 DMA 操作的接口。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.8\textwidth]{image/pcie-io}
+	\caption{PCIe I/O 通道的架构。}
+	\label{clicknp:fig:pcie-io}
+\end{figure}
+
+
 在基于槽位的抽象中，PCIe 物理链路划分为64个逻辑子通道，即\textit {slots}（插槽）。
 每个插槽都有一对用于DMA操作的发送和接收缓冲区。
 在64个插槽中，33个由 OpenCL BSP 用于管理 ClickNP 内核和访问板载 DDR（即 OpenCL 控制通道），一个插槽用于将信号传递给 \name 元件。
@@ -165,21 +175,14 @@ CPU 上的槽位抽象可以在中断或轮询模式下工作。
 
 
 
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.8\textwidth]{image/pcie-io}
-	\caption{PCIe I/O 通道的架构。}
-	\label{clicknp:fig:pcie-io}
-\end{figure}
-
-图 \ref {clicknp:fig:pcie} 显示了具有不同插槽数和批量大小的PCIe I / O通道的基准测试结果。
-作为基线，还测量了OpenCL全局内存操作的性能 - 到目前为止，这是OpenCL \cite {opencl}中为CPU / FPGA通信提供的唯一方法。
+图 \ref {clicknp:fig:pcie} 显示了具有不同插槽数和批量大小的PCIe I/O通道的基准测试结果。
+作为基线，还测量了OpenCL全局内存（global memory）操作的性能 - 到目前为止，这是OpenCL \cite {opencl}中为CPU/FPGA通信提供的唯一方法。
 可以看到，单个插槽的最大吞吐量约为8.4~Gbps。
-通过4个插槽，PCIe I / O通道的总吞吐量可达25.6~Gbps。
+通过4个插槽，PCIe I/O通道的总吞吐量可达25.6~Gbps \footnote{这是本章写作时使用的 PCIe Gen2 x8 硬核的实际最高性能。事实上该 FPGA 支持 PCIe Gen3 x8 硬核，第 \ref{chapter:kvdirect} 章通过替换硬核和优化 shell，实现了 2 倍的 PCIe I/O 通道吞吐量。}。
 这是由于DMA引擎时钟频率的限制，可以从当前FPGA芯片中获得的最大吞吐量。
 但是，OpenCL的吞吐量低得惊人，低于1~Gbps。这是因为全局内存API旨在传输 GB 级的大量数据。这可能适用于具有大数据集的应用程序，但不适用于需要强流处理功能的网络功能。
 同样，图 \ref {clicknp:fig:pcie}（b）显示了通信延迟。由于OpenCL未针对流处理进行优化，因此OpenCL延迟高达1~ms，通常是网络功能无法接受的。
-相比之下，PCIe I / O通道在轮询模式下具有非常低的1 $\mu$s的延迟（一个 CPU 核重复轮询状态寄存器），而在中断模式下的延迟为 9 $\mu$ s（几乎没有CPU开销） 。
+相比之下，PCIe I/O通道在轮询模式下具有非常低的1 $\mu$s的延迟（一个 CPU 核重复轮询状态寄存器），而在中断模式下的延迟为 9 $\mu$ s（几乎没有CPU开销） 。
 
 \begin{figure}[htbp]
 	\centering
