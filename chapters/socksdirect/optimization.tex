@@ -23,35 +23,37 @@
 		\label{socksdirect:fig:ringbuffer-new}
 	}
 	
-	\caption{环缓冲数据结构。 阴影部分是包元数据，黑色部分是有效载荷。}
+	\caption{环形缓冲区数据结构。 阴影部分是元数据，黑色部分是有效载荷。}
 \end{figure}
 
-传统上，网络堆栈使用环形缓冲区从网卡发送和接收数据包。
-如图 \ref {socksdirect:fig:ringbuffer-traditional} 所示，它会导致缓冲区管理开销和内部碎片。
-传统的网卡支持有限数量的环形缓冲区，因此多个连接可以通过一个环形缓冲区进行复用，这种设计可以将有效负载移动到每个连接缓冲区而无需复制。
-幸运的是，RDMA编写动词开辟了新的设计可能性。
-本章的创新是拥有\emph {每个套接字连接一个环形缓冲区}并将数据包背靠背存储，如图 \ref {socksdirect:fig:ringbuffer-new} 所示。
-发送方确定环形缓冲区和偏移量（即\emph {tail}指针），然后使用RDMA写动词将数据包写入远程端内存中的尾指针。
-在传输过程中，接收器CPU不需要做任何事情。
-当接收器应用程序调用\texttt {recv}时，数据从\emph {head}指针中出列。
-共享内存的过程类似，因为共享内存和RDMA都支持写原语。
+传统上，网络协议栈使用环形缓冲区从网卡发送和接收数据包。
+如图 \ref {socksdirect:fig:ringbuffer-traditional} 所示，传统的环形缓冲区由一组定长的元数据构成，每个元数据指向一个定长的内存页面以存储有效载荷。这种设计会导致内存分配开销和内部碎片。
+传统网卡使用这种设计的原因是环形缓冲区的数量有限，需要多个连接复用一个环形缓冲区。这种设计可以将有效载荷的元数据移动到每个连接的元数据队列，而无需复制有效载荷的内容。
+幸运的是，单边 RDMA 写操作（write verb）开辟了新的设计可能性。
+本章的创新是 \emph {每个套接字连接拥有专有的环形缓冲区} 并将数据包背靠背存储，如图 \ref {socksdirect:fig:ringbuffer-new} 所示。
+发送方确定环形缓冲区内的偏移量（即 \emph{tail} 指针），然后使用单边 RDMA 写操作将数据包写入远程内存中尾指针所指向的位置。
+在传输过程中，接收端 CPU 不需要做任何事情。
+当接收端应用程序调用 \texttt {recv} 操作时，数据从 \emph {head} 指针中出列。
+通过共享内存传输数据的过程类似，因为共享内存和 RDMA 都支持写操作。
 
-要判断环形缓冲区是否已满，发送方将保持\textit {队列信用} 计数，指示环形缓冲区中的空闲字节数。
-当发件人将数据包入队时，它会消耗信用。 当接收器使消息出列时，它会在本地递增计数器，并在计数器超过环形缓冲区大小的一半时在发送者的内存中写入\textit {信用返回标志}。 发送者在检测到标志时重新获得队列信用。
-请注意，此机制与拥塞控制无关; 后者由网卡硬件处理 \cite {zhu2015congestion}。
+为了判断环形缓冲区是否已满，发送方将保持 \textit {队列信用}（queue credits）计数，指示环形缓冲区中的空闲字节数。
+当发送方将数据包入队时，会消耗入队数据包大小的信用。
+信用不足时，发送方会阻塞等待。
+当接收方使数据包出队时，它会在本地增加计数器，并在计数器超过环形缓冲区大小的一半时，向发送方的内存中写入 \textit {信用返回标志}。发送者在检测到该标志时重新获得队列信用。
+请注意，队列信用机制与拥塞控制无关；后者由网卡硬件处理 \cite {zhu2015congestion}。
 
-\textbf {发送和接收方的两个环形缓冲区拷贝。}
-上述机制仍然会在发送端引起缓冲区管理，因为发送方需要在缓冲区中构造RDMA消息。
-其次，它不支持容器热迁移，因为RDMA队列中的剩余数据很难迁移。
+\textbf {发送和接收方各有一个环形缓冲区拷贝。}
+上述机制仍然需要发送端进行内存分配，因为发送方需要缓冲区来构造 RDMA 消息。
+其次，上述机制不支持容器热迁移，因为 RDMA 队列中未来得及接收的剩余数据很难迁移。
 第三，本章的目标是批量处理小消息以提高吞吐量。
-为此，本章在发送方和接收方都保留了环形缓冲区的拷贝。
-发送方写入其本地环形缓冲区，并调用RDMA以使发送方与接收方同步。
-\libipc{} 为每个环形缓冲区使用一个 RDMA RC QP，并维护一个机上RDMA消息的计数器。
-如果计数器未超过阈值，则为每个socket \texttt {send}操作发送RDMA消息。
-否则，不发送消息，\emph {send\_next}标记第一个未发送的消息。
-完成RDMA写入后，\libipc{} 会在图 \ref {socksdirect:fig:ringbuffer-new}中发送包含所有未发送更改的消息（\emph {send\_next}到\emph {tail}）。
-这种自适应批处理机制可最大限度地减少空闲链路上的延迟，并最大化繁忙链路上的吞
-对于共享内存，只有一个由两个进程共享的环形缓冲区拷贝，并且同步由高速缓存一致性硬件完成。
+为此，本章在发送方和接收方都保留了一份环形缓冲区的拷贝。
+发送方写入其本地环形缓冲区，并调用单边 RDMA 写操作以使发送方与接收方的环形缓冲区同步。
+为了最大限度地减少空闲链路上的延迟，并最大化繁忙链路上的吞吐量，本文设计了一种自适应的批处理机制（adaptive batching）。
+\libipc{} 为每个环形缓冲区创建一个 RDMA 可靠连接（RC）队列对（QP），并维护一个 RDMA 消息的计数器。
+如果计数器未超过阈值，则为每个套接字 \texttt {send} 操作发送 RDMA 消息。
+否则，暂时不发送消息，而是用 \emph {send\_next} 标记第一个未发送的消息。
+完成 RDMA 写操作后，\libipc{} 会在图 \ref {socksdirect:fig:ringbuffer-new} 中发送包含所有未发送更改的消息（从 \emph {send\_next} 到 \emph {tail}）。
+对于共享内存，由于高速缓存一致性（cache coherence）硬件可以自动进行核间同步，只需一个由两个进程共享的环形缓冲区 \footnote{共享内存即一个物理页面分别映射到两个进程的用户地址空间。}。
 
 %Before sending, sender clears header of the next message to prevent the receiver from considering junk data in the ring buffer to be a message. Next, sender writes payload, then writes header, finally advances \textit{tail}. Receiver polls \textit{isvalid} at \textit{head} pointer, then copies the message, finally advances \textit{head}.
 %For RDMA, the sender maintains a local copy of ring buffer, and we use one-sided RDMA write to synchronize updates from sender to receiver.
