@@ -150,7 +150,7 @@ PCIe交换机将仲裁新添加的I / O通道与shell中的其他组件（例如
 \name 支持灵活的 I/O 操作。如图 \ref{clicknp:fig:pcie-io} 所示，\name 提供了基于槽位（slot）和工作队列（work queue）两种与主机 CPU 通信的抽象，还提供了裸 DMA 操作的接口。
 在基于槽位的抽象中，PCIe 物理链路划分为64个逻辑子通道，即\textit {slots}（插槽）。
 每个插槽都有一对用于DMA操作的发送和接收缓冲区。
-在64个插槽中，33个由 OpenCL BSP 用于管理 ClickNP 内核和访问板载 DDR，一个插槽用于将信号传递给 \name 元件。
+在64个插槽中，33个由 OpenCL BSP 用于管理 ClickNP 内核和访问板载 DDR（即 OpenCL 控制通道），一个插槽用于将信号传递给 \name 元件。
 剩余的30个插槽用于FPGA和CPU元件之间的数据通信。
 CPU 上的槽位抽象可以在中断或轮询模式下工作。
 
@@ -161,7 +161,7 @@ CPU 上的槽位抽象可以在中断或轮询模式下工作。
 
 除了槽位和工作队列，FPGA 和 CPU 之间还需要更灵活的通信方式。首先，第 \ref{chapter:kvdirect} 章的键值存储中，FPGA 需要直接读写主机内存中的键值，而无需主机 CPU 参与，这就需要 FPGA 能够直接发出裸的 PCIe DMA 读写请求。
 其次，在基于可编程网卡的内存解聚中，FPGA 将远程内存通过 PCIe MMIO 直接映射到主机内存空间，主机 CPU 直接访问此内存空间，生成 PCIe DMA 读写请求发送到 FPGA。FPGA 中的用户逻辑需要处理这些 DMA 被动读写操作。
-最后，一些应用（如传统 OpenCL 应用）可能希望主机 CPU 与 FPGA 之间采用 FPGA 板上的 DRAM 作为共享内存，因此 FPGA 板上的 DRAM 通过 PCIe MMIO 映射到主机内存空间，由 shell 中的 PCIe 被动读写逻辑发送到 DRAM 控制器。
+最后，一些应用（如传统 OpenCL 应用）可能希望主机 CPU 与 FPGA 之间采用 FPGA 板上的 DRAM 作为共享内存，因此 FPGA 板上的 DRAM 通过 PCIe MMIO 映射到主机内存空间，由 shell 中的 PCIe 被动读写逻辑发送到 DRAM 控制器。由于主机 PCIe MMIO 读写大块数据的效率较低，也支持主机 CPU 通过控制寄存器，让 FPGA shell 主动发起 DMA 在板上 DRAM 和主机内存间搬运数据。
 
 
 
