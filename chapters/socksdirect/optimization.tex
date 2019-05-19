@@ -1,4 +1,4 @@
-\subsection{带RDMA和SHM的环形缓冲区}
+\subsection{基于RDMA和共享内存的环形缓冲区}
 \label{socksdirect:subsec:lockless-queue}
 
 \iffalse
@@ -27,17 +27,17 @@
 \end{figure}
 
 传统上，网络堆栈使用环形缓冲区从网卡发送和接收数据包。
-如图 \ref {socksdirect:fig:ringbuffer-traditional}所示，它会导致缓冲区管理开销和内部碎片。
+如图 \ref {socksdirect:fig:ringbuffer-traditional} 所示，它会导致缓冲区管理开销和内部碎片。
 传统的网卡支持有限数量的环形缓冲区，因此多个连接可以通过一个环形缓冲区进行复用，这种设计可以将有效负载移动到每个连接缓冲区而无需复制。
 幸运的是，RDMA编写动词开辟了新的设计可能性。
-本章的创新是拥有\emph {每个套接字连接一个环形缓冲区}并将数据包背靠背存储，如图 \ref {socksdirect:fig:ringbuffer-new}所示。
+本章的创新是拥有\emph {每个套接字连接一个环形缓冲区}并将数据包背靠背存储，如图 \ref {socksdirect:fig:ringbuffer-new} 所示。
 发送方确定环形缓冲区和偏移量（即\emph {tail}指针），然后使用RDMA写动词将数据包写入远程端内存中的尾指针。
 在传输过程中，接收器CPU不需要做任何事情。
 当接收器应用程序调用\texttt {recv}时，数据从\emph {head}指针中出列。
-SHM的过程类似，因为SHM和RDMA都支持写原语。
+共享内存的过程类似，因为共享内存和RDMA都支持写原语。
 
-要判断环形缓冲区是否已满，发送方将保持\textit {queue credits}计数，指示环形缓冲区中的空闲字节数。
-当发件人将数据包入队时，它会消耗信用。 当接收器使消息出列时，它会在本地递增计数器，并在计数器超过环形缓冲区大小的一半时在发送者的内存中写入\textit {credit return flag}。 发送者在检测到标志时重新获得队列信用。
+要判断环形缓冲区是否已满，发送方将保持\textit {队列信用} 计数，指示环形缓冲区中的空闲字节数。
+当发件人将数据包入队时，它会消耗信用。 当接收器使消息出列时，它会在本地递增计数器，并在计数器超过环形缓冲区大小的一半时在发送者的内存中写入\textit {信用返回标志}。 发送者在检测到标志时重新获得队列信用。
 请注意，此机制与拥塞控制无关; 后者由网卡硬件处理 \cite {zhu2015congestion}。
 
 \textbf {发送和接收方的两个环形缓冲区拷贝。}
@@ -51,7 +51,7 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 否则，不发送消息，\emph {send\_next}标记第一个未发送的消息。
 完成RDMA写入后，\libipc{} 会在图 \ref {socksdirect:fig:ringbuffer-new}中发送包含所有未发送更改的消息（\emph {send\_next}到\emph {tail}）。
 这种自适应批处理机制可最大限度地减少空闲链路上的延迟，并最大化繁忙链路上的吞
-对于SHM，只有一个由两个进程共享的环形缓冲区拷贝，并且同步由高速缓存一致性硬件完成。
+对于共享内存，只有一个由两个进程共享的环形缓冲区拷贝，并且同步由高速缓存一致性硬件完成。
 
 %Before sending, sender clears header of the next message to prevent the receiver from considering junk data in the ring buffer to be a message. Next, sender writes payload, then writes header, finally advances \textit{tail}. Receiver polls \textit{isvalid} at \textit{head} pointer, then copies the message, finally advances \textit{head}.
 %For RDMA, the sender maintains a local copy of ring buffer, and we use one-sided RDMA write to synchronize updates from sender to receiver.
@@ -63,7 +63,7 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 
 
 \textbf {有效载荷和元数据之间的一致性。}
-对于SHM，英特尔和AMD的X86处理器提供了整体商店订购 \cite {sewell2010x86,intel-manual}，这意味着其他内核按照与编写时相同的顺序观察到两次写入。一个8字节的\texttt {MOV}指令是原子的，所以写一个标题是原子的。由于发送方在有效负载之后写入标头，因此接收方将读取一致的消息因此，不需要存储器栅栏指令。
+对于共享内存，英特尔和AMD的X86处理器提供了原子写操作 \cite {sewell2010x86,intel-manual}，这意味着其他内核按照与编写时相同的顺序观察到两次写入。一个8字节的\texttt {MOV}指令是原子的，所以写一个标题是原子的。由于发送方在有效负载之后写入标头，因此接收方将读取一致的消息因此，不需要存储器栅栏指令。
 
 因为RDMA不能确保消息中的写入顺序 \cite {infiniband2000infiniband}，确实需要确保消息完全到达。虽然在使用go-back-0或go-back-N loss recovery~ \cite {dragojevic2014farm}的RDMA网卡中观察到消息写入顺序，但对于具有选择性重传的更高级网卡，情况并非如此 \cite {mprdma,mittal2018revisiting} 。在\libipc {}中，发送方使用\textit {RDMA write with immediate}动词在接收方生成完成。接收器轮询RDMA \emph {完成队列}而不是环形缓冲区。 RDMA确保接收器上的高速缓存一致性，并且在将数据写入\libipc {}环形缓冲区 \cite {infiniband2000infiniband}之后保证完成消息。
 
@@ -73,7 +73,7 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 首先，对于RDMA队列，利用RDMA 网卡将事件通知复用到单个队列中。
 每个线程对所有RDMA QP使用\emph {共享完成队列}，因此它只需要轮询一个队列而不是所有每个套接字队列。
 
-其次，每个队列可以在\textit {polling}和\textit {interrupt}模式之间切换。监视器的队列始终处于轮询模式。每个队列的接收者维护一个连续空轮询的计数器。当它超过阈值时，接收器向发送器发送消息，通知队列正在进入中断模式，并在短时间后停止轮询。当发送方以中断模式写入队列时，它还会通知监视器，监视器将通知接收方恢复轮询。
+其次，每个队列可以在\textit {轮询}和\textit {中断}模式之间切换。监视器的队列始终处于轮询模式。每个队列的接收者维护一个连续空轮询的计数器。当它超过阈值时，接收器向发送器发送消息，通知队列正在进入中断模式，并在短时间后停止轮询。当发送方以中断模式写入队列时，它还会通知监视器，监视器将通知接收方恢复轮询。
 
 %\RED{Need a performance comparison figure of ring buffer architectures. (traditional ring buffer, new ring buffer, intra, inter, x axis: msg size, y axis: throughput)}
 
@@ -84,11 +84,11 @@ SHM的过程类似，因为SHM和RDMA都支持写原语。
 
 
 零拷贝的主要挑战是维护套接字API的语义。
-幸运的是，虚拟内存提供了一个间接层，许多相关工作利用了这种\emph {页面重映射}（page remapping）技术，从而可以将物理页面从发件人的虚拟地址重新映射到接收者，而不是复制。
-Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数据页设置为写时复制。
-但是，许多应用程序经常覆盖发送缓冲区，因此写时复制机制只是将复制从\texttt {send}时间延迟到第一次覆盖时间。
+幸运的是，虚拟内存提供了一个间接层，许多相关工作利用了这种 \emph {页面重映射}（page remapping）技术，从而可以将物理页面从发件人的虚拟地址重新映射到接收者，而不是复制。
+Linux零复制套接字 \cite {linux-zero-copy} 仅支持发送方，通过将数据页设置为写时复制。
+但是，许多应用程序经常覆盖发送缓冲区，因此写时复制机制只是将复制从调用\texttt {send}操作的时间延迟到第一次覆盖的时间。
 为了实现零拷贝接收，20年前，BSD~ \cite {thadani1995efficient}和Solaris~ \cite {chu1996zero}将应用缓冲区的虚拟页面重新映射到系统缓冲区的物理页面。但是，如表 \ref {socksdirect:tab:operation-performance} 所示，在现代CPU上，由于内核交叉和TLB刷新成本，映射一个页面的成本甚至比复制它更高。
-最近，许多高性能TCP / IP堆栈 \cite {han2012megapipe,yasukata2016stackmap}和socket-to-RDMA库 \cite {rsockets,socketsdirect}提供标准套接字API和备用零拷贝API，但它们都没有实现标准API的零拷贝。
+最近，许多高性能 TCP/IP 堆栈 \cite {han2012megapipe,yasukata2016stackmap}和socket-to-RDMA库 \cite {rsockets,socketsdirect}提供标准套接字API和备用零拷贝API，但它们都没有实现标准API的零拷贝。
 此外，没有现有的工作支持主机内套接字的零拷贝。
 
 
@@ -130,7 +130,7 @@ Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数
 
 \begin{figure}[htbp]
 	\centering
-	\subfloat[服务器内SHM。 1）获取物理页面并设置写入时复制; 2）通过SHM发送页面地址; 3）映射收到的页面; 4）（可选）在发送者写入/ memcpy / recv时重新映射。]{
+	\subfloat[服务器内共享内存。 1）获取物理页面并设置写入时复制; 2）通过共享内存发送页面地址; 3）映射收到的页面; 4）（可选）在发送者写入/ memcpy / recv时重新映射。]{
 		\includegraphics[width=0.44\textwidth]{images/zerocopy_intra}
 		\label{socksdirect:fig:zerocopy-intra}
 	}
@@ -143,7 +143,7 @@ Linux零复制套接字 \cite {linux-zero-copy}仅支持发送方，通过将数
 \end{figure}
 
 
-\textbf {通过SHM安全发送页面地址。}
+\textbf {通过共享内存安全发送页面地址。}
 对于主机内部套接字，在用户空间队列中的消息中发送物理页面地址，如图 \ref {socksdirect:fig:zerocopy-intra} 中的步骤2所示。
 \sys{} 必须防止未经发送端允许的任意页面映射。
 为此，\libipc {} 调用修改后的网卡驱动程序
@@ -251,7 +251,7 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 
 
 \textbf{连接。}
-客户端应用程序调用\texttt {connect}并发送SYN命令以通过SHM队列进行监视。
+客户端应用程序调用\texttt {connect}并发送SYN命令以通过共享内存队列进行监视。
 现在，监视器需要将新连接分派给侦听应用程序。
 在Linux中，新的连接请求在内核的\emph {积压}（backlog）中排队。
 每次服务器应用程序调用\texttt {accept}时，它都会访问内核以从积压中出列，这需要同步并增加延迟。
@@ -265,7 +265,7 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 
 \textbf {建立点对点队列。}
 客户端和服务器应用程序第一次通信时，服务器监视器可帮助它们建立直接连接。
-对于主机内部，监视器分配SHM队列并将SHM密钥发送到客户端和服务器应用程序。
+对于主机内部，监视器分配共享内存队列并将共享内存密钥发送到客户端和服务器应用程序。
 对于主机间，客户端和服务器监视器建立新的RDMA QP，并将本地和远程密钥发送到相应的应用程序。
 为了减少延迟，当SYN命令分发到监听器的待办事项时，监视器会建立对等队列。
 但是，如果SYN被另一个侦听器窃取，则需要在客户端和新侦听器之间建立新队列，如图 \ref {socksdirect:fig:conn-setup}中的Wait-Server状态所示。
@@ -292,7 +292,7 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 
 
 一个棘手的问题是接收的数据包被传递到原始套接字和内核网络堆栈，并且内核将使用RST响应，因为这样的连接不存在。
-为避免此行为，监视器会安装\emph {iptables}规则来过滤此类出站RST数据包。
+为避免此行为，监视器会安装 \emph {iptables} 规则来过滤此类出站RST数据包。
 
 
 
@@ -302,7 +302,7 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 
 当应用程序调用\texttt {close}时，\libipc {}会从重映射表中删除文件描述符。
 然而，套接字数据可能仍然有用，因为文件描述符可以与其他进程共享，并且缓冲区中可能存在未发送的数据。
-\libipc{} 跟踪每个套接字的引用计数，它在fork上递增，在close时递减。
+\libipc{} 跟踪每个套接字的引用计数，它在fork时递增，在close时递减。
 为了推出未发送的数据，需要在对等体之间进行握手，类似于TCP close。
 因为套接字是双向的，所以\texttt {close}在发送和接收方向上相当于\texttt {shutdown}。
 如图 \ref{socksdirect:fig:conn-close}，当应用程序关闭连接的一个方向时，它会向对等方发送\emph {shutdown message}（关闭消息）。

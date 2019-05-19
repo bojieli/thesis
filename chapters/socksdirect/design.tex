@@ -98,16 +98,16 @@
 \end{figure}
 
 
-为此，本章在每个主机上设计一个\emph {monitor}守护进程来协调控制平面操作，例如连接创建。监视器是系统服务。在每个主机中，所有加载\libipc {}的应用程序必须与主机的监视器守护程序建立共享内存（SHM）队列，从而形成控制平面。在数据平面上，应用程序构建对等队列以直接通信，从而减轻了监视器守护程序的负担。图 \ref {socksdirect:fig:architecture}显示了\sys {}的体系结构。
+为此，本章在每个主机上设计一个\emph {monitor}守护进程来协调控制平面操作，例如连接创建。监视器是系统服务。在每个主机中，所有加载\libipc {}的应用程序必须与主机的监视器守护程序建立共享内存（共享内存）队列，从而形成控制平面。在数据平面上，应用程序构建对等队列以直接通信，从而减轻了监视器守护程序的负担。图 \ref {socksdirect:fig:architecture}显示了\sys {}的体系结构。
 
 
 %To this end, we regard processes as a shared-nothing distributed system that communicates through message passing.
 %We design a secure control-plane protocol between applications and the monitor, and a data-plane protocol between applications.
 
-为了实现低延迟和高吞吐量，\sys {}使用SHM进行主机内部和RDMA进行主机间通信。
-每个套接字连接都映射到SHM队列或RDMA QP。
-SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它。
-套接字发送操作转换为对远程端点上的套接字缓冲区的SHM或RDMA写操作。
+为了实现低延迟和高吞吐量，\sys {}使用共享内存进行主机内部和RDMA进行主机间通信。
+每个套接字连接都映射到共享内存队列或RDMA QP。
+共享内存或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它。
+套接字发送操作转换为对远程端点上的套接字缓冲区的共享内存或RDMA写操作。
 
 对于\emph {主机内}（intra-host）通信，通信发起者首先向本地监视器发送请求，然后监视器在两个应用程序之间（可能在不同的容器中）建立共享内存队列。 之后这两个应用程序可以直接通信。
 
@@ -147,27 +147,28 @@ SHM或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它�
 
 大多数套接字系统都获得了一个每文件描述符的锁，以使线程和进程共享套接字。
 以前的工作 \cite {boyd2010analysis,clements2015scalable} 表明许多套接字操作不可交换，并且不能始终避免同步。
-本章利用SHM消息传递比锁 \cite {roghanchi2017ffwd} 便宜得多的事实，并使用消息传递作为独占同步机制。
+本章利用共享内存消息传递比锁 \cite {roghanchi2017ffwd} 便宜得多的事实，并使用消息传递作为独占同步机制。
 
 
 \begin{figure}[htbp]
 	\centering
-	\subfloat[Traditional locking]{
+	\subfloat[传统加锁。]{
 		\includegraphics[width=0.3\textwidth]{images/one_conn3}
 		\label{socksdirect:fig:fork-locking}
 	}
 	\hspace{0.02\textwidth}
-	\subfloat[SocksDirect peer-to-peer]{
+	\subfloat[\sys{} 点对点。]{
 		\includegraphics[width=0.22\textwidth]{images/one_conn1}
 		\label{socksdirect:fig:fork-p2p}
 	}
 	\hspace{0.02\textwidth}
-	\subfloat[S2 forks to S2' and S3]{
+	\subfloat[S2 fork 成为 S2' 和 S3]{
 		\includegraphics[width=0.2\textwidth]{images/one_conn2}
 		\label{socksdirect:fig:fork-fork}
 	}
 	
-	\caption{Inter-process queue architectures for a shared socket. Dashed arrows represent non-activated queues.}
+	\caption{共享套接字的进程间队列结构。虚线箭头代表没有被启用的队列。}
+	\label{socksdirect:fig:inter-process-queue}
 \end{figure}
 
 
@@ -253,19 +254,20 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 	\centering
 	\includegraphics[width=0.6\textwidth]{images/fork_memory}
 	
-	\caption{fork后的内存布局。 文件描述符 3和4在fork之前创建并因此共享。 在fork之后，父进程和子进程分别创建一个新的文件描述符 5，它在文件描述符表中写入时被复制。 文件描述符 3和4的套接字元数据和缓冲区在SHM中并因此被共享。 子进程创建一个新的SHM来存储文件描述符 5的套接字元数据和缓冲区，当它再次fork时，它将与子进程共享。 RDMA QP位于私有内存中，而SHM队列是共享的。}
+	\caption{fork后的内存布局。 文件描述符 3和4在fork之前创建并因此共享。 在fork之后，父进程和子进程分别创建一个新的文件描述符 5，它在文件描述符表中写入时被复制。 文件描述符 3和4的套接字元数据和缓冲区在共享内存中并因此被共享。 子进程创建一个新的共享内存来存储文件描述符 5的套接字元数据和缓冲区，当它再次fork时，它将与子进程共享。 RDMA QP位于私有内存中，而共享内存队列是共享的。}
 	\label{socksdirect:fig:fork-memory}
 \end{figure}
+
 \textbf {套接字数据共享。}
 主要的挑战是在\texttt {fork}和\texttt {exec}之后共享套接字元数据，缓冲区和底层传输。
 内存空间在fork之后变为写时复制并在exec之后被擦除，但是套接字文件描述符仍应该可用。
-\sys{} 使用共享内存（SHM）来存储套接字元数据和缓冲区，因此在fork之后，数据仍然是共享的。
-要在exec之后附加SHM，\libipc {}将连接到监视器以获取其父进程的SHM密钥。
-在fork之后，因为父进程看不到子进程创建的套接字，所以子进程创建一个新的SHM来存储新套接字的元数据和缓冲区。
+\sys{} 使用共享内存（共享内存）来存储套接字元数据和缓冲区，因此在fork之后，数据仍然是共享的。
+要在exec之后附加共享内存，\libipc {}将连接到监视器以获取其父进程的共享内存密钥。
+在fork之后，因为父进程看不到子进程创建的套接字，所以子进程创建一个新的共享内存来存储新套接字的元数据和缓冲区。
 
 现在需要共享连接到对等端的底层传输。
-SHM传输不需要特别小心，因为fork / exec之前创建的SHM仍然在fork / exec之后共享。
-但是，RDMA与fork / exec有问题，因为DMA内存区域不在SHM中。
+共享内存传输不需要特别小心，因为fork / exec之前创建的共享内存仍然在fork / exec之后共享。
+但是，RDMA与fork / exec有问题，因为DMA内存区域不在共享内存中。
 它们在fork之后变为写时复制，而网卡仍然从原始物理页面DMA，因此子进程不能使用现有的RDMA资源。
 在exec之后，整个RDMA上下文被清除。
 本章的解决方案是让子进程在fork / exec之后重新初始化RDMA资源（PD，MR等）。
@@ -273,22 +275,22 @@ SHM传输不需要特别小心，因为fork / exec之前创建的SHM仍然在for
 因此，远程可能会看到一个套接字的两个或更多QP，但它们链接到套接字元数据和缓冲区的唯一拷贝。
 图 \ref {socksdirect:fig:fork-memory}显示了一个fork示例。
 
-\textbf {文件描述符 space sharing。}
-与套接字数据不同，文件描述符空间在fork之后变为写入时复制:现有文件描述符是共享的，但新文件描述符由creater进程专有。
+\textbf {文件描述符空间共享。}
+与套接字数据不同，文件描述符空间在fork之后变为写入时复制:现有文件描述符是共享的，但新文件描述符由父进程专有。
 所以文件描述符重映射表驻留在堆内存中，这是fork之后的copy-on-write。
 要在exec之后恢复文件描述符重映射表，它将在exec之前复制到共享内存，并在\libipc {}初始化期间附加到新进程。
 
 \textbf{安全。}
 安全性是一个问题，因为恶意进程可能将自己伪装成特权父进程的子进程。
 要在监视器中标识父关系和子关系，当应用程序调用\texttt {fork}，\texttt {clone}或\texttt {pthread\_create}时，\libipc {}首先生成一个用于配对的秘密并将其发送到监视器，然后调用\emph {libc}中的原始函数。
-在fork之后，子进程为监视器创建一个新的SHM队列并发送秘密（子进程继承父内存空间并知道该秘密）。
+在fork之后，子进程为监视器创建一个新的共享内存队列并发送秘密（子进程继承父内存空间并知道该秘密）。
 因此，监视器可以将子进程与父进程配对。
 
 \textbf {监视行动。}
 在fork，exec或线程创建时，每个现有套接字需要将发送方添加到发送方向，将接收方添加到接收方向。
 父进程继承该令牌，因此子进程始终处于非活动状态。
 
-%The socket queues are in SHM between parent and child processes.
+%The socket queues are in 共享内存 between parent and child processes.
 %However, to avoid synchronization in accessing shared metadata, the metadata is in thread local storage and copied from parent to child.
 %To maintain isolation between parent and child, monitor creates new shared memory queues to replace all queues in \emph{both} parent and child, as Figure~\ref{socksdirect:fig:fork-fork} shows. We do not reuse queues due to potential isolation violation. %The monitor then sends credentials of new queues to parent and child via bootstrap sockets. 
 %Each peer process is notified of the new queues and the new process. From then on, parent and child processes have isolated queues to the monitor and peers.

@@ -5,7 +5,7 @@
 使用商用 RDMA 网卡时，\sys {} 对大量连接的可伸缩性受共享内存和RDMA的限制。
 为了表明 \libipc {} 和监视器不是瓶颈，本节在两个重用RDMA QP和共享内存的进程之间创建了很多连接。使用 \libipc {} 的应用程序线程每秒可以创建1.4~M个新连接，这是Linux的20倍和mTCP的2倍 \cite {jeong2014mtcp}。监视器每秒可以创建5.3~M个连接。
 
-由于主机内的进程数量有限，因此SHM连接的数量可能不会很大。
+由于主机内的进程数量有限，因此共享内存连接的数量可能不会很大。
 但是，一台主机可能连接到许多其他主机，RDMA的可扩展性成为一个问题。
 RDMA 的可扩展性归结为两个问题。
 首先，RDMA 网卡使用网卡内存作为缓存来保持每个连接状态。当有数千个并发连接时，性能受到频繁缓存未命中的影响 \cite {mprdma,kaminsky2016design,kalia2018datacenter}。
@@ -79,17 +79,9 @@ RDMA 网卡需要处理来自主机的控制和数据传输命令（工作请求
 \subsection{多套接字共享队列}
 \label{socksdirect:subsec:multiplex-conn}
 
-很多应用在两个进程间建立多个套接字连接。
+很多应用在两个进程间建立多个套接字连接。例如，数据库的多个客户端线程和多个服务器线程之间可能两两建立连接。HTTP 负载均衡器与后端 Web 服务之间往往为每个 HTTP 请求建立一个连接。一些其他的传输层协议（如 SCTP）和应用层协议（如 QUIC 和很多 RPC 库）也提供多连接的抽象。在传统设计中，每个连接需要独立的缓冲区，因而所需的缓冲区数量较多。
 
-
-
-
-%\textbf{Multiplex connections in event-driven applications.}
-To reduce memory footprint and improve locality of memory accesses, we use one queue to multiplex all connections between a pair of threads. Each data item in the queue is marked with its 文件描述符. By using a single queue, we reduce per-socket memory footprint, random memory accesses and cache misses.
-
-\textbf{Message format.}
-As shown in Figure~\ref{socksdirect:fig:locklessq-structure}, the main component of the queue is a \emph{data ring buffer}, where messages are stored back-to-back.
-Each message in the ring buffer consists of an 8-byte header and a variably sized payload. The header consists of an \textit{isvalid} flag, an opcode, the receiver's 文件描述符 number and the payload size. Messages are aligned to 8 bytes to ensure header write atomicity.% and accelerate payload copy.
+为了降低内存占用，提升内存访问的局部性，如图 \ref{socksdirect:fig:fork-rdwr}，本文使用一条队列来共享一对线程之间的所有连接。队列中的每个数据元素用其文件描述符标识。通过使用一条队列，可以降低每套接字的内存占用、随机内存访问和缓存不命中。
 
 
 
@@ -102,7 +94,7 @@ Each message in the ring buffer consists of an 8-byte header and a variably size
 	\subfloat[多套接字共享队列结构。]{
 		\includegraphics[width=0.6\textwidth]{images/fork_rdwr}
 	}
-	\caption{队列结构的比较。 假设发送者和接收者各有两个线程。 首先，\ sys {}在每对发送方和接收方线程之间创建对等队列。 我们不是用锁来保护队列，而是将每个文件描述符指定给接收者线程以确保排序。 其次，来自所有连接（文件描述符）的数据通过共享队列进行多路复用，而不是每个文件描述符一个队列。}
+	\caption{队列结构的比较。假设发送者和接收者各有两个线程。 首先，在每对发送方和接收方线程之间创建对等队列。不是用锁来保护队列，而是将每个文件描述符指定给接收者线程以确保排序。其次，来自所有连接（文件描述符）的数据通过共享队列进行多路复用，而不是每个文件描述符一个队列。}
 	\label{socksdirect:fig:fork-rdwr}
 \end{figure}
 
@@ -117,34 +109,37 @@ Each message in the ring buffer consists of an 8-byte header and a variably size
 \end{figure}
 \fi
 
-\textbf{Event polling.}
-We maintain a bitmap of each epoll 文件描述符 set.
-When \texttt{epoll\_wait} is called, we scan all data queues round-robin and check the 文件描述符 of each data message against the bitmap. If the 文件描述符 is in the bitmap, an event is returned to the application.
-A global cursor exists to resume data queue scanning from the last position in the last scanned queue.
+\textbf{队列中的消息格式。}
+在第 \ref{socksdirect:subsec:lockless-queue} 节的传统队列结构基础上，为每条消息在头部增加一个文件描述符域，表示接收端的文件描述符。这样，不同文件描述符的消息就可以共享一个队列。每条消息头部还增加一个 \textit{下一消息指针} 域，用于下述的事件轮询；增加一个 \textit{删除} 位，用于下述的从队列中间取消息。
 
-A per-queue cursor records the last scanned position in each queue to avoid scanning a message multiple times.
-To speedup repeated receive operations of a specific 文件描述符, we build a linked list of messages for each 文件描述符 as a side product of event polling.
-Each 文件描述符 maintains positions of the first and last scanned but unread messages of the 文件描述符.
-When a new message of the 文件描述符 is scanned, the \emph{nextptr} pointer in the last message is updated to point to the new message.
 
-To poll events from sockets and other 文件描述符 (handled by kernel) at the same time, \libipc{} creates an \textit{epoll thread} in each process to wait on all 文件描述符 handled by kernel. When it receives a kernel event, it broadcasts the event to application threads via shared memory queues. %\texttt{Epoll\_wait} in \libipc{} will return such kernel events in addition to socket events. %Note that Linux allows an event to be received by multiple threads sharing the 文件描述符.
+\textbf{事件轮询。}
+为每个 epoll 文件描述符集合维护一个位图。
+当调用 \texttt{epoll\_wait} 时，轮流扫描所有的数据队列，并在位图中检查每个数据消息的文件描述符。
+如果文件描述符在位图中，就返回给应用程序一个事件。
+维护一个全局指针，以便从上次扫描的队列位置恢复数据队列的扫描。
+为了避免多次扫描同一个消息，每条队列设置一个指针，保存上次扫描的位置。
+由于应用程序可能在一个文件描述符上反复执行接收操作，直到该文件描述符的队列为空，本文一边扫描，一边为每个文件描述符创建一个消息链表，以加速重复的接收操作。
+每个文件描述符维护两个指针，即该文件描述符的第一个和最后一个扫描过但尚未被接收走的消息。
+当扫描文件描述符的一条新消息时，消息头部的下一消息指针域被更新，指向新扫描的消息，这就组成了同一文件描述符的消息链表。
 
-\textbf{Pick from middle of queue.}
-In order to support receiving data from a specific 文件描述符, the queue needs to support picking a message in the middle with a specific 文件描述符.
-Fortunately, this does not happen frequently. Event-driven applications typically process incoming events in a FIFO order. For \texttt{epoll\_wait} in level trigger mode, we iterate through all messages in the queue and return those in the set of registered 文件描述符. When applications call \texttt{recv}, \libipc{} would usually dequeue the message at head.
+\textbf{从队列中间取消息。}
+为了从任意的文件描述符接收数据，队列需要支持从中间取走一条消息。
+幸运的是，这并不经常发生。事件驱动的应用程序通常按照先到先处理的顺序处理到来的事件。
+对于电平触发模式的 \texttt{epoll\_wait} 操作，\libipc{} 在队列中扫描所有消息，并返回那些文件描述符已被注册在 epoll 文件描述符集合中的消息。
+因此，当应用程序调用 \texttt{recv} 时，取走的通常是队列头部的消息。
 
-To pick from middle of queue, receiver traverses messages in the ring buffer. During traversal, receiver iterates messages from \textit{head} until free space in ring buffer, determined by \textit{isvalid}. Hence, receiver cannot clear \textit{isvalid} when a non-head message is dequeued. That's why each message has an \textit{isdel} flag. When a message is dequeued from the middle, its \textit{isdel} is set. %If the message at \textit{head} has \textit{isdel} set, the receiver advances \textit{head} and repeats this step.
+为了从队列的中间寻找特定文件描述符的消息，如果文件描述符的消息链表非空，则链表头就是要找的消息；如果为空，则需要在队列中遍历消息，从环形缓冲区的头指针遍历到未被分配的空间（用 \textit{有效} 位标识）。因此，当从队列中间取走一条消息时，其 \textit{有效} 位不能被清空。因此，每条消息增加一个 \textit{删除} 位。当消息从中间被取走时，该 \textit{删除} 位被设置。
 
-\textbf{Head-of-line blocking.}
-%Second, if application does not receive from a 文件描述符 for a long time, data items of the 文件描述符 may fill up the queue and starve other 文件描述符.
-If application does not receive from a 文件描述符 for a long time, the empty space in queue will become fragmented.
-When data queue is full, the sender sends a message via emergency queue to trigger garbage collection in the receiver.
-The receiver scans empty space in the middle of queue and moves remaining messages, so that empty space can be returned to the sender.
-%To avoid starvation, we need at least one byte of headroom per 文件描述符. Accordingly, we design a single byte \textit{headroom slot} per 文件描述符. When data queue is full and the per-文件描述符 headroom slot is free, sender uses it and sends a notification via emergency queue. Receiver receives from data queue first, then from the headroom slot if it received a notification.
+\textbf{碎片整理。}
+如果应用程序一直不接收某个文件描述符的数据，队列的空闲空间将变得碎片化。
+当环形缓冲区中没有可用空间时，有可能其中仍有很多已被删除的消息，但因其位于未被接收的其他文件描述符消息之间，这些消息的空间无法被利用。
+当环形缓冲区没有可用空间时，发送端通过共享内存中的控制寄存器，通知接收端进行碎片整理。
+接收端扫描环形缓冲区中的可用空间，将尚未被接收的消息集中在一起，并将空闲空间返回给发送端。
 
-\textbf{Emergency queue.}
-Control messages may need to be delivered out-of-band when the queue is full. For example, in order to close the receive direction while sending data, the shutdown message should not be blocked by unconsumed data in the queue. To this end, we add an \textit{emergency queue} alongside each data queue.
-A receiver will always retrieve messages in the emergency queue immediately.
+%\textbf{Emergency queue.}
+%Control messages may need to be delivered out-of-band when the queue is full. For example, in order to close the receive direction while sending data, the shutdown message should not be blocked by unconsumed data in the queue. To this end, we add an \textit{emergency queue} alongside each data queue.
+%A receiver will always retrieve messages in the emergency queue immediately.
 
 
 %\subsubsection{Zero Copy TCP}
@@ -159,10 +154,10 @@ A receiver will always retrieve messages in the emergency queue immediately.
 %Upon \texttt{recv}, the payload buffer is remapped to application.
 
 
-
+下面评估多套接字共享队列的连接数可扩放性。
+测试前在两个进程间预先建立指定数量的连接，然后轮流（round-robin）使用这些连接以乒乓（ping-pong）的模式收发数据。
 图 \ref{socksdirect:fig:eval-connnum-tput} 显示了不同并发连接数量下的单核吞吐量。
-测试前在两个主机间预先建立指定数量的连接，然后轮流（round-robin）使用这些连接以乒乓（ping-pong）的模式收发数据。
-\sys{} 可以用 4 GB 的可编程网卡 DRAM 内存支持 100 M 条并发连接，并且在如此高的并发度下吞吐量不降低。
+\sys{} 可以用 16 GB 的主机内存支持 100 M 条并发连接，并且在如此高的并发度下吞吐量不降低。
 作为对比，RDMA、LibVMA 和 Linux 的性能随连接数量的增加而迅速降低。
 对于 RDMA，性能在超过 512 条并发连接后迅速降低，这是由于 RDMA 传输层状态占满了网卡缓冲区。
 尽管 LibVMA 和 Linux 并不使用 RDMA 作为传输层，它们为每条连接维护缓冲区，因此在数千条并发连接时会导致 CPU 缓存和 TLB 不命中。
