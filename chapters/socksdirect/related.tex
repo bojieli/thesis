@@ -66,14 +66,34 @@ RDMA 网卡需要处理来自主机的控制和数据传输命令（工作请求
 
 
 \subsection{基于 CPU 的传输层}
+\label{socksdirect:subsec:cpu-transport}
 
 实现连接数可扩放性的另一种方案是在主机 CPU 上实现传输层协议，从而网卡无需为每个连接存储状态，只需实现无状态卸载。
-用户态协议栈与网卡之间使用收发数据包接口，而非 RDMA 消息接口。
-我们利用 DPDK 等高性能数据包处理框架实现主机 CPU 与网卡间的高效通信。
-基于 LibVMA 实现……
+网卡无状态卸载的常见方案是用户态协议栈与网卡之间使用收发数据包接口，而非 RDMA 远程内存访问接口。
+基于数据包的实现除了可以处理大量并发连接，还可以在不支持 RDMA 的虚拟化平台上使用。例如，微软 Azure 云的很多虚拟机实例不支持 RDMA，但支持 DPDK 和 LibVMA 等高性能数据包接口，基于数据包的传输层将可以在这些虚拟化平台上使用。
+
+LibVMA 与网卡之间使用高性能数据包收发接口。LibVMA 的兼容性、性能和多核可扩放性问题主要是由于其 VFS 层。因此，本节利用 LibVMA 实现传输层功能和网卡接口，替换 \libipc{} 中的环形缓冲区和 RDMA 硬件传输层。
+LibVMA \cite{libvma} 用户态套接字库的结构与图 \ref{socksdirect:fig:libsd-architecture} 的 \libipc{} 库类似，都是由 API 封装、VFS 层、队列层和传输层构成。
+LibVMA 的队列层和传输层由 LwIP 轻量级 TCP/IP 协议栈和 Mellnox 网卡的高速数据包收发接口组成。
+为了使用 LibVMA，在 \libipc{} 中将基于环形缓冲区的队列替换成 LwIP 的发送接收接口。
+测试表明，LibVMA 中的 LwIP 和网卡接口部分发送和接收小数据包的吞吐量为 18 M 次每秒；\libipc{} 中的 API 封装和 VFS 层的吞吐量为 27 M 次每秒。这意味着基于 LibVMA 的 \libipc{} 吞吐量大约可达 10.8M 个小数据包每秒。
+
+为了实现基于 TCP/IP 的零拷贝，LibVMA 中的 LwIP 传输层需要修改。
+为了页面重映射，发送和接收的有效载荷需要对齐到 4~KiB 边界。
+发送时，\libipc{} 组建一个两块缓冲区构成的数据包：首先是从数据包头模板经过 LwIP 传输层组建的数据包头部，然后是零拷贝的有效载荷。
+\libipc{} 利用网卡的分散-聚集（scatter-gather）支持来让网卡把两块缓冲区组成一个数据包。
+接收时，\libipc{} 使用一个包含两块缓冲区的接收工作请求，首先是恰好能容纳标准 TCP/IP 数据包头的 54 字节缓冲区，然后是页面对齐的有效载荷缓冲区。
+与第 \ref{socksdirect:subsec:lockless-queue} 章的设计相同，\libipc{} 在接收到数据包后及时补充 \texttt{recv} 工作请求，保持网卡始终有接收缓冲区可用。
 
 
-
+上述基于数据包接口的方案需要 LibVMA 库为每条连接插入一条流重定向（flow steering）规则，把接收到的数据包映射到接收工作队列。这仍然需要网卡为每条连接维护状态，因此如第 \ref{socksdirect:sec:evaluation} 节的评估结果显示的，并发连接数较多时性能仍然会下降。
+为了让网卡完全不保存连接状态，可以用可编程网卡实现不可靠、无拥塞控制的单边 RDMA 写操作（目前 Mellanox RDMA 网卡不支持基于不可靠数据报的单边 RDMA）。
+单边 RDMA 写操作中包含远程主机上的内存地址，因此接收端网卡只需将有效载荷通过 PCIe DMA 写入数据包中指定的地址。
+这样就可以应用本章第 \ref{socksdirect:subsec:lockless-queue} 节的环形缓冲区设计，发送端通过不可靠信道将环形缓冲区的变化同步到接收端。
+启用了 RDMA 的数据中心网络丢包率很低，因此可以通过超时检测丢包。具体地，接收端发现环形缓冲区内有数据后即发送确认（ACK）包；发送端如果超时未收到确认包则重传。
+为了实现基于窗口的拥塞控制，发送端需要为每个环形缓冲区（即每条连接）维护一个发送窗口，并在收到确认包和显式拥塞通知（ECN）时调整发送窗口。
+丢包恢复和拥塞控制等传输层功能增加的 CPU 开销是有限的。
+通过这种方法可以解决网卡连接数的可扩放性问题。
 
 
 \subsection{多套接字共享队列}
@@ -145,13 +165,6 @@ RDMA 网卡需要处理来自主机的控制和数据传输命令（工作请求
 %\subsubsection{Zero Copy TCP}
 %\label{socksdirect:subsec:zero-copy-tcp}
 %
-%For TCP connections, we optimize the user-space TCP/IP stack to remove memory copy between \libipc{} and 网卡.
-%Because the payloads of sent and received packets need to align at 4~KiB page boundary, we leverage scatter-gather support in modern 网卡s~\cite{mellanox} to separate packet header from application payload.
-%%During initialization, \libipc{} queries IP and Ethernet MAC address from the kernel and constructs a packet header template.
-%For \texttt{send}, \libipc{} constructs a packet header to a 网卡 send work request, then fills in the payload buffer address from application. 
-%For receiving data, in background, \libipc{} issues 网卡 receive work requests with a 54-byte buffer to store Ethernet, IPv4 and TCP headers, followed by a page-aligned buffer to store payload.
-%%In corner cases where the received header length is not 54 bytes, \libipc{} reassembles the packet.
-%Upon \texttt{recv}, the payload buffer is remapped to application.
 
 
 下面评估多套接字共享队列的连接数可扩放性。
@@ -186,15 +199,20 @@ RDMA 网卡需要处理来自主机的控制和数据传输命令（工作请求
 
 
 
-\section{讨论：应用、协议栈与网卡间的接口抽象}
-\label{socksdirect:sec:api-discussion}
+\subsection{应用、协议栈与网卡间的接口抽象}
+\label{future:nic-interface}
 
-应用程序与用户态协议栈之间使用套接字接口。协议栈与网卡间使用 RDMA 接口。任务划分？不仅是性能问题，接口容易编程？
+本章中，应用程序与用户态协议栈之间使用套接字接口通信，协议栈与网卡间使用 RDMA 接口通信。这是为了兼容现有的应用程序和 RDMA 网卡。然而，应用程序在套接字层上往往还有更高层次的通信抽象，如第 \ref{chapter:kvdirect} 章的键值存储原语，以及远程过程调用（RPC）、消息队列等原语。随着可编程网卡的出现，主机 CPU 与网卡间任务划分的界限也未必遵循 RDMA 接口。因此，应用程序、协议栈与网卡间的接口抽象可以通盘考虑。
 
+应用、协议栈与网卡之间的接口抽象不仅需要考虑性能问题，还要考虑是否容易编程。如果仅从性能的角度考虑，对于现有内存容量较小的网卡，较好的任务划分是在网卡上实现高带宽和低延迟连接的传输层，在主机 CPU 上实现大量其他连接的传输层。然而这需要开发者指定哪些连接是需要高带宽和低延迟的，增加了编程负担；或者由协议栈和网卡自动划分和迁移，这也将增加系统的复杂度。
 
+协议栈与应用之间如果可以不遵循套接字接口，将有更大的设计空间，本章 \ref{socksdirect:sec:background} 节介绍了很多相关工作。例如，在零拷贝方面，如果应用程序能给协议栈更多的提示信息，将可以避免很多不必要的内存拷贝。当应用程序调用 \texttt{send} 后，可能继续读写发送缓冲区。为了保证应用程序能读到缓冲区的内容，零拷贝的页面必须设置为只读，这使得同一主机内的接收端就地修改接收内容时需要写时复制。当应用程序写入发送缓冲区时，协议栈并不知道该缓冲区未被写入的部分是否会被应用程序读取，因此并不能映射一个空页面，而需要写时复制。本文通过拦截 \texttt{memcpy} 来优化整页写入的情况，然而不能优化页面被部分写入的情况。很多应用程序事实上不需要在发送后读取缓冲区内容。解决上述问题的最佳方案是由应用程序告知协议栈，被发送的缓冲区内容是否还需要读取。这可以通过给 \texttt{send} 调用增加一个选项，或者额外的 \texttt{mem\_is\_junk} API 来实现。
 
+网卡基于消息的 RDMA 原语与基于字节流的套接字原语存在不匹配。发送端与接收端之间的环形缓冲区在 CPU 的共享内存中不需要软件显式同步。但在基于单边 RDMA 的共享内存中，就需要软件显式发送 RDMA 操作来同步两个缓冲区，即将发送端的数据同步到接收端，并将接收端释放的缓冲区空间同步到发送端。相比硬件实现的一致（coherent）共享内存，软件显式同步增加了 CPU 开销。用硬件实现环形缓冲区同步可以达到更高的吞吐量，特别是在消息很小时。
 
+目前商用 RDMA 网卡与主机 CPU 之间的传输层功能划分不够灵活。如第 \ref{socksdirect:subsec:cpu-transport} 节讨论的，Mellanox RDMA 网卡中的单边 RDMA 操作只支持可靠连接（RC）而不支持不可靠数据报（UD），这意味着如果希望在主机 CPU 上实现传输层，就必须使用双边 \texttt{send} 和 \texttt{recv} 操作或者网卡提供的其他数据包收发接口，而无法使用远程内存访问原语。此外，传输层中的按序传输、拥塞控制、丢包重传等功能也是紧密耦合的，要么全部使用网卡厂商固定的硬件实现，要么全部在 CPU 上用软件实现。可编程网卡提供了解耦传输层功能的机会。
 
+如果网卡具备处理大量并发连接的能力，在网卡中实现连接建立将可以节约 CPU 创建连接过程中的开销和延迟。
 
 %Another promising direction to solve the RDMA concurrency issue is to implement the reliable transport in CPU, and the 网卡 remains stateless. However, RDMA UD does not support one-sided write, so the ring buffer in Sec.~\ref{socksdirect:subsec:lockless-queue} will not work. Existing software RDMA~\cite{soft-roce} has low performance. It would be interesting to co-design software and 网卡.
 
