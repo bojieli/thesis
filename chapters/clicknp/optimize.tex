@@ -192,15 +192,6 @@ S2: A[idx].cnt ++;
 \textbf{新内容：元件之间共享内存，存储类型标识符 global / static / register。}
 \fi
 
-\begin{figure}
-
-\includegraphics[width=.15\textwidth]{fsm1.jpg} \\
-\includegraphics[width=.2\textwidth]{fsm2.jpg} \\
-
-\caption{FSM expansion. }
-\label{clicknp:fig:fsm-expansion}
-\end{figure}
-
 \subsubsection{平衡流水级}
 理想情况下，一个处理管道中的每个阶段应当具有相同的速度。即，在一个时钟周期处理数据。
 但是，如果每个阶段的过程不平衡并且某些阶段需要比其他阶段更多的循环，则这些阶段将限制管道的整个吞吐量。
@@ -286,6 +277,15 @@ S2:} else {
 
 \end{figure}
 
+\iffalse
+\begin{figure}
+	
+	\includegraphics[width=.15\textwidth]{fsm1.jpg} \\
+	\includegraphics[width=.2\textwidth]{fsm2.jpg} \\
+	
+	\caption{FSM expansion. }
+	\label{clicknp:fig:fsm-expansion}
+\end{figure}
 
 \smalltitle{Expand code.} \name\ provides several tools to help programmers to expand code, trading off FPGA area for speed.
 One common code expansion is to unroll loops. Additionally, \name\ provides \textit{.repeat} directive to expand code according to
@@ -299,3 +299,4 @@ For example, Figure~\ref{clicknp:fig:memscattering}(d) shows the parsing tree th
 But \name\ compiler can automatically expends the FSM to an equivalent, but much flattened FSM, as shown in Figure~\ref{clicknp:fig:memscattering}(e). Now every header can be parsed in one cycle -- all parsing paths can be evaluated in parallel, 
 instead of up to 4 cycles (Figure~\ref{clicknp:fig:memscattering}(d)).
 
+\fi

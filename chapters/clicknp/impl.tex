@@ -138,13 +138,6 @@ HashTCAM和RateLimiter具有适度的逻辑资源使用，因为这些元件具�
 为此，本文扩展了OpenCL运行时，添加一个新的I / O通道，并连接到shell中的PCIe交换机。
 PCIe交换机将仲裁新添加的I / O通道与shell中的其他组件（例如DDR内存控制器）之间的访问。
 
-Catapult shell \cite {putnam2014reconfigurable}中的PCIe插槽DMA引擎将PCIe Gen2 x8链路划分为64个逻辑子通道，即\textit {slots}。
-每个插槽都有一对用于DMA操作的发送和接收缓冲区。
-在64个插槽中，33个由Shell保留，运行时库用于控制内核和访问板载DDR，一个插槽用于将信号传递给\name 元件。
-然而，剩余的30个插槽用于FPGA和CPU元件之间的数据通信。
-为了分摊DMA开销，本章积极地使用\textit {batching}。最大邮件大小限制为64KB。
-PCIe通道可以在中断或轮询模式下工作。
-
 
 \iffalse
 \textbf{图：ClickNP element，channel，signal 菊花链，command hub 的示例}
@@ -154,7 +147,22 @@ PCIe通道可以在中断或轮询模式下工作。
 \textit {CmdHub}还用于将控制信号从管理器线程分发到FPGA元件。
 为了识别目标元件，在信号消息中嵌入元件ID，并且\textit {CmdHub}可以读取ID并再次通过FIFO缓冲器将信号消息转发到相应的元件。
 
-ClickNP 支持灵活的 I/O 操作。如图 \ref{clicknp:fig:pcie-io} 所示。
+\name 支持灵活的 I/O 操作。如图 \ref{clicknp:fig:pcie-io} 所示，\name 提供了基于槽位（slot）和工作队列（work queue）两种与主机 CPU 通信的抽象，还提供了裸 DMA 操作的接口。
+在基于槽位的抽象中，PCIe 物理链路划分为64个逻辑子通道，即\textit {slots}（插槽）。
+每个插槽都有一对用于DMA操作的发送和接收缓冲区。
+在64个插槽中，33个由 OpenCL BSP 用于管理 ClickNP 内核和访问板载 DDR，一个插槽用于将信号传递给 \name 元件。
+剩余的30个插槽用于FPGA和CPU元件之间的数据通信。
+CPU 上的槽位抽象可以在中断或轮询模式下工作。
+
+槽位抽象中每发送一个数据都需要至少 4 次 DMA 操作 \footnote{从主机 CPU 发送数据到 FPGA 的过程是：主机 CPU 写 FPGA 中的下行控制寄存器（又称门铃，doorbell）；FPGA 从主机内存中 DMA 读取数据。当 FPGA 处理完槽位中的数据后，写主机内存中的下行完成寄存器，并向主机 CPU 发送中断。从 FPGA 向主机 CPU 发送数据的过程是：FPGA 读内部的上行控制寄存器，判断为空；FPGA 向主机内存 DMA 写入数据，并向主机 CPU 发送中断。主机接收 FPGA 发来的数据过程是：读 FPGA 中的上行控制寄存器，判断非空；读取主机内存中的数据；写 FPGA 中的上行控制寄存器，表示处理完毕。}，且需要等待对面的设备处理完成才能在同一槽位发送下一个数据。
+为分摊 DMA 开销、提高消息发送的并发度，工作队列是槽位抽象的扩展，每个槽位不再仅有一对缓冲区，而是有一对用于发送和接收的环形缓冲区队列。
+每条环形缓冲区队列有 128 个槽位，按照先进先出的方式访问。
+发送端发现环形缓冲区队列中还有尚未被取走的数据时，就无需通知对端，节约了 CPU 通过 PCIe MMIO 发送门铃（doorbell）和 FPGA 发送中断的开销。
+
+除了槽位和工作队列，FPGA 和 CPU 之间还需要更灵活的通信方式。首先，第 \ref{chapter:kvdirect} 章的键值存储中，FPGA 需要直接读写主机内存中的键值，而无需主机 CPU 参与，这就需要 FPGA 能够直接发出裸的 PCIe DMA 读写请求。
+其次，在基于可编程网卡的内存解聚中，FPGA 将远程内存通过 PCIe MMIO 直接映射到主机内存空间，主机 CPU 直接访问此内存空间，生成 PCIe DMA 读写请求发送到 FPGA。FPGA 中的用户逻辑需要处理这些 DMA 被动读写操作。
+最后，一些应用（如传统 OpenCL 应用）可能希望主机 CPU 与 FPGA 之间采用 FPGA 板上的 DRAM 作为共享内存，因此 FPGA 板上的 DRAM 通过 PCIe MMIO 映射到主机内存空间，由 shell 中的 PCIe 被动读写逻辑发送到 DRAM 控制器。
+
 
 
 \begin{figure}[htbp]
@@ -164,7 +172,7 @@ ClickNP 支持灵活的 I/O 操作。如图 \ref{clicknp:fig:pcie-io} 所示。
 	\label{clicknp:fig:pcie-io}
 \end{figure}
 
-图 \ref {clicknp:fig:pcie} 显示了具有不同插槽数和批量大小的PCIe I / O通道的基准。
+图 \ref {clicknp:fig:pcie} 显示了具有不同插槽数和批量大小的PCIe I / O通道的基准测试结果。
 作为基线，还测量了OpenCL全局内存操作的性能 - 到目前为止，这是OpenCL \cite {opencl}中为CPU / FPGA通信提供的唯一方法。
 可以看到，单个插槽的最大吞吐量约为8.4~Gbps。
 通过4个插槽，PCIe I / O通道的总吞吐量可达25.6~Gbps。
