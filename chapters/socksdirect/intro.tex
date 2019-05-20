@@ -26,19 +26,18 @@
 %However, these abstractions are radically different from socket, so it is complicated and potentially insecure to port socket applications to shared memory and RDMA.
 %The overhead of Linux socket becomes salient given the rapid growth of network speed and number of CPU cores per server. %We benchmark communication intensive applications (\textit{e.g.} Nginx and memcached) and find that 50\%$\sim$90\% of CPU time is spent in the OS kernel. When more CPU cores are utilized, they even spend a larger portion of time in the kernel~\cite{boyd2010analysis}. In addition to CPU overhead, latency is also a problem. The round-trip time (RTT) between two processes communicating with shared memory can be as low as 0.2$\mu$s, while TCP socket RTT between two cores is $\approx$16$\mu$s. In a data center, the RTT between RDMA servers is also one order of magnitude lower than kernel TCP/IP stack.
 
-Socket API是现代应用程序中使用最广泛的通信原语。 它通常用于进程，容器和主机之间的通信。
-Linux套接字只能实现比硬件的原始功能差一个数量级的延迟和吞吐量。
+Socket API是现代应用程序中使用最广泛的通信原语，通常用于进程，容器和主机之间的通信。
+Linux套接字只能实现比裸的硬件（如共享内存和 RDMA）差一到两个数量级的延迟和吞吐量。
 %Socket operations have latency and throughput one order of magnitude worse than the raw hardware.
 %Socket operations are expensive and scale poorly with modern multi-core CPUs.
 %Communication intensive applications such as distributed key-value stores and web servers could spend 50\%$\sim$90\% of CPU time in the OS kernel~\cite{jeong2014mtcp}, mostly processing socket operations.
-
-存在大量旨在改善套接字性能的工作。
-现有方法要么优化内核网络协议栈 \cite {lin2016scalable,han2012megapipe,yasukata2016stackmap}，要么将TCP / IP协议栈移动到用户空间 \cite {jeong2014mtcp,marinos2014network,seastar,fstack,libvma}，或者把传输层卸载到RDMA网卡 \cite{rsockets,socketsdirect}。
+近年来，大量工作旨在改善套接字性能。
+现有方法或者优化内核网络协议栈 \cite {lin2016scalable,han2012megapipe,yasukata2016stackmap}，或者将TCP/IP协议栈移动到用户空间 \cite {jeong2014mtcp,marinos2014network,seastar,fstack,libvma}，或者把传输层卸载到RDMA网卡 \cite{rsockets,socketsdirect}。
 但是，所有这些解决方案都在兼容性和性能方面存在限制。
-它们中的大多数在诸如进程 fork，事件轮询，多应用程序套接字共享和主机内通信等方面与本机套接字不完全兼容。
-其中一些 \cite {jeong2014mtcp}存在隔离问题，不允许多个应用程序共享网卡。
-即使在性能方面，仍有很大的提升空间。现有的工作都不能达到接近原始RDMA的性能，因为它们无法消除一些重要的开销，例如多线程同步，缓冲区管理和内存复制。
-例如，套接字在进程中的线程之间共享，因此，许多系统使用锁来避免竞争条件。
+它们中的大多数在诸如进程 fork、事件轮询、多应用程序套接字共享和主机内通信等方面与 Linux 套接字不完全兼容。
+其中一些 \cite {jeong2014mtcp} 存在隔离问题，不允许多个应用程序共享网卡。
+尽管这些工作致力于提升性能，仍有很大的性能提升空间。现有的工作都不能达到接近原始RDMA 和共享内存的性能，因为它们无法消除一些重要的开销，例如多线程同步，缓冲区管理和内存复制。
+例如，套接字在进程中的多个线程之间共享，因此，许多系统使用锁来避免竞争条件。
 
 %\textcolor{red}{Wei: This seems not promising because socket to RDMA has many solutions.}
 %It is often believed that the legacy socket API contributes most to the overheads, so many high performance socket systems propose alternative APIs that require developers to change application code.
@@ -59,39 +58,44 @@ Linux套接字只能实现比硬件的原始功能差一个数量级的延迟和
 
 %The goal of this work is to answer the question: Can a Linux compatible and general purpose socket system provide performance comparable to RDMA systems?
 
-认识到这些限制，本章设计了\sys {}，一个用户空间套接字系统，可以同时实现兼容性，隔离性和高性能。
+认识到这些限制，本章设计了\sys {}，一个用户空间套接字系统，可以同时实现兼容性、隔离性和高性能。
 \begin{ecompact}
 \item \textbf {兼容性}。
-应用程序可以使用\sys {}作为替代品而无需修改。
-它支持主机内和主机间通信，并且在进程fork和线程创建期间表现正常。
-如果远程对端不支持\sys {}，则系统将透明地回退到TCP。
-\item \textbf {隔离}。
-\sys {}保留了应用程序和容器之间的隔离，并强制实施访问控制策略。
+应用程序无需修改，即可使用\sys {} 作为 Linux 套接字的替代品。
+\sys{} 同时支持主机内和主机间通信，并且在进程fork和线程创建期间行为正确。
+如果远程对端不支持\sys {}，则系统将透明地回退到标准TCP。
+\item \textbf {隔离性}。
+\sys {}保持了应用程序和容器之间的隔离性，并强制实施访问控制策略。
 \item \textbf {高性能}。
-\sys {}提供高吞吐量和低延迟，可与原始RDMA相媲美，并可通过多个CPU核心进行扩展。
+\sys {}提供高吞吐量和低延迟，可与原始RDMA相媲美，并可通过多个CPU核心实现性能扩放。
 \end{ecompact}
 
 
-为了实现高性能，\sys{}充分利用了现代硬件的能力。 它利用RDMA进行主机间通信，并使用\emph {共享内存}（共享内存）进行主机内通信。 但是，将套接字函数转换为RDMA和共享内存操作并非易事。 简单明了的解决方案可能会违反兼容性或在表格上留下很多性能。 例如，在socket \textbf {send()}返回后，应用程序可能会覆盖缓冲区。 相反，发送RDMA需要引脚和写保护缓冲区。 现有的工作 \cite {rsockets}要么提供与未修改的应用程序不兼容的零拷贝API，要么管理内部缓冲区并从应用程序缓冲区复制数据。
+为了实现高性能，\sys{}充分利用了现代硬件的能力。 它利用RDMA进行主机间通信，并使用\emph {共享内存}（shared memory）进行主机内通信。 但是，将套接字操作转换为RDMA和共享内存操作并非易事。
+简单的解决方案可能会违反兼容性或在表格上留下很多性能。
+例如，在套接字 \textbf {send()}返回后，应用程序可能会覆盖缓冲区。
+然而，RDMA 发送操作需要写保护缓冲区。
+现有的工作 \cite {rsockets} 或者提供与未修改应用程序不兼容的零拷贝 API，或者需要协议栈管理内部缓冲区并从缓冲区复制数据。
 %For example, \textcolor{red}{Take socket send() to RDMA send operations as an example here. If no memory copy, compatibility. If memory copy, performance degradation. Btw, how to point out isolation problem here?}
 
-为了同时实现所有这三个目标，首先需要了解Linux套接字如何提供兼容性和隔离性。 Linux套接字为应用程序提供虚拟文件系统（VFS）抽象。 通过这种抽象，应用程序开发人员可以像操作文件那样进行通信，而无需深入研究网络协议细节。 这种抽象还在共享地址和端口空间的应用程序之间提供了良好的隔离。 但是，VFS抽象非常复杂，许多API本身就不具备可扩展性。\cite {clark1989analysis,boyd2010analysis,jeong2014mtcp}。
+为了同时实现所有这三个目标，首先需要了解Linux套接字如何提供兼容性和隔离性。 Linux套接字为应用程序提供虚拟文件系统（VFS）抽象。 通过这种抽象，应用程序开发人员可以像操作文件那样进行通信，而无需深入研究网络协议细节。 这种抽象还在共享地址和端口空间的应用程序之间提供了良好的隔离。 但是，VFS抽象非常复杂，许多API本身就不具备可扩展性 \cite {clark1989analysis,boyd2010analysis,jeong2014mtcp}。
 
 尽管VFS具有普遍性和复杂性，许多常用的套接字操作实际上都很简单。因此，本章的设计原则是针对常见情况进行优化，同时保持兼容性。
 
 为了在连接管理中保持隔离的同时加速数据传输，\sys {}将控制和数据平面分开 \cite {peter2016arrakis}。
-在每个主机中，引入一个 \emph {monitor} 守护进程作为\emph {控制平面}来强制执行访问控制策略，管理地址/端口资源，分派新连接以及在通信对等体之间建立传输通道。
-\emph {数据平面}由动态加载的用户空间库\libipc {}处理，它拦截对Linux \emph {glibc}的函数调用。 \libipc {}在用户空间中实现套接字API，并将非套接字相关的API转发给内核。
+在每个主机中，引入一个 \emph {管程}（monitor）守护进程作为 \emph {控制平面} 来强制执行访问控制策略，管理地址、端口资源，分派新连接以及在通信对端之间建立传输通道。
+\emph {数据平面} 由动态加载的用户空间库\libipc {}处理，它拦截对Linux 标准 C 库=的函数调用。 \libipc {}在用户空间中实现套接字API，并将非套接字相关的API转发给内核。
 应用程序可以通过在Linux中使用\emph {LD\_PRELOAD}环境变量来加载库来利用\libipc {}。
 
 
-在\sys {}中，数据传输和事件轮询在进程之间以对端式处理，而连接建立则委托给管程。
-本章利用多种技术有效地利用硬件并提高系统效率。
-通常，线程和fork进程之间共享套接字连接。
-为了避免访问套接字元数据和缓冲区中的竞争条件，需要同步。通过基于令牌的共享方法，而不是锁每个操作，消除了常见情况下的同步开销。
+在\sys {}中，数据传输和事件轮询在对端进程之间直接处理，而连接建立则委托给管程。
+本章利用多种技术高效利用硬件并提高系统效率。
+通常，线程和fork产生的进程之间共享套接字连接。
+为了避免访问套接字元数据和缓冲区带来的竞争条件（race condition），需要同步。
+通过基于令牌的共享方法，而不是为每个操作加锁，\sys{} 消除了常见情况下的同步开销。
 从网卡发送和接收数据时，现有系统为每个数据包分配缓冲区。
-为了消除缓冲区管理开销，本章设计了每个连接独享的环形缓冲区，在发送方和接收方都有两个拷贝，然后利用RDMA和共享内存从发送方环缓冲区同步到接收方。
-为了实现大型消息的零拷贝，本章利用虚拟内存重新映射页面。
+为了消除缓冲区管理开销，本章设计了每个连接独享的环形缓冲区，在发送方和接收方各有一个拷贝，然后利用RDMA和共享内存从发送方环形缓冲区同步到接收方。
+为了实现较大消息的零拷贝，\sys{} 利用虚拟内存机制重新映射页面。
 %Finally, we observe that cooperative context switch is faster than process wakeup, so we design a mechanism to allow CPU time sharing among polling processes.
 
 \iffalse
@@ -132,19 +136,19 @@ To share a CPU core efficiently among multiple active threads, \sys uses \emph{c
 %First, we intercept \texttt{memcpy} of full pages to reduce copy-on-write. Second, we move kernel-based page allocation to user-space while preserving security.
 %As a result, we achieve zero copy for both shared memory, RDMA and TCP transport.
 
-\sys {}实现了与底层共享内存队列和RDMA可实现的原始性能接近的延迟和吞吐量。
-在延迟方面，\sys {}实现了主机内套接字的0.3微秒RTT，Linux的1/35，比裸机共享内存队列高出0.05微秒。对于主机间套接字，\sys {}在RDMA主机之间实现了1.7微秒的RTT，几乎与原始RDMA写入和1/17的Linux相同。
-在吞吐量方面，单个线程可以每秒发送23~M个主机内消息（Linux的20倍）或18~M个主机间（15倍的Linux，1.4倍的原始RDMA写入）。
-对于大型消息，零拷贝，单个连接会使网卡带宽饱和。
-上述性能可根据内核数量进行扩展。
-\sys {}为实际应用程序提供了显着的加速。
-例如，Nginx~ \cite {nginx}的HTTP请求延迟提高了5.5倍，RPC提高了50％。
+\sys {}实现了与底层共享内存队列和裸RDMA的性能接近的延迟和吞吐量。
+在延迟方面，\sys {} 对主机内套接字实现了0.3微秒RTT，是 Linux的1/35，仅比裸机共享内存队列高出0.05微秒。对于主机间套接字，\sys {} 在RDMA主机之间实现了1.7微秒的RTT，几乎与裸的RDMA写入相同，达到了Linux的1/17。
+在吞吐量方面，单个线程可以每秒发送23~M个主机内消息（Linux的20倍）或18~M个主机间（15倍于Linux，1.4倍于裸的RDMA写入）。
+对于大型消息，通过零拷贝，单个连接即可饱和利用 100 Gbps 网卡的带宽。
+上述性能可随内核数量线性扩放。
+\sys {} 为实际应用程序提供了显著的加速。
+例如，Nginx~ \cite {nginx} 的HTTP请求延迟降低到了 1/5.5，标准 RPC 库的延迟也可以降低 50％。
 
 总之，本章做出了以下贡献：
 \begin{ecompact}
 \item 分析Linux套接字的开销。
-\item \sys {}的设计和实现，这是一个与Linux兼容的高性能用户空间套接字系统，可以保留应用程序之间的隔离。
-\item 支持fork，无锁连接共享，分配空闲环缓冲区和零拷贝的技术，可能在套接字以外的许多场景中都很有用。
+\item 设计和实现了 \sys {}，一个与Linux兼容、能保持应用程序间隔离的高性能用户空间套接字系统。
+\item 支持fork、无锁连接共享、环形缓冲区和零拷贝等技术，可能在套接字以外的许多场景中都很有用。
 \item 评估显示\sys {}可以实现与RDMA和共享内存队列相当的性能。
 \end{ecompact}
 
