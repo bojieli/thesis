@@ -34,7 +34,8 @@
 %\end{figure}
 
 套接字（socket）是应用程序，容器和主机之间的标准通信原语。
-图 \ref{socksdirect:fig:socket-pseudo-code} 示意了使用套接字原语的典型服务器应用程序的伪代码。首先，服务器
+图 \ref{socksdirect:fig:socket-pseudo-code} 示意了使用套接字原语的典型服务器应用程序的伪代码。首先，服务器创建一个套接字文件描述符 \texttt{lfd} 用于监听端口、接收新连接，并设置为非阻塞以便异步处理。然后创建一个事件文件描述符 \texttt{efd} 用于接收新连接事件和各个连接发送接收数据的事件。
+接下来进入事件循环，对每个接收到的事件，如果是新连接，就调用 \texttt{accept} 接收之，并加入事件监视；如果是已有连接上有数据到达，就接收该连接上的所有数据（因为有接收缓冲区大小限制，一次 \texttt{recv} 可能接收不完）；如果对端已经准备好接收（即接收缓冲区有空闲空间），就将待发送的数据发送出去。
 
 \begin{figure}[htbp]
 \begin{lstlisting}[style=myCStyle]
@@ -74,19 +75,19 @@ while (true) { // main event loop
 \end{figure}
 
 
-现代数据中心网络具有微秒级基本延迟和数十Gbps吞吐量。 但是，传统的Linux套接字是在具有共享数据结构的操作系统内核空间中实现的，这使得套接字成为在多个主机上运行的通信密集型应用程序的众所周知的瓶颈 \cite {barroso2017attack}。 除了主机间通信之外，同一主机上的云应用程序和容器经常相互通信，使得主机内套接字通信在云时代变得越来越重要。 在压力测试下，Nginx~ \cite {reese2008nginx}，Memcached~ \cite {fitzpatrick2004distributed}和Redis~ \cite {carlson2013redis}等应用程序在内核中消耗50％到90％的CPU时间，主要处理TCP套接字操作 \cite{jeong2014mtcp}。
+现代数据中心网络具有微秒级延迟和数十Gbps吞吐量。 但是，传统的Linux套接字是在具有共享数据结构的操作系统内核空间中实现的，这使得套接字成为在多个主机上运行的通信密集型应用程序众所周知的瓶颈 \cite {barroso2017attack}。 除了主机间通信之外，同一主机上的微服务和容器经常相互通信，使得主机内套接字通信在云时代变得越来越重要。 在压力测试下，Nginx~ \cite {reese2008nginx}，Memcached~ \cite {fitzpatrick2004distributed} 和Redis~ \cite {carlson2013redis} 等应用程序在内核中消耗50\%到9\%％的CPU时间，主要用于处理TCP套接字操作 \cite{jeong2014mtcp}。
 
 要了解套接字的成本，首先需要了解套接字的功能。
-现代操作系统中的TCP套接字通常具有三个功能:（1）寻址，找到并连接到另一个应用程序；（2）提供可靠且有序的通信通道，由整数\emph {文件描述符}（File Descriptor）标识；（3）来自多个频道的多重事件，例如poll和epoll。 大多数Linux应用程序使用准备驱动的I / O多路复用模型。 操作系统告诉应用程序哪些文件描述符已准备好接收或发送，然后应用程序可以准备缓冲区并发出接收或发送操作。
+现代操作系统中的TCP套接字通常具有三个功能:（1）寻址，找到并连接到另一个应用程序；（2）提供可靠且有序的通信通道，由整数 \emph {文件描述符}（File Descriptor）标识；（3）查询来自多个通道的事件，例如 poll 和 epoll。大多数Linux应用程序使用准备驱动（readiness-driven）的 I/O 多路复用模型，即操作系统告诉应用程序哪些文件描述符已准备好接收或发送，然后应用程序可以准备缓冲区并发出接收或发送操作。
 
-从概念上讲，Linux网络协议栈由三层组成。首先，VFS层为应用程序提供套接字API（例如\emph {connect}，\emph {send}，\emph {epoll}）。套接字连接是双向，可靠且有序的管道，由整数\emph {文件描述符}（文件描述符）标识。
-其次，传统的TCP / IP传输层提供I / O复用，拥塞控制，丢失恢复，路由和QoS功能。
-第三，网卡层与网卡硬件（或用于主机内套接字的虚拟环回接口）通信以发送和接收分组。
-众所周知，VFS层贡献了很大一部分成本 \cite {clark1989analysis,boyd2010analysis}。
-这可以通过一个简单的实验来验证:主机中两个进程之间的Linux TCP套接字的延迟和吞吐量只比管道，FIFO和Unix域套接字差一点（表 \ref {socksdirect:tab:operation-performance} ）。
-管道，FIFO和UNIX域套接字绕过传输层和网卡层，但它们的性能仍然不尽如人意。
+从概念上讲，Linux网络协议栈由三层组成。首先，VFS层为应用程序提供套接字API（例如\emph {connect}，\emph {send} 和 \emph {epoll}）。套接字连接是双向、可靠且有序的管道，由整数 \emph {文件描述符}（文件描述符）标识。
+其次，传统的TCP/IP传输层提供I/O复用、拥塞控制、丢包恢复、路由和服务质量保证（QoS）功能。
+第三，网卡层与网卡硬件（或用于主机内套接字的虚拟环回接口）通信以发送和接收数据包。
+众所周知，VFS层贡献了网络协议栈中的很大一部分成本 \cite {clark1989analysis,boyd2010analysis}。
+这可以通过一个简单的实验来验证：主机中两个进程之间的Linux TCP套接字的延迟和吞吐量只比管道（pipe）、FIFO和Unix域套接字（Unix domain socket）差一点（表 \ref {socksdirect:tab:operation-performance} ）。
+管道、FIFO和Unix域套接字绕过了传输层和网卡层，但它们的性能仍然不尽如人意。
 
-下文将套接字开销分为四种类型:每个操作，每个数据包，每个字节和每个连接。
+下文将套接字开销分为四种类型：每个操作，每个数据包，每个字节和每个连接。
 
 %Clark et. al~\cite{clark1989analysis} categorized socket overhead into per-packet and per-byte costs.
 %Because connection establishment incurs significant cost~\cite{jeong2014mtcp,lin2016scalable} and some operations do not touch payload (e.g. \texttt{dup2}, \texttt{fnctl} and \texttt{epoll}), we include two additional types of costs: per connection cost and per operation cost, as Table~\ref{socksdirect:tab:overhead} shows.
@@ -132,15 +133,15 @@ while (true) { // main event loop
 \subsubsection{每次操作的开销}
 \label{socksdirect:subsec:per-operation-overhead}
 
-\parab {内核穿越。}
-传统上，套接字API在内核中实现，因此需要针对每个套接字操作进行内核交叉（系统调用）。更糟糕的是，内核页表隔离（KPTI）补丁 \cite {kpti}以防止Meltdown \cite {Lipp2018meltdown}攻击使内核交叉4倍昂贵，如表 \ref {socksdirect:tab:operation-performance}显示。
-本章的目标是绕过内核而不会影响安全性。
+\parab {内核穿越（kernel crossing）。}
+传统上，套接字API在内核中实现，因此需要针对每个套接字操作进行内核穿越（即系统调用）。更糟糕的是，为防止 Meltdown \cite {Lipp2018meltdown} 攻击，内核页表隔离（KPTI）补丁 \cite {kpti} 使内核穿越变得4倍昂贵，如表 \ref {socksdirect:tab:operation-performance} 所示。
+本章的目标是绕过内核而不影响安全性。
 
 \parab {套接字文件描述符锁。}
 许多应用程序都是多线程的，原因有两个。
-首先，与FreeBSD不同，用于在Linux中读写磁盘文件的异步接口无法利用操作系统缓存和缓冲区，因此应用程序继续使用具有多个线程的同步接口 \cite {nginx-multi-thread}。
-其次，许多Web应用程序框架更喜欢同步编程模型来处理每个用户请求，因为它更容易编写和调试 \cite {barroso2017attack}。
-进程中的多个线程共享套接字连接。此外，在进程fork之后，父进程和子进程共享现有套接字。套接字也可以通过Unix域套接字传递给另一个进程。为了保护并发操作，Linux内核为每个套接字操作获取每个套接字锁 \cite {boyd2010analysis,han2012megapipe,lin2016scalable}。表 \ref {socksdirect:tab:operation-performance}表明，受原子操作保护的共享内存队列具有4x延迟和无锁队列的22％吞吐量，即使没有争用。
+首先，与FreeBSD不同，用于在Linux中读写磁盘文件的异步接口无法利用操作系统缓存和缓冲区，因此应用程序继续使用多线程和同步接口 \cite {nginx-multi-thread}。
+其次，许多Web应用程序框架更喜欢用同步编程模型处理每个用户请求，因为同步编程模型更容易编写和调试 \cite {barroso2017attack}。
+进程中的多个线程共享套接字连接。此外，在进程fork之后，父进程和子进程共享现有套接字。套接字也可以通过Unix域套接字传递给另一个进程。为了保护并发操作，Linux内核为每个套接字操作获取每个套接字锁 \cite {boyd2010analysis,han2012megapipe,lin2016scalable}。表 \ref {socksdirect:tab:operation-performance} 表明，即使没有多核争用，受原子操作保护的共享内存队列相比无锁队列的延迟可达 4 倍，吞吐量也只有无锁队列的 22\%。
 本章的目标是通过优化常见情况并删除常用套接字操作中的同步来最小化同步开销。
 
 %\parab{Intra-host communication.}
@@ -244,63 +245,64 @@ while (true) { // main event loop
 \label{socksdirect:subsec:per-packet-overhead}
 
 \parab {传输协议（TCP / IP）。}
-传统上，TCP / IP是数据中心中的事实上的传输协议。
-TCP / IP协议处理，拥塞控制和丢失恢复在每个发送和接收的数据包上消耗CPU。
-此外，丢失检测，基于速率的拥塞控制和TCP状态机使用定时器，这很难实现微秒级粒度和低开销 \cite{jeong2014mtcp}。
+传统上，TCP/IP是数据中心传输协议的事实标准。
+TCP/IP协议处理、拥塞控制和丢包恢复在每个发送和接收的数据包上消耗CPU。
+此外，丢包检测，基于速率的拥塞控制和TCP状态机使用定时器，很难实现微秒级粒度和低开销 \cite{jeong2014mtcp}。
 幸运的是，近年来在许多数据中心见证了RDMA的大规模部署 \cite {guo2016rdma,zhu2015congestion,mittal2015timely}。
-RDMA提供与TCP / IP相当的基于硬件的传输，因此需要将传输协议卸载到RDMA 网卡。
-对于主机内套接字，本章的目标是完全绕过传输协议。 Linux \emph {pipe}的％。
+RDMA将传输协议卸载到RDMA 网卡，提供了与TCP/IP相当的基于硬件的传输层。
+对于主机内套接字，本章的目标是完全绕过传输层。
+对于主机间套接字，本章的目标是利用 RDMA 硬件传输层。
 
 \parab {缓冲管理。}
-传统上，CPU通过\emph {ring buffers}从网卡发送和接收数据包。
+传统上，CPU通过\emph {环形缓冲区}（ring buffer）从网卡发送和接收数据包。
 环形缓冲区由固定数量的固定长度的元数据条目组成。
 每个条目都指向一个存储数据包有效负载的缓冲区。
 要发送或接收数据包，需要分配和释放缓冲区。
-成本显示在表 \ref {socksdirect:tab:operation-performance}中。
+表 \ref {socksdirect:tab:operation-performance} 显示了环形缓冲区的成本。
 此外，为了确保可以接收MTU大小的分组，每个接收缓冲区应该具有至少一个MTU的大小。
-但是，许多数据包小于MTU~ \cite {thompson1997wide}，因此内部碎片会降低内存利用率和位置。
-虽然现代网卡支持LSO和LRO~ \cite {lsolro}在缓冲区中批量处理多个数据包，但本章的目标是完全消除开销。
+但是，许多数据包小于MTU~ \cite {thompson1997wide}，因此内部碎片会降低内存利用率。
+虽然现代网卡支持LSO和LRO~ \cite {lsolro} 以批量处理多个数据包，但本章的目标是完全消除缓冲区管理的开销。
 
-\parab {I / O多路复用。}
+\parab {I/O多路复用。}
 对于传统的网卡，接收到的不同连接的数据包通常在环形缓冲区中混合，因此网络协议栈需要将数据包分类到相应的套接字缓冲区中。
 现代网卡支持接收数据包转向 \cite {mellanox}，它可以将特定连接映射到专用环形缓冲区，该缓冲区由高性能套接字系统使用 \cite {jeong2014mtcp,lin2016scalable,libvma}。
-本章利用RDMA网卡中的类似功能，将接收到的数据包解复用到QP。
+本章利用RDMA网卡中的类似功能，将接收到的数据包解复用（demultiplex）到专用的环形缓冲区。
 
 \parab {中断处理。}
 Linux网络协议栈分为系统调用和中断上下文，因为它处理来自应用程序和硬件设备的事件。
-TCP拥塞控制中的ACK时钟 \cite {mprdma}要求及时响应收到的数据包。
-中断上下文不一定与应用程序在同一核心上，导致核心位置不佳和核心间同步。
-但是，对于RDMA 网卡，需要精确计时的数据包处理由网卡硬件处理。
-因此，\libipc {}运行每个套接字操作完成并使用轮询等待阻塞操作。
+TCP拥塞控制中的ACK时钟（ACK clocking）\cite {mprdma} 要求及时响应收到的数据包。
+中断上下文不一定与应用程序在同一核心上，导致核心间的缓存迁移和核心间同步。
+但是，RDMA 网卡硬件实现了需要精确计时的数据包处理，因此主机 CPU 不再需要处理精确计时的中断。
+因此，\libipc {} 可以运行每个套接字操作直到完成（run-to-completion），并使用轮询等待阻塞操作。
 
 
 
 \parab {进程唤醒。}
-当进程调用RPC并等待回复时，是否应将CPU放弃到准备运行的其他进程？
-Linux的答案是肯定的，唤醒睡眠过程需要3到5 $\mu$s，如表 \ref {socksdirect:tab:operation-performance}所示。
+当进程调用远程过程调用（RPC）并等待回复时，是否应让CPU切换到准备运行的其他进程？
+Linux的答案是肯定的，这个进程切换的唤醒睡眠过程需要3到5 $\mu$s，如表 \ref {socksdirect:tab:operation-performance} 所示。
 在主机内RPC的往返时间内，两个进程唤醒贡献了超过一半的延迟。
-注意到通过RDMA的RPC延迟甚至低于唤醒成本，许多系统使用轮询，每个核仅允许一个进程。
-为了隐藏微秒级RPC延迟 \cite {barroso2017attack}，通过\texttt {sched \_yield}的协作上下文切换比进程唤醒要快得多。
-本章的目标是有效地在流程之间共享核心。
+注意到通过RDMA的主机间RPC延迟甚至低于唤醒成本，许多系统使用轮询，每个核仅运行一个线程。
+为了隐藏微秒级RPC延迟 \cite {barroso2017attack}，通过 \texttt {sched\_yield} 的协作上下文切换比进程唤醒要快得多。
+本章的目标是高效地在多个线程之间共享核心。
 
 \parab {容器网络。}
-许多容器部署使用隔离的网络命名空间用于容器，这些容器通过虚拟覆盖网络进行通信。
-在Linux中，虚拟交换机 \cite {pfaff2015design}在主机网卡和容器中的虚拟网卡之间转发数据包。
+许多容器部署使用隔离的网络命名空间，这些容器通过虚拟覆盖网络（virtual overlay network）进行通信。
+在Linux中，虚拟交换机 \cite {pfaff2015design} 在主机网卡和容器中的虚拟网卡之间转发数据包。
 这种架构会在每个数据包上产生多个上下文切换和内存拷贝的开销，虚拟交换机成为瓶颈 \cite {pfefferle2015hybrid}。
-Slim~ \cite {slim}将三次内核往返减少到一次。
-几个工作 \cite {martins2014clickos,roghanchi2017ffwd,huang2017high,nsdi19freeflow}将所有操作委托给作为守护进程运行的虚拟交换机，因此它增加了数据路径上的延迟和CPU成本。
-本章的解决方案是用于隔离和分布式数据平面以实现性能的集中控制平面。
+Slim~ \cite {slim} 将三次内核往返减少到一次。
+最近的几个工作 \cite {martins2014clickos,roghanchi2017ffwd,huang2017high,nsdi19freeflow} 将所有操作委托给作为守护进程运行的虚拟交换机，因此它增加了数据路径上的延迟和CPU成本。
+本章的解决方案是集中式的控制平面和分布式的数据平面。
 
 
 \subsubsection{每字节的开销}
 \label{socksdirect:subsec:per-byte-overhead}
 
-\parab {内容（payload）复制。}
+\parab {有效载荷（payload）复制。}
 在大多数套接字系统中，\texttt {send}和\texttt {recv}的语义会导致应用程序和网络协议栈之间的内存复制。 对于非阻塞\texttt {send}，系统需要将数据复制出缓冲区，因为应用程序可能会在\texttt {send}返回后立即覆盖缓冲区。 简单地删除拷贝可能会违反应用程序的正确性。
 零拷贝\texttt {recv}甚至比\texttt {send}更难。
-Linux提供了基于准备就绪的事件模型，即应用程序知道传入的数据（例如通过\texttt {epoll}）然后调用\texttt {recv}，因此网卡接收但未传递给应用程序的数据必须 存储在系统缓冲区中。
+Linux提供了基于准备就绪的事件模型，即应用程序知道传入的数据（例如通过\texttt {epoll}）然后调用\texttt {recv}，因此网卡接收但未传递给应用程序的数据必须存储在系统缓冲区中。
 因为\texttt {recv}允许应用程序提供任何缓冲区作为数据目标，所以系统需要将数据从系统复制到应用程序缓冲区。
-本章的目标是在标准套接字应用程序中为大型传输提供零拷贝。
+本章的目标是在标准套接字应用程序中为较大有效载荷传输实现零拷贝。
 
 
 
@@ -309,21 +311,21 @@ Linux提供了基于准备就绪的事件模型，即应用程序知道传入的
 
 \parab {内核文件描述符分配。}
 在Linux中，每个套接字连接都是VFS中的文件，因此需要分配整数文件描述符和\emph {inode}。
-用户空间套接字的挑战是有许多API（例如open，close和epoll）支持套接字和非套接字文件描述符（例如文件和设备），因此必须将套接字文件描述符与其他文件描述符区分开来。
-用户空间中的Linux兼容套接字 \cite {libvma,rsockets}通常在内核中打开一个文件以获取每个套接字的虚拟文件描述符，因此它们仍然需要内核文件描述符分配。
-LOS~ \cite {huang2017high}将文件描述符空间划分为用户和内核部分，但违反了Linux分配最小可用文件描述符的属性。
-但是，许多应用程序，如Redis~ \cite {redis}和Memcached~ \cite {memcached}都依赖于此属性。
+用户空间套接字的挑战是有许多API（例如open，close和epoll）同时支持套接字和非套接字文件描述符（例如文件和设备），因此必须将套接字文件描述符与其他文件描述符区分开来。
+用户空间中的Linux兼容套接字 \cite {libvma,rsockets} 通常在内核中打开一个文件以获取每个套接字的虚拟文件描述符，因此它们仍然需要内核文件描述符分配。
+LOS~ \cite {huang2017high} 将文件描述符空间划分为用户和内核部分，但违反了Linux分配最小可用文件描述符的属性。
+但是，许多应用程序，如Redis~ \cite {redis} 和Memcached~ \cite {memcached} 都依赖于此属性。
 本章的目标是在保持兼容性的同时绕过内核套接字文件描述符分配。
 
-\parab {TCB管理中的锁。}
-在建立连接期间，Linux获取几个全局锁来分配TCB（TCP控制块）。
-最近的工作，如MegaPipe~ \cite {han2012megapipe}和FastSocket~ \cite {lin2016scalable}通过对全局表进行分区来减少锁争用，但正如Table~ \ref {socksdirect:tab:operation-performance}所示，非争用自旋锁是仍然很贵。
+\parab {TCP控制块管理中的锁。}
+在建立连接期间，Linux获取几个全局锁来分配TCB（TCP Control Block，TCP控制块）。
+最近的工作，如MegaPipe~ \cite {han2012megapipe} 和FastSocket~ \cite {lin2016scalable} 通过对全局表进行分区来减少锁争用，但正如表~ \ref {socksdirect:tab:operation-performance} 所示，非争用自旋锁是仍然很贵。
 本章将工作分发到每个进程中的用户空间库\libipc {}。
 
 \parab {新连接调度。}
 多个进程和线程可以侦听同一端口以接受传入连接。
 在Linux中，处理\texttt {accept}调用的核心在传入连接的队列上进行竞争。
-本章利用委托比锁 \cite {roghanchi2017ffwd}更快并使用管程守护程序来分派新连接的事实。
+本章利用委托（delegation）比锁 \cite {roghanchi2017ffwd} 更快的事实，使用管程守护程序来分派新连接。
 
 
 %Most modern applications use socket in an event-driven style. similar to Figure~\ref{socksdirect:fig:socket-pseudo-code}.

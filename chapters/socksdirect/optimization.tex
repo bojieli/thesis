@@ -45,7 +45,7 @@
 为了判断环形缓冲区是否已满，发送方将保持 \textit {队列信用}（queue credits）计数，指示环形缓冲区中的空闲字节数。
 当发送方将数据包入队时，会消耗入队数据包大小的信用。
 信用不足时，发送方会阻塞等待。
-当接收方使数据包出队时，它会在本地增加计数器，并在计数器超过环形缓冲区大小的一半时，向发送方的内存中写入 \textit {信用返回标志}。发送者在检测到该标志时重新获得队列信用。
+当接收方使数据包出队时，它会在本地增加计数器，并在计数器超过环形缓冲区大小的一半时，向发送方的内存中写入 \textit {信用返回标志}。发送方在检测到该标志时重新获得队列信用。
 请注意，队列信用机制与拥塞控制无关；后者由网卡硬件处理 \cite {zhu2015congestion}。
 
 \textbf {发送和接收方各有一个环形缓冲区拷贝。}
@@ -81,7 +81,7 @@
 首先，对于RDMA队列，利用RDMA 网卡将事件通知复用到单个队列中。
 每个线程对所有RDMA QP使用 \emph {共享完成队列}，因此它只需要轮询一个队列而不是所有套接字队列。
 
-其次，每个队列可以在\textit {轮询}（polling）和\textit {中断}（interrupt）模式之间切换。管程（monitor）的队列始终处于轮询模式。每个队列的接收者维护一个连续空轮询的计数器。当它超过阈值时，接收器向发送器发送消息，通知队列正在进入中断模式，并在短时间后停止轮询。当发送方以中断模式写入队列时，它还会通知管程，管程将通知接收方恢复轮询。
+其次，每个队列可以在\textit {轮询}（polling）和\textit {中断}（interrupt）模式之间切换。管程（monitor）的队列始终处于轮询模式。每个队列的接收方维护一个连续空轮询的计数器。当它超过阈值时，接收器向发送器发送消息，通知队列正在进入中断模式，并在短时间后停止轮询。当发送方以中断模式写入队列时，它还会通知管程，管程将通知接收方恢复轮询。
 
 %\RED{Need a performance comparison figure of ring buffer architectures. (traditional ring buffer, new ring buffer, intra, inter, x axis: msg size, y axis: throughput)}
 
@@ -121,29 +121,29 @@ Linux 零复制套接字 \cite {linux-zero-copy} 仅支持发送方，它的原�
 
 
 \textbf{减少写时复制。}
-当发送者在\texttt {send}之后覆盖缓冲区时，现有设计使用copy-on-write。
-复制是必需的，因为发件人可能会读取页面的未写入部分。
-由于应用程序几乎总是将缓冲区重用于后续发送操作，因此在大多数情况下会调用copy-on-write，这使得零拷贝在发送方上基本无用。
+当发送方在\texttt {send}之后覆盖缓冲区时，现有设计使用写时复制（copy-on-write）。
+复制是必需的，因为发送方可能会读取页面的未写入部分。
+由于应用程序几乎总是将缓冲区重用于后续发送操作，因此在大多数情况下会调用写时复制，这使得零拷贝对发送方基本无用。
 本文观察到，大多数应用程序不会逐字节写入发送缓冲区。 相反，它们会通过\texttt {recv}或\texttt {memcpy}覆盖发送缓冲区的整个页面，因此无需复制页面的原始数据。
-对于\texttt {memcpy}，\libipc{} 调用内核重新映射新页面并禁用copy-on-write，然后执行实际复制。
+对于\texttt {memcpy}，\libipc{} 调用内核重新映射新页面并禁用写时复制，然后执行实际复制。
 对于\texttt {recv}，旧页面映射将被接收的页面替换。
 
 
 \textbf {页面分配开销。}
-页面重新映射需要内核为每个零拷贝\texttt {send}和\texttt {recv}分配和释放页面。
-内核中的页面分配使用全局锁，这是低效的。 \libipc {}在本地管理每个进程中的可用页面池。
+页面重新映射机制需要内核为每个零拷贝\texttt {send}和\texttt {recv}分配和释放内存页面。
+内核中的页面分配使用全局锁，这是低效的。因此，\libipc {}在本地管理每个进程中的可用页面池。
 \libipc {}还跟踪收到的零拷贝页面的来源。
 当页面未映射时，如果它来自另一个进程，\libipc {}会通过消息将页面返回给所有者。
 
 
 \begin{figure}[htbp]
 	\centering
-	\subfloat[服务器内共享内存。 1）获取物理页面并设置写入时复制; 2）通过共享内存发送页面地址; 3）映射收到的页面; 4）（可选）在发送者写入/ memcpy / recv时重新映射。]{
+	\subfloat[服务器内共享内存。 1）获取物理页面并设置写时复制; 2）通过共享内存发送页面地址; 3）映射收到的页面; 4）（可选）在发送方写入 / memcpy / recv时重新映射。]{
 		\includegraphics[width=0.44\textwidth]{images/zerocopy_intra}
 		\label{socksdirect:fig:zerocopy-intra}
 	}
 	\hspace{0.02\textwidth}
-	\subfloat[服务器间RDMA。 1）获取物理页面并设置写入时复制; 2）从池中获取免费页面; 3）通过RDMA发送数据; 4）通过RDMA发送页面地址; 5）地图收到的页面; 6）将未映射的页面返回到池。]{
+	\subfloat[服务器间RDMA。 1）获取物理页面并设置写时复制; 2）从页面池中获取可用页面; 3）通过RDMA发送数据; 4）通过RDMA发送页面地址; 5）映射收到的页面; 6）将未映射的页面返回到页面池。]{
 		\includegraphics[width=0.42\textwidth]{images/zerocopy_inter}
 		\label{socksdirect:fig:zerocopy-inter}
 	}
@@ -152,18 +152,17 @@ Linux 零复制套接字 \cite {linux-zero-copy} 仅支持发送方，它的原�
 
 
 \textbf {通过共享内存安全发送页面地址。}
-对于主机内部套接字，在用户空间队列中的消息中发送物理页面地址，如图 \ref {socksdirect:fig:zerocopy-intra} 中的步骤2所示。
-\sys{} 必须防止未经发送端允许的任意页面映射。
-为此，\libipc {} 调用修改后的网卡驱动程序
-获取发送缓冲区的模糊物理页面地址，并通过共享内存队列将地址发送给接收方。
-在接收端，\libipc {} 调用内核将模糊的物理页面重新映射到应用程序提供的接收缓冲区虚拟地址。
+对于主机内部套接字，\libipc{} 在用户态队列的消息中发送物理页面地址，如图 \ref {socksdirect:fig:zerocopy-intra} 中的步骤2所示。
+为了安全，\sys{} 必须防止未经发送端允许的任意页面映射。
+为此，\libipc {} 调用修改后的网卡驱动程序获取发送缓冲区经过加密处理的物理页面地址，并通过共享内存队列将加密地址发送给接收方。
+在接收端，\libipc {} 调用内核将加密的物理页面地址重新映射到应用程序提供的接收缓冲区虚拟地址。
 
 \textbf {RDMA下的零拷贝。}
-\libipc {}初始化接收器上的固定页面池，并将页面的物理地址发送给发送者。
-发件人管理池。
-在发送方上，\libipc {}将发送缓冲区固定，从远程接收器页面池中分配页面以确定RDMA写入的远程地址，如图 \ref {socksdirect:fig:zerocopy-inter}中的步骤2所示。
+\libipc {} 初始化接收器上的固定页面池，并将页面的物理地址发送给发送方。
+页面池由发送方管理。
+在发送方上，\libipc {} 将发送缓冲区的虚拟与物理页面映射固定（pin），然后从远程接收器页面池中分配页面以确定RDMA写入的远程地址，如图 \ref {socksdirect:fig:zerocopy-inter} 中的步骤2所示。
 在接收器上，当调用\texttt {recv}时，\libipc 调用网卡驱动程序将池中的页面映射到应用程序缓冲区虚拟地址。
-在重新映射的页面被释放后（例如被另一个\texttt {recv}覆盖），\libipc {}将它们返回给发送方中的池管理器（步骤6）。
+在重新映射的页面被释放后（例如被另一个\texttt {recv}覆盖），\libipc {} 将它们返回给发送方中的页面池管理器（步骤6）。
 
 %If the OS runs out of memory, \libipc{} unpins pages to reclaim memory.
 %For security, kernel validates that page numbers are in the huge-page receive buffer.
@@ -174,19 +173,19 @@ Linux 零复制套接字 \cite {linux-zero-copy} 仅支持发送方，它的原�
 
 \textbf {挑战1：在内核和\libipc {}之间复用事件。}
 应用程序轮询来自Linux内核处理的套接字和其他\textit {内核文件描述符}的事件。
-轮询内核事件的一种简单方法是每次都调用系统调用（例如\textit {epoll \_wait}），这会产生很高的开销，因为事件轮询几乎是每次发送和接收的频繁操作。
-LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {epoll \_wait}系统调用，这导致延迟和CPU开销之间的权衡。不同的是，
-不同的是，\libipc {}创建了一个per-process \textit {epoll thread}，它调用\textit {epoll \_wait} syscall来轮询内核事件。每当epoll线程收到内核事件时，应用程序线程将报告该事件以及用户空间套接字事件。
+轮询内核事件的一种简单方法是每次都调用系统调用（例如\texttt {epoll\_wait}），这会产生很高的开销，因为事件轮询几乎是每次发送和接收都需调用的频繁操作。
+LOS~ \cite {huang2017high} 定期用内核文件描述符调用非阻塞\texttt {epoll\_wait}系统调用，这导致延迟和CPU开销之间的权衡：如果调用太频繁，CPU 开销较高；如果调用不够频繁，则内核事件被通知到应用程序的平均延迟较高。
+不同的是，\libipc {} 在每个进程中创建了一个 \textit {epoll 线程}，它调用 \texttt {epoll\_wait} 系统调用来轮询内核事件。每当epoll线程收到内核事件时，应用程序线程将报告该事件以及用户空间套接字事件。
 
 \textbf {挑战2：中断繁忙的进程。}
-套接字接管机制（Sec .~ \ref {socksdirect:subsubsec:fork_rdwr}）需要一个进程来响应管程请求。但是，进程可以执行应用程序代码而无需长时间调用\libipc {}。为了解决这个问题，本章设计了一个类似于OS中断的\textit {signal}机制。事件启动器首先轮询接收队列一段时间以进行ACK。如果没有回复，它会向接收器发送Linux \textit {signal}并唤醒进程。
+套接字接管机制（第 \ref {socksdirect:subsubsec:fork_rdwr} 节）需要进程响应管程请求。但是，进程可能长时间执行应用程序代码，而没有调用 \libipc {}，管程请求也就无法被响应。为了解决这个问题，本章设计了一个可以类比操作系统中断的\textit {信号}（signal）机制。管程在发出请求后，首先轮询接收队列一段时间，如果超时没有回复，它会向相应进程发送 Linux \textit {信号} 并唤醒进程。
 
-由\libipc {}注册的信号处理程序首先确定进程是执行application还是\libipc {}代码。 \libipc {}在库的入口和出口处设置和清除标志。如果信号处理程序发现进程在\libipc 中，它什么也不做，\libipc {}将在将控制权返回给应用程序之前处理该事件。否则，在将控制权返回给应用程序之前，信号处理程序会立即处理从紧急队列到管程的消息。
-因为\libipc {}被设计为快速且无阻塞，所以消息传递启动器很快就会收到响应。
+由\libipc {}注册的信号处理程序首先确定进程是执行应用程序还是\libipc {}代码。 \libipc {}在库的入口和出口处设置和清除标志。如果信号处理程序发现进程在\libipc 中，它什么也不做，\libipc {}将在将控制权返回给应用程序之前处理该事件。否则，信号处理程序会立即处理管程的消息。
+因为\libipc {}被设计为快速且无阻塞（可能导致阻塞的系统调用都在 epoll 线程中调用），所以管程在发送信号后很快就会收到响应。
 
 \textbf {挑战3：让多个线程分时核心。}
-对于阻塞操作（例如，阻塞recv，connect和epoll\_wait），\libipc {}首先轮询环形缓冲区一次。如果操作没有完成，而不是无限轮询，\libipc {}调用\textit {sched\_yield}以放弃 CPU，切换到同一核心上的其他进程。如章节 \ref {socksdirect:subsec:motivation} 中所述，协同多任务处理中的上下文切换仅需要0.4~$\mu$s。但是，应用程序可能需要等待很长时间才能进行外部事件，从而导致频繁的唤醒浪费。为此，\libipc{} 对连续的不处理任何消息的唤醒进行计数，并在达到阈值时将进程置于休眠状态。
-如果\libipc {}继续产生一定数量的轮次，它将使自己进入睡眠状态。在睡眠之前，它会向管程和所有对等方发送消息，以便稍后通过消息将其唤醒。
+对于阻塞套接字操作（例如，阻塞recv，connect 和 epoll\_wait），\libipc {}首先轮询环形缓冲区一次。如果操作没有完成，\libipc {}调用\textit {sched\_yield}以放弃 CPU，切换到同一核心上的其他进程。如章节 \ref {socksdirect:subsec:motivation} 中所述，协同多任务处理中的上下文切换仅需要0.4~$\mu$s。但是，一些应用程序可能需要等待很长时间才能收到一个套接字消息，从而导致频繁的唤醒浪费。为此，\libipc{} 对连续的不处理任何消息的唤醒进行计数，并在达到阈值时将进程置于休眠状态。
+如果\libipc {}继续产生一定数量的轮次，它将使自己进入休眠状态。在休眠之前，它会向管程和所有与之直接通信的进程（peers）发送消息，以便稍后通过信号将其唤醒。
 
 \textbf{缺陷1：空闲进程轮询的 CPU 开销。}
 \libipc{} 的协作式非抢占调度有两个缺陷。首先，如果较多进程共享一个 CPU 核，而事件的到来是相对随机的，上述轮询方法会唤醒大量没有待处理事件的进程，造成延迟增加。为此，需要让内核的协作式调度变得更 ``智能''，根据到来的请求来调度有任务可做的进程，同时又不重新引入原有抢占式调度的一系列开销。核心方法是根据消息来调整内核的调度队列。考虑两种情况：第一，单机内，一个分派进程发送消息到多个运行在同一 CPU 核上的工作进程。这是一种常见的通信模式，例如任务分派器将任务分发到不同客户的网络功能进程，或者消息源把事件分发给多个订阅者进程。由分派进程管理工作进程的调度顺序。操作系统内核把同一个 CPU 核上运行的工作进程组织成一个进程组，用位图（bitmap）表示，并将其映射到分派进程的用户态地址空间。分派进程在向共享内存队列写入数据后，设置位图中工作进程对应的位。修改内核调度器，不再依次调度所有就绪状态的进程，而是扫描位图并调度下一个被置位的进程。为了防止同一 CPU 核上的其他进程饿死，将工作进程组作为一个持续处于就绪状态且绑定了 CPU 核心的传统进程。由于非工作进程通常处于非就绪（阻塞）状态，不会浪费 CPU 时间调度它们。
@@ -222,20 +221,12 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 %The detailed procedure is as follows.
 
 
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.6\textwidth]{images/conn-setup-new}
-	\caption{\libipc{} 中连接建立过程的状态机。}
-	\label{socksdirect:fig:conn-setup}
-\end{figure}
-
-
 \subsubsection{文件描述符重映射表}
 \label{socksdirect:subsubsec:fd-remapping-table}
 
 
 
-套接字文件描述符和其他文件描述符（例如磁盘文件）共享命名空间，Linux总是分配最低可用文件描述符。
+套接字文件描述符和其他文件描述符（例如磁盘文件）共享命名空间，Linux总是分配最小的可用文件描述符。
 为了保留这种语义而不在内核中分配虚拟文件描述符，\libipc {}拦截所有与文件描述符相关的Linux API并维护\emph {文件描述符重映射表}以将每个应用文件描述符映射到用户空间套接字对象或内核文件描述符。
 当文件描述符关闭时，\libipc {}将其放入\emph {文件描述符回收池}。
 在文件描述符分配时，\libipc {}首先尝试从池中获取文件描述符。
@@ -245,61 +236,71 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 \subsubsection{连接建立}
 
 
-图 \ref {socksdirect:fig:conn-setup}显示了连接建立过程。
+图 \ref {socksdirect:fig:conn-setup} 显示了连接建立过程。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.6\textwidth]{images/conn-setup-new}
+	\caption{\libipc{} 中连接建立过程的状态机。}
+	\label{socksdirect:fig:conn-setup}
+\end{figure}
+
+
 
 \textbf{绑定。}
 创建套接字后，应用程序调用\texttt {bind}来分配地址和端口。
-由于地址和端口是具有权限保护的全局资源，因此分配由管程协调。
-如图 \ref {socksdirect:fig:conn-setup}所示，\libipc {}将请求发送到管程。
-为了隐藏联系管程的延迟，如果绑定请求不会失败，\libipc {}会立即返回应用程序，例如，当没有为客户端套接字指定端口时。
+由于地址和端口是具有权限保护的全局资源，分配由管程协调。
+如图 \ref {socksdirect:fig:conn-setup} 所示，\libipc {}将请求发送到管程。
+为了隐藏与管程通信的延迟，作为一个优化，如果绑定请求不可能失败（例如没有为客户端套接字指定端口时），\libipc {}会立即返回应用程序。
 
 \textbf{监听。}
 当服务器应用程序准备好接受来自客户端的连接时，它会调用\texttt {listen}并通知管程。
-管程维护每个地址和端口上的侦听进程列表，以分派新连接。
+管程维护每个地址和端口上的监听进程列表，以分派新连接。
 
 
 \textbf{连接。}
-客户端应用程序调用\texttt {connect}并发送SYN命令以通过共享内存队列进行监视。
-现在，管程需要将新连接分派给侦听应用程序。
+客户端应用程序调用\texttt {connect}并发送SYN命令以通过共享内存队列进行监听。
+现在，管程需要将新连接分派给监听应用程序。
 在Linux中，新的连接请求在内核的\emph {积压}（backlog）中排队。
 每次服务器应用程序调用\texttt {accept}时，它都会访问内核以从积压中出列，这需要同步并增加延迟。
-相反，\sys{} 为每个侦听套接字的线程维护一个每个监听器的积压。
-管程以循环方式将SYN分发给侦听器线程。
+为解决此问题，\sys{} 为每个监听套接字的线程维护一个每个监听者的积压。
+管程以循环方式将SYN分发给监听者线程。
 
-当侦听器不接受新连接时，调度与侦听器的连接可能会导致饥饿。
-\sys{} 使用 \emph {work stealing}方法。
-当监听器在积压为空时调用\texttt {accept}时，它会请求管程窃取其他人的积压。
-为了避免侦听器和管程之间的争用，管程向侦听器发送请求以从积压中窃取。
+当监听者不接受新连接时，分发到该监听者的连接可能会导致饥饿（starvation）。
+\sys{} 使用 \emph {工作窃取}（work stealing）\footnote{工作窃取（work stealing）是实现负载均衡的一种常用方法，即每个工作者维护一个请求等待队列，当自己的队列为空时，就从其他工作者的等待队列中窃取请求。} 方法。
+当监听者在积压为空时调用\texttt {accept}时，它会请求管程窃取其他人的积压。
+为了避免监听者和管程之间的争用（race condition），管程向侦听器发送请求以从积压中窃取。
 
 \textbf {建立点对点队列。}
 客户端和服务器应用程序第一次通信时，服务器管程可帮助它们建立直接连接。
 对于主机内部，管程分配共享内存队列并将共享内存密钥发送到客户端和服务器应用程序。
 对于主机间，客户端和服务器管程建立新的RDMA QP，并将本地和远程密钥发送到相应的应用程序。
-为了减少延迟，当SYN命令分发到监听器的待办事项时，管程会建立对等队列。
-但是，如果SYN被另一个侦听器窃取，则需要在客户端和新侦听器之间建立新队列，如图 \ref {socksdirect:fig:conn-setup}中的Wait-Server状态所示。
+为了减少延迟，当SYN命令分发到监听者的积压时，管程会建立对等队列（peer-to-peer queue）。
+但是，如果SYN被另一个监听者窃取，则需要在客户端和新监听者之间建立新队列，如图 \ref {socksdirect:fig:conn-setup} 中的Wait-Server状态所示。
 
 \textbf {连接建立的最后步骤。}
-服务器设置对等队列后，如图 \ref {socksdirect:fig:conn-setup}左侧所示，服务器应用程序向客户端发送ACK。 ACK包含SYN请求中的客户端文件描述符及其分配的服务器文件描述符。
+服务器设置对等队列后，如图 \ref {socksdirect:fig:conn-setup} 左侧所示，服务器应用程序向客户端发送ACK。 ACK包含SYN请求中的客户端文件描述符及其分配的服务器文件描述符。
 与TCP握手类似，服务器应用程序可以在发送ACK后将数据发送到队列。
-当客户端收到ACK时，如图 \ref {socksdirect:fig:conn-setup}右侧所示，它设置文件描述符映射并可以开始发送数据。
+当客户端收到ACK时，如图 \ref {socksdirect:fig:conn-setup} 右侧所示，它设置文件描述符映射并可以开始发送数据。
 
 
 \subsubsection{与常规 TCP/IP 对端的兼容性}
 
 
-为了与不支持\sys {}和RDMA的对等端兼容，需要检测\sys {}功能并回退到TCP / IP。
-但是，Linux不支持向TCP SYN和ACK数据包添加特殊选项。
-由于中间盒和网络重新排序，使用另一个端口（例如LibVMA~ \cite {libvma}）也是不可靠的。
-为此，首先使用内核原始套接字直接发送带有特殊选项的SYN和ACK数据包，如果不存在特殊选项，则回退到内核TCP / IP套接字。
+为了与不支持\sys {}和RDMA的对等端兼容，需要检测\sys {}功能并回退到TCP/IP。
+但是，Linux普通套接字不支持向TCP SYN和ACK数据包添加特殊选项。
+由于中间盒（middlebox）和网络重新排序，使用另一个端口（例如LibVMA~ \cite {libvma} 的做法）也是不可靠的。
+为此，\libipc{} 首先使用内核原始套接字（raw socket）直接发送带有特殊选项的SYN和ACK数据包，如果不存在特殊选项，则回退到内核TCP/IP套接字。
 
 在客户端，管程通过网络发送带有特殊选项的TCP SYN数据包。
-如果对等体具有\sys {}能力，则其管程将接收特殊SYN并且知道客户端具有\sys {}能力。
+如果对端具有\sys {}能力，则其管程将接收特殊SYN并且知道客户端具有\sys {}能力。
 然后，服务器使用特殊选项响应SYN + ACK，包括设置RDMA连接的凭据，以便两个管程之后可以通过RDMA进行通信。
-如果客户端或服务器管程发现对等方是常规TCP / IP主机，它将使用TCP连接修复 \cite {tcp-connection-repair}在内核中创建已建立的TCP连接。
-然后管程通过Unix域套接字将内核文件描述符发送到应用程序，\libipc {}可以使用内核文件描述符进行未来的套接字操作。
+如果客户端或服务器管程发现对端是常规TCP/IP主机，它将使用 Linux 的 TCP连接修复功能 \cite {tcp-connection-repair} 在内核中创建已建立的TCP连接。
+然后管程通过Unix域套接字（Unix domain socket）将内核文件描述符发送到应用程序，\libipc {}可以使用内核文件描述符进行未来的套接字操作。
 
 
-一个棘手的问题是接收的数据包被传递到原始套接字和内核网络协议栈，并且内核将使用RST响应，因为这样的连接不存在。
+一个棘手的问题是接收的数据包被同时传递到原始套接字和内核网络协议栈，此时内核将回复RST数据包，因为此连接在内核中不存在。
 为避免此行为，管程会安装 \emph {iptables} 规则来过滤此类出站RST数据包。
 
 
@@ -309,13 +310,13 @@ LOS~ \cite {huang2017high}定期用内核文件描述符调用非阻塞\texttt {
 
 
 当应用程序调用\texttt {close}时，\libipc {}会从重映射表中删除文件描述符。
-然而，套接字数据可能仍然有用，因为文件描述符可以与其他进程共享，并且缓冲区中可能存在未发送的数据。
-\libipc{} 跟踪每个套接字的引用计数，它在fork时递增，在close时递减。
-为了推出未发送的数据，需要在对等体之间进行握手，类似于TCP close。
-因为套接字是双向的，所以\texttt {close}在发送和接收方向上相当于\texttt {shutdown}。
-如图 \ref{socksdirect:fig:conn-close}，当应用程序关闭连接的一个方向时，它会向对等方发送\emph {shutdown message}（关闭消息）。
-对等体以关闭消息响应。
-当\libipc {}在两个方向上收到关闭消息时，将删除套接字。
+然而，套接字可能仍然有用，因为文件描述符可以与其他进程共享，并且缓冲区中可能存在未发送的数据。
+\libipc{} 跟踪每个套接字的引用计数，在fork时递增，在close时递减。
+为了确保未发送的数据已经发送到对端，连接关闭过程中需要在对端之间进行握手，类似于TCP close。
+因为套接字是双向的，所以\texttt {close} 相当于在发送和接收方向上分别执行 \texttt {shutdown}。
+如图 \ref{socksdirect:fig:conn-close}，当应用程序关闭连接的一个方向时，它会向对端发送 \emph {shutdown message}（关闭消息）。
+对端以关闭消息响应。
+当\libipc {}在两个方向上都收到关闭消息时，将删除套接字。
 
 
 \begin{figure}[htbp]

@@ -2,33 +2,24 @@
 \label{socksdirect:sec:architecture}
 
 
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.8\textwidth]{images/architecture_new}
-	
-	\caption{\sys {}的体系结构。 主机1和2具有RDMA能力，而主机3不具备RDMA。}
-	\label{socksdirect:fig:architecture}
-	\vspace{5pt}
-\end{figure}
-
 
 
 %As shown in Figure~\ref{socksdirect:fig:architecture}, the core component of \sys{} is a user-space library \libipc{}.
 
-为了简化部署和开发 \cite {andromeda}，以及删除内核交叉开销，本章在用户空间而不是内核中实现\sys{}。
-要使用\sys{}，应用程序通过设置\texttt {LD\_PRELOAD}环境变量来加载用户空间库\libipc {}。 \libipc {}拦截标准C库中与文件描述符（文件描述符）操作相关的所有Linux API。它使用\emph {文件描述符重映射表}来区分套接字文件描述符与内核文件描述符（例如文件和设备），在用户空间中实现套接字功能并将其他功能转发到内核。
-从安全的角度来看，因为\libipc {}驻留在应用程序地址空间中，它的行为不可信。例如，如果恶意应用程序在\libipc {}中强制执行，则可能会绕过防火墙策略。此外，TCP端口是一个需要分配的全局资源 \cite {lin2016scalable,nsdi19freeflow}。因此，需要在\libipc {}之外的可信组件来强制实施访问控制和管理全局资源。
+为了简化部署和开发 \cite {andromeda}，以及消除内核交叉开销，本章在用户空间而不是内核中实现\sys{}。
+要使用\sys{}，应用程序通过设置\texttt {LD\_PRELOAD}环境变量来加载用户空间库\libipc {}。 \libipc {} 拦截标准C库（glibc）中与文件描述符操作相关的所有Linux API，在用户空间中实现套接字功能。
+从安全的角度来看，因为\libipc {}驻留在应用程序地址空间中，它的行为不可信。例如，如果恶意应用程序在\libipc {}中强制执行，则可能会绕过防火墙策略。此外，如表 \ref{socksdirect:tab:socket-api} 所示，尽管大多数套接字操作可以在调用者本地或连接的两端之间实现，还有很多套接字操作需要中心化的协调。例如，TCP端口号是一个需要集中分配的全局资源 \cite {lin2016scalable,nsdi19freeflow}。因此，需要在\libipc {}之外的可信组件来强制实施访问控制和管理全局资源。
 
 \begin{table*}[htbp]
 	\centering
 	\small
 	\begin{tabular}{ll|ll}
 		\toprule
-		\multicolumn{2}{c|}{Initialization} &
-		\multicolumn{2}{c}{Connection Mgmt} \\
+		\multicolumn{2}{c|}{初始化} &
+		\multicolumn{2}{c}{连接管理} \\
 		\midrule
-		API & Cat. &
-		API & Cat. \\
+		API & 类别 &
+		API & 类别 \\
 		\midrule
 		\textbf{socket} & Local &
 		\textbf{connect} & NoPart \\
@@ -58,8 +49,8 @@
 		\multicolumn{2}{c|}{Data Transmission} &
 		\multicolumn{2}{c}{Process Mgmt} \\
 		\midrule
-		API & Cat. &
-		API & Cat. \\
+		API & 类别 &
+		API & 类别 \\
 		\midrule
 		\textbf{recv(from,(m)msg)} & P2P &
 		\textit{pthread\_create} & NoPart \\
@@ -83,22 +74,21 @@
 		\textit{sigaction} & Local \\
 		\bottomrule
 	\end{tabular}
-	\caption{Linux APIs that are related to socket and intercepted by \libipc{}. Categories include local, peer-to-peer (P2P) and non-partitionable (NoPart). APIs in \textit{italic} indicate usages besides socket. APIs in \textbf{bold} are called relatively more frequently.}
-	
+	\caption{与套接字相关、被 \libipc{} 截获的主要 Linux API。分类包括本地（Local）、两端之间（P2P）和需集中协调、不可划分（NoPart）。\textit{斜体} 的 API 表示除了套接字，还有操作系统的其他用途。\textbf{粗体} 的 API 比其他 API 的调用更频繁，因此更值得优化。}
 	\label{socksdirect:tab:socket-api}
 \end{table*}
 
 
+
+为此，本章在每个主机上设计一个\emph {monitor} 守护进程（下称 \textit{管程}）来协调控制平面操作，例如连接创建。管程是系统服务。在每个主机中，所有加载\libipc {}的应用程序必须与主机的管程建立共享内存（共享内存）队列，从而形成控制平面。在数据平面上，应用程序构建对等队列以直接通信，从而减轻了管程守护程序的负担。图 \ref {socksdirect:fig:architecture} 显示了\sys {}的体系结构。
+
+
 \begin{figure}[htbp]
 	\centering
-	\includegraphics[width=0.5\textwidth]{images/libsd_architecture}
-	
-	\caption{\libipc{} 运行库的架构。}
-	\label{socksdirect:fig:libsd-architecture}
+	\includegraphics[width=0.8\textwidth]{images/architecture_new}
+	\caption{\sys {}的体系结构。 主机1和2具有RDMA能力，而主机3不具备RDMA。}
+	\label{socksdirect:fig:architecture}
 \end{figure}
-
-
-为此，本章在每个主机上设计一个\emph {monitor}守护进程来协调控制平面操作，例如连接创建。管程是系统服务。在每个主机中，所有加载\libipc {}的应用程序必须与主机的管程守护程序建立共享内存（共享内存）队列，从而形成控制平面。在数据平面上，应用程序构建对等队列以直接通信，从而减轻了管程守护程序的负担。图 \ref {socksdirect:fig:architecture}显示了\sys {}的体系结构。
 
 
 %To this end, we regard processes as a shared-nothing distributed system that communicates through message passing.
@@ -120,10 +110,21 @@
 对于\emph {主机间}（inter-host）通信，两个主机的管程都参与其中。当应用程序连接到远程主机时，其本地管程会建立常规TCP连接，并检测远程主机是否支持\sys {}。
 如果是这样，它会在两个管程之间建立一个RDMA队列，以便可以更快地创建两个主机之间的未来连接。远程端的管程调度与目标的连接，并帮助两个应用程序建立RDMA队列，如图 \ref {socksdirect:fig:architecture} 中的主机1和2之间。如果远程主机不支持\sys {}，它将继续使用TCP连接，如图 \ref {socksdirect:fig:architecture} 中的主机1和3之间。详细的连接管理协议在第 \ref {socksdirect:subsec:connection-management} 节中介绍。
 
-为了确保线程安全并避免锁，以及支持fork和container热迁移，本章针对只有一对发送和接收线程处于活动状态的常见情况进行了优化，同时确保所有情况下的正确性（第 \ref {socksdirect:subsec:fork} 节）。
+为了确保线程安全并避免锁，以及支持fork和容器热迁移，本章针对只有一对发送和接收线程处于活动状态的常见情况进行了优化，同时确保所有情况下的正确性（第 \ref {socksdirect:subsec:fork} 节）。
 为了消除缓冲区管理开销，设计了一个环形缓冲区，每个主机间消息平摊下来只需要一次RDMA写操作，每个主机内消息需要一个缓存迁移（第 \ref {socksdirect:subsec:lockless-queue}  节）。
-本章进一步设计了一种零拷贝机制，可以在发送和接收端删除大型消息的数据拷贝（第 \ref {socksdirect:subsec:zerocopy} 节）。
+本章进一步设计了一种零拷贝机制，可以在发送和接收端消除较大消息的数据拷贝（第 \ref {socksdirect:subsec:zerocopy} 节）。
 最后，第 \ref {socksdirect:subsec:process-mux} 节提供了事件通知机制。
+
+
+如图 \ref{socksdirect:fig:libsd-architecture} 所示，\libipc{} 运行库由 API 封装、虚拟文件系统（VFS）、队列、传输等四层构成。API 封装层使用 \emph {文件描述符重映射表} 来区分套接字文件描述符与内核文件描述符（例如文件和设备），在用户空间中实现套接字功能，并将其他系统调用通过标准 C 库（glibc）转发到内核。虚拟文件系统层实现了连接创建与关闭、事件轮询与通知、多进程共享套接字、fork、容器迁移等功能，是最复杂的一层。虚拟文件系统的旁边是信号层，负责接收来自操作系统的事件以及与管程、对端通信。下面一层是基于环形缓冲区的无锁队列。最下层是传输层，用共享内存（SHM）或 RDMA 实现。
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.5\textwidth]{images/libsd_architecture}
+	\caption{\libipc{} 运行库的架构。}
+	\label{socksdirect:fig:libsd-architecture}
+\end{figure}
+
 
 %In order to remove synchronization overhead for multi-threaded applications, we treat each thread as a separate process.
 %%Although threads in a process share memory, we use thread-specific storage for most states in \libipc{}.
@@ -145,48 +146,19 @@
 \label{socksdirect:subsec:fork}
 
 
-大多数套接字系统都获得了一个每文件描述符的锁，以使线程和进程共享套接字。
-以前的工作 \cite {boyd2010analysis,clements2015scalable} 表明许多套接字操作不可交换，并且不能始终避免同步。
-本章利用共享内存消息传递比锁 \cite {roghanchi2017ffwd} 便宜得多的事实，并使用消息传递作为独占同步机制。
+大多数套接字系统为每个文件描述符维护一个锁，以使线程和进程共享套接字。
+以前的工作 \cite {boyd2010analysis,clements2015scalable} 表明，许多套接字操作不可交换，并且不能始终避免同步。
+本章利用共享内存消息传递比锁 \cite {roghanchi2017ffwd} 便宜得多的事实，并使用消息传递作为唯一的同步机制。
 
 
-\begin{figure}[htbp]
-	\centering
-	\subfloat[传统加锁。]{
-		\includegraphics[width=0.3\textwidth]{images/one_conn3}
-		\label{socksdirect:fig:fork-locking}
-	}
-	\hspace{0.02\textwidth}
-	\subfloat[\sys{} 点对点。]{
-		\includegraphics[width=0.22\textwidth]{images/one_conn1}
-		\label{socksdirect:fig:fork-p2p}
-	}
-	\hspace{0.02\textwidth}
-	\subfloat[S2 fork 成为 S2' 和 S3]{
-		\includegraphics[width=0.2\textwidth]{images/one_conn2}
-		\label{socksdirect:fig:fork-fork}
-	}
-	
-	\caption{共享套接字的进程间队列结构。虚线箭头代表没有被启用的队列。}
-	\label{socksdirect:fig:inter-process-queue}
-\end{figure}
-
-
-逻辑上，套接字由两个相反方向的FIFO \emph {队列}组成，每个FIFO具有多个并发发送器和接收器。
+逻辑上，套接字由两个相反传输方向的FIFO \emph {队列}组成，每个FIFO具有多个并发的发送方和接收方。
 系统设计目标是在保持FIFO语义的同时最大化通用情况性能。
 本文观察到应用程序的如下两个特征：首先，由于成本高，高性能应用程序很少fork和创建线程。
-其次，几个进程从共享套接字发送或接收并不常见，因为套接字的字节流语义使得很难避免接收部分消息。
+其次，几个进程并发从共享套接字发送或接收并不常见，因为套接字的字节流语义使得很难避免接收部分消息。
 需要同时发送或接收的应用程序通常使用消息代理（message broker） \cite {hintjens2013zeromq,rabbitmq2017rabbitmq,kreps2011kafka} 而非直接共享套接字。
 常见的进程间套接字共享情况是应用程序隐式地将套接字从一个进程迁移到另一个进程，例如将事务从主进程卸载到工作进程。
 
 
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.6\textwidth]{images/queue_arch}
-	
-	\caption{无锁套接字与两个发送器和两个接收器线程共享。 虚线箭头表示每个套接字的活动发送方和接收方。 每个线程跟踪其活动套接字并通过独占队列与管程通信。}
-	\label{socksdirect:fig:queue-arch}
-\end{figure}
 
 
 
@@ -209,32 +181,64 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 \end{enumerate}
 \fi
 
-本章的解决方案是每个\emph {套接字队列}（套接字的一个方向）有\emph {发送令牌}和\emph {接收令牌}。
-每个令牌都由\emph {活跃线程} 持有，它具有发送或接收的权限。
+本章的解决方案是每个 \emph {套接字队列}（套接字的一个传输方向）有一个 \emph {发送令牌} 和一个 \emph {接收令牌}。
+每个令牌都由一个 \emph {活跃线程} 持有，它具有发送或接收的权限。
 因此，在任何时间点只有一个活动的发送方线程和一个活动的接收方线程。
 套接字队列在线程和进程之间共享，允许来自一个发送方和一个接收方的无锁访问（详细信息将在第 \ref {socksdirect:subsec:lockless-queue} 节中讨论）。
-当另一个线程想要发送或接收时，它应该请求\emph {接管}令牌。
+当另一个线程想要发送或接收时，它应该请求 \emph {接管}（take over）令牌。
+
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.6\textwidth]{images/queue_arch}
+	\caption{无锁套接字与两个发送器和两个接收器线程共享。 虚线箭头表示每个套接字的活动发送方和接收方。 每个线程跟踪其活动套接字并通过独占队列与管程通信。}
+	\label{socksdirect:fig:queue-arch}
+\end{figure}
+
 
 %\RED{Need performance comparison in a figure.}
 
-每种类型的操作的详细信息如下:a）数据传输（\texttt {send}和\texttt {recv}），b）添加新的发送者和接收者（\texttt {fork}和线程创建 ），c）容器热迁移，和d）连接关闭。
+每种类型的操作的详细信息如下:a）数据传输（\texttt {send}和\texttt {recv}），b）添加新的发送方和接收方（\texttt {fork}和线程创建 ），c）容器热迁移，和d）连接关闭。
 
 \subsubsection{发送/接收操作}
 \label{socksdirect:subsubsec:fork_rdwr}
 
+\iffalse
+\begin{figure}[htbp]
+	\centering
+	\subfloat[传统加锁。]{
+		\includegraphics[width=0.3\textwidth]{images/one_conn3}
+		\label{socksdirect:fig:fork-locking}
+	}
+	\hspace{0.02\textwidth}
+	\subfloat[\sys{} 每个发送端一个。]{
+		\includegraphics[width=0.22\textwidth]{images/one_conn1}
+		\label{socksdirect:fig:fork-p2p}
+	}
+	\hspace{0.02\textwidth}
+	\subfloat[S2 fork 成为 S2' 和 S3]{
+		\includegraphics[width=0.2\textwidth]{images/one_conn2}
+		\label{socksdirect:fig:fork-fork}
+	}
+	\caption{共享套接字的进程间队列结构。虚线箭头代表没有被启用的队列。}
+	\label{socksdirect:fig:inter-process-queue}
+\end{figure}
+\fi
+
 
 当一个线程没有发送令牌但想要通过套接字发送时，非活动线程需要\emph {接管}令牌。
-如果在非活动线程和活动线程之间创建直接通信通道，则会有对等队列，其数量为线程数的二次方，或者是具有锁的共享队列。
+如果在非活动线程和活动线程之间创建直接通信通道，则需要点对点的队列，其数量为线程数的平方，或者是具有锁的共享队列。
 为了避免这两种开销，在\emph {接管}过程中使用监控守护进程作为代理。
-此消息传递设计还具有以下优点:发送方进程可以位于不同的主机上，这在容器热迁移中非常有用。
+此消息传递设计还具有以下优点：发送方进程可以位于不同的主机上，这在容器热迁移中非常有用。
 
-接管过程如下:
-非活动发送方向管程发送\emph {take over}命令，管程将其添加到等待列表并将命令代理到活动发送方。
+接管过程如下：
+非活动发送方向管程发送\emph {接管}命令，管程将其添加到等待列表并将命令代理到活动发送方。
 当活动发送方收到请求时，它会将发送令牌发送给管程。
-管程将令牌授予等待列表中的第一个非活动发送者，并更新活动发件人。
-非活动发件人可以在收到令牌后发送。
+管程将令牌授予等待列表中的第一个非活动发送方，并更新活动发送方。
+非活动发送方可以在收到令牌后发送。
 此机制无死锁，因为至少有一个发送方或管程持有发送令牌。
-它也是无饥饿的，因为每个发送者最多可以出现在等待列表中一次，并按FIFO顺序提供。
+它也是无饥饿的，因为每个发送方最多可以出现在等待列表中一次，并按FIFO顺序提供。
 
 接收器侧的接管过程类似。
 
@@ -250,45 +254,45 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 \label{socksdirect:subsubsec:fork_fork}
 
 
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.6\textwidth]{images/fork_memory}
-	
-	\caption{fork后的内存布局。 文件描述符 3和4在fork之前创建并因此共享。 在fork之后，父进程和子进程分别创建一个新的文件描述符 5，它在文件描述符表中写入时被复制。 文件描述符 3和4的套接字元数据和缓冲区在共享内存中并因此被共享。 子进程创建一个新的共享内存来存储文件描述符 5的套接字元数据和缓冲区，当它再次fork时，它将与子进程共享。 RDMA QP位于私有内存中，而共享内存队列是共享的。}
-	\label{socksdirect:fig:fork-memory}
-\end{figure}
-
 \textbf {套接字数据共享。}
-主要的挑战是在\texttt {fork}和\texttt {exec}之后共享套接字元数据，缓冲区和底层传输。
-内存空间在fork之后变为写时复制并在exec之后被擦除，但是套接字文件描述符仍应该可用。
+主要的挑战是在\texttt {fork}和\texttt {exec}之后共享套接字元数据、缓冲区和底层的传输层。
+在fork之后，内存空间变为写时复制，并在exec之后被擦除，但是套接字文件描述符仍需要可用。
 \sys{} 使用共享内存（共享内存）来存储套接字元数据和缓冲区，因此在fork之后，数据仍然是共享的。
 要在exec之后附加共享内存，\libipc {}将连接到管程以获取其父进程的共享内存密钥。
 在fork之后，因为父进程看不到子进程创建的套接字，所以子进程创建一个新的共享内存来存储新套接字的元数据和缓冲区。
 
 现在需要共享连接到对等端的底层传输。
 共享内存传输不需要特别小心，因为fork / exec之前创建的共享内存仍然在fork / exec之后共享。
-但是，RDMA与fork / exec有问题，因为DMA内存区域不在共享内存中。
+但是，RDMA在fork / exec后存在问题，因为DMA内存区域不在共享内存中。
 它们在fork之后变为写时复制，而网卡仍然从原始物理页面DMA，因此子进程不能使用现有的RDMA资源。
-在exec之后，整个RDMA上下文被清除。
+而在exec之后，整个RDMA上下文将被清除。
 本章的解决方案是让子进程在fork / exec之后重新初始化RDMA资源（PD，MR等）。
 当子进程使用在fork之前创建的套接字时，它会要求管程与远程端点重新建立RDMA QP。
-因此，远程可能会看到一个套接字的两个或更多QP，但它们链接到套接字元数据和缓冲区的唯一拷贝。
-图 \ref {socksdirect:fig:fork-memory}显示了一个fork示例。
+因此，对端进程可能会看到一个套接字的两个或更多QP，但它们链接到套接字元数据和缓冲区的唯一拷贝。
+图 \ref {socksdirect:fig:fork-memory} 显示了一个fork示例。
+
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=0.6\textwidth]{images/fork_memory}
+	\caption{fork后的内存布局。 文件描述符 3和4在fork之前创建并因此共享。 在fork之后，父进程和子进程分别创建一个新的文件描述符 5，它在文件描述符表中写入时被复制。 文件描述符 3和4的套接字元数据和缓冲区在共享内存中并因此被共享。 子进程创建一个新的共享内存来存储文件描述符 5的套接字元数据和缓冲区，当它再次fork时，它将与子进程共享。 RDMA QP位于私有内存中，而共享内存队列是共享的。}
+	\label{socksdirect:fig:fork-memory}
+\end{figure}
+
 
 \textbf {文件描述符空间共享。}
-与套接字数据不同，文件描述符空间在fork之后变为写入时复制:现有文件描述符是共享的，但新文件描述符由父进程专有。
-所以文件描述符重映射表驻留在堆内存中，这是fork之后的copy-on-write。
-要在exec之后恢复文件描述符重映射表，它将在exec之前复制到共享内存，并在\libipc {}初始化期间附加到新进程。
+与套接字数据不同，文件描述符空间在fork之后变为写时复制：fork 前创建的文件描述符是共享的，但新文件描述符由创建者进程独享。
+因此，只需将文件描述符重映射表驻留在堆内存（heap memory）中，利用 fork 之后操作系统的写时复制机制。
+要在exec之后恢复文件描述符重映射表，它将在exec之前复制到共享内存，并在\libipc {}初始化期间拷贝回新进程。
 
 \textbf{安全。}
 安全性是一个问题，因为恶意进程可能将自己伪装成特权父进程的子进程。
-要在管程中标识父关系和子关系，当应用程序调用\texttt {fork}，\texttt {clone}或\texttt {pthread\_create}时，\libipc {}首先生成一个用于配对的秘密并将其发送到管程，然后调用\emph {libc}中的原始函数。
-在fork之后，子进程为管程创建一个新的共享内存队列并发送秘密（子进程继承父内存空间并知道该秘密）。
+要在管程中标识父关系和子关系，当应用程序调用\texttt {fork}，\texttt {clone}或\texttt {pthread\_create}时，\libipc {}首先生成一个用于配对的密钥并将其发送到管程，然后调用\emph {libc}中的原始函数。
+在fork之后，子进程为管程创建一个新的共享内存队列并发送密钥（子进程继承父内存空间，从而知道该密钥）。
 因此，管程可以将子进程与父进程配对。
 
-\textbf {监视行动。}
-在fork，exec或线程创建时，每个现有套接字需要将发送方添加到发送方向，将接收方添加到接收方向。
-父进程继承该令牌，因此子进程始终处于非活动状态。
+\textbf {管程操作。}
+在fork，exec或线程创建时，管程需要新进程添加到每个现有套接字的发送方和接收方列表中，以便管理接管操作。
 
 %The socket queues are in 共享内存 between parent and child processes.
 %However, to avoid synchronization in accessing shared metadata, the metadata is in thread local storage and copied from parent to child.
