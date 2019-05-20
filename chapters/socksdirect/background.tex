@@ -1,8 +1,8 @@
 \section{背景}
 \label{socksdirect:sec:background}
 
-\subsection{Linux 套接字中的开销}
-\label{socksdirect:subsec:motivation}
+
+\subsection{Linux 套接字简介}
 
 %\begin{figure}[t]
 %	\centering
@@ -74,11 +74,15 @@ while (true) { // main event loop
 \label{socksdirect:fig:socket-pseudo-code}
 \end{figure}
 
+现代操作系统中的TCP套接字通常具有三个功能:（1）寻址，找到并连接到另一个应用程序；（2）提供可靠且有序的通信通道，由整数 \emph {文件描述符}（File Descriptor）标识；（3）查询来自多个通道的事件，例如 poll 和 epoll。大多数Linux应用程序使用准备驱动（readiness-driven）的 I/O 多路复用模型，即操作系统告诉应用程序哪些文件描述符已准备好接收或发送，然后应用程序可以准备缓冲区并发出接收或发送操作。
+
+
+
+\subsection{Linux 套接字中的开销}
+\label{socksdirect:subsec:motivation}
+
 
 现代数据中心网络具有微秒级延迟和数十Gbps吞吐量。 但是，传统的Linux套接字是在具有共享数据结构的操作系统内核空间中实现的，这使得套接字成为在多个主机上运行的通信密集型应用程序众所周知的瓶颈 \cite {barroso2017attack}。 除了主机间通信之外，同一主机上的微服务和容器经常相互通信，使得主机内套接字通信在云时代变得越来越重要。 在压力测试下，Nginx~ \cite {reese2008nginx}，Memcached~ \cite {fitzpatrick2004distributed} 和Redis~ \cite {carlson2013redis} 等应用程序在内核中消耗50\%到9\%％的CPU时间，主要用于处理TCP套接字操作 \cite{jeong2014mtcp}。
-
-要了解套接字的成本，首先需要了解套接字的功能。
-现代操作系统中的TCP套接字通常具有三个功能:（1）寻址，找到并连接到另一个应用程序；（2）提供可靠且有序的通信通道，由整数 \emph {文件描述符}（File Descriptor）标识；（3）查询来自多个通道的事件，例如 poll 和 epoll。大多数Linux应用程序使用准备驱动（readiness-driven）的 I/O 多路复用模型，即操作系统告诉应用程序哪些文件描述符已准备好接收或发送，然后应用程序可以准备缓冲区并发出接收或发送操作。
 
 从概念上讲，Linux网络协议栈由三层组成。首先，VFS层为应用程序提供套接字API（例如\emph {connect}，\emph {send} 和 \emph {epoll}）。套接字连接是双向、可靠且有序的管道，由整数 \emph {文件描述符}（文件描述符）标识。
 其次，传统的TCP/IP传输层提供I/O复用、拥塞控制、丢包恢复、路由和服务质量保证（QoS）功能。
