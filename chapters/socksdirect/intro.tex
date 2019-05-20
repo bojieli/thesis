@@ -33,7 +33,7 @@ Linux套接字只能实现比硬件的原始功能差一个数量级的延迟和
 %Communication intensive applications such as distributed key-value stores and web servers could spend 50\%$\sim$90\% of CPU time in the OS kernel~\cite{jeong2014mtcp}, mostly processing socket operations.
 
 存在大量旨在改善套接字性能的工作。
-现有方法要么优化内核网络堆栈 \cite {lin2016scalable,han2012megapipe,yasukata2016stackmap}，要么将TCP / IP堆栈移动到用户空间 \cite {jeong2014mtcp,marinos2014network,seastar,fstack,libvma}，或者把传输层卸载到RDMA网卡 \cite{rsockets,socketsdirect}。
+现有方法要么优化内核网络协议栈 \cite {lin2016scalable,han2012megapipe,yasukata2016stackmap}，要么将TCP / IP协议栈移动到用户空间 \cite {jeong2014mtcp,marinos2014network,seastar,fstack,libvma}，或者把传输层卸载到RDMA网卡 \cite{rsockets,socketsdirect}。
 但是，所有这些解决方案都在兼容性和性能方面存在限制。
 它们中的大多数在诸如进程 fork，事件轮询，多应用程序套接字共享和主机内通信等方面与本机套接字不完全兼容。
 其中一些 \cite {jeong2014mtcp}存在隔离问题，不允许多个应用程序共享网卡。
@@ -85,7 +85,7 @@ Linux套接字只能实现比硬件的原始功能差一个数量级的延迟和
 应用程序可以通过在Linux中使用\emph {LD\_PRELOAD}环境变量来加载库来利用\libipc {}。
 
 
-在\sys {}中，数据传输和事件轮询在进程之间以对等方式处理，而连接建立则委托给监视器。
+在\sys {}中，数据传输和事件轮询在进程之间以对等方式处理，而连接建立则委托给管程。
 本章利用多种技术有效地利用硬件并提高系统效率。
 通常，线程和fork进程之间共享套接字连接。
 为了避免访问套接字元数据和缓冲区中的竞争条件，需要同步。通过基于令牌的共享方法，而不是锁每个操作，消除了常见情况下的同步开销。

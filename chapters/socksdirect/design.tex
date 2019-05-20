@@ -98,7 +98,7 @@
 \end{figure}
 
 
-为此，本章在每个主机上设计一个\emph {monitor}守护进程来协调控制平面操作，例如连接创建。监视器是系统服务。在每个主机中，所有加载\libipc {}的应用程序必须与主机的监视器守护程序建立共享内存（共享内存）队列，从而形成控制平面。在数据平面上，应用程序构建对等队列以直接通信，从而减轻了监视器守护程序的负担。图 \ref {socksdirect:fig:architecture}显示了\sys {}的体系结构。
+为此，本章在每个主机上设计一个\emph {monitor}守护进程来协调控制平面操作，例如连接创建。管程是系统服务。在每个主机中，所有加载\libipc {}的应用程序必须与主机的管程守护程序建立共享内存（共享内存）队列，从而形成控制平面。在数据平面上，应用程序构建对等队列以直接通信，从而减轻了管程守护程序的负担。图 \ref {socksdirect:fig:architecture}显示了\sys {}的体系结构。
 
 
 %To this end, we regard processes as a shared-nothing distributed system that communicates through message passing.
@@ -109,7 +109,7 @@
 共享内存或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它。
 套接字发送操作转换为对远程端点上的套接字缓冲区的共享内存或RDMA写操作。
 
-对于\emph {主机内}（intra-host）通信，通信发起者首先向本地监视器发送请求，然后监视器在两个应用程序之间（可能在不同的容器中）建立共享内存队列。 之后这两个应用程序可以直接通信。
+对于\emph {主机内}（intra-host）通信，通信发起者首先向本地管程发送请求，然后管程在两个应用程序之间（可能在不同的容器中）建立共享内存队列。 之后这两个应用程序可以直接通信。
 
 
 %During initialization, \libipc{} connects to the local monitor via a shared memory queue.
@@ -117,8 +117,8 @@
 %connection request is always sent to the local monitor.
 %For local peers, the monitor just construct a shared memory queue between the two applications , %so they can communicate directly.
 
-对于\emph {主机间}（inter-host）通信，两个主机的监视器都参与其中。当应用程序连接到远程主机时，其本地监视器会建立常规TCP连接，并检测远程主机是否支持\sys {}。
-如果是这样，它会在两个监视器之间建立一个RDMA队列，以便可以更快地创建两个主机之间的未来连接。远程端的监视器调度与目标的连接，并帮助两个应用程序建立RDMA队列，如图 \ref {socksdirect:fig:architecture} 中的主机1和2之间。如果远程主机不支持\sys {}，它将继续使用TCP连接，如图 \ref {socksdirect:fig:architecture} 中的主机1和3之间。详细的连接管理协议在第 \ref {socksdirect:subsec:connection-management} 节中介绍。
+对于\emph {主机间}（inter-host）通信，两个主机的管程都参与其中。当应用程序连接到远程主机时，其本地管程会建立常规TCP连接，并检测远程主机是否支持\sys {}。
+如果是这样，它会在两个管程之间建立一个RDMA队列，以便可以更快地创建两个主机之间的未来连接。远程端的管程调度与目标的连接，并帮助两个应用程序建立RDMA队列，如图 \ref {socksdirect:fig:architecture} 中的主机1和2之间。如果远程主机不支持\sys {}，它将继续使用TCP连接，如图 \ref {socksdirect:fig:architecture} 中的主机1和3之间。详细的连接管理协议在第 \ref {socksdirect:subsec:connection-management} 节中介绍。
 
 为了确保线程安全并避免锁，以及支持fork和container热迁移，本章针对只有一对发送和接收线程处于活动状态的常见情况进行了优化，同时确保所有情况下的正确性（第 \ref {socksdirect:subsec:fork} 节）。
 为了消除缓冲区管理开销，设计了一个环形缓冲区，每个主机间消息平摊下来只需要一次RDMA写操作，每个主机内消息需要一个缓存迁移（第 \ref {socksdirect:subsec:lockless-queue}  节）。
@@ -184,7 +184,7 @@
 	\centering
 	\includegraphics[width=0.6\textwidth]{images/queue_arch}
 	
-	\caption{无锁套接字与两个发送器和两个接收器线程共享。 虚线箭头表示每个套接字的活动发送方和接收方。 每个线程跟踪其活动套接字并通过独占队列与监视器通信。}
+	\caption{无锁套接字与两个发送器和两个接收器线程共享。 虚线箭头表示每个套接字的活动发送方和接收方。 每个线程跟踪其活动套接字并通过独占队列与管程通信。}
 	\label{socksdirect:fig:queue-arch}
 \end{figure}
 
@@ -229,11 +229,11 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 此消息传递设计还具有以下优点:发送方进程可以位于不同的主机上，这在容器热迁移中非常有用。
 
 接管过程如下:
-非活动发送方向监视器发送\emph {take over}命令，监视器将其添加到等待列表并将命令代理到活动发送方。
-当活动发送方收到请求时，它会将发送令牌发送给监视器。
-监视器将令牌授予等待列表中的第一个非活动发送者，并更新活动发件人。
+非活动发送方向管程发送\emph {take over}命令，管程将其添加到等待列表并将命令代理到活动发送方。
+当活动发送方收到请求时，它会将发送令牌发送给管程。
+管程将令牌授予等待列表中的第一个非活动发送者，并更新活动发件人。
 非活动发件人可以在收到令牌后发送。
-此机制无死锁，因为至少有一个发送方或监视器持有发送令牌。
+此机制无死锁，因为至少有一个发送方或管程持有发送令牌。
 它也是无饥饿的，因为每个发送者最多可以出现在等待列表中一次，并按FIFO顺序提供。
 
 接收器侧的接管过程类似。
@@ -262,7 +262,7 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 主要的挑战是在\texttt {fork}和\texttt {exec}之后共享套接字元数据，缓冲区和底层传输。
 内存空间在fork之后变为写时复制并在exec之后被擦除，但是套接字文件描述符仍应该可用。
 \sys{} 使用共享内存（共享内存）来存储套接字元数据和缓冲区，因此在fork之后，数据仍然是共享的。
-要在exec之后附加共享内存，\libipc {}将连接到监视器以获取其父进程的共享内存密钥。
+要在exec之后附加共享内存，\libipc {}将连接到管程以获取其父进程的共享内存密钥。
 在fork之后，因为父进程看不到子进程创建的套接字，所以子进程创建一个新的共享内存来存储新套接字的元数据和缓冲区。
 
 现在需要共享连接到对等端的底层传输。
@@ -271,7 +271,7 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 它们在fork之后变为写时复制，而网卡仍然从原始物理页面DMA，因此子进程不能使用现有的RDMA资源。
 在exec之后，整个RDMA上下文被清除。
 本章的解决方案是让子进程在fork / exec之后重新初始化RDMA资源（PD，MR等）。
-当子进程使用在fork之前创建的套接字时，它会要求监视器与远程端点重新建立RDMA QP。
+当子进程使用在fork之前创建的套接字时，它会要求管程与远程端点重新建立RDMA QP。
 因此，远程可能会看到一个套接字的两个或更多QP，但它们链接到套接字元数据和缓冲区的唯一拷贝。
 图 \ref {socksdirect:fig:fork-memory}显示了一个fork示例。
 
@@ -282,9 +282,9 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 
 \textbf{安全。}
 安全性是一个问题，因为恶意进程可能将自己伪装成特权父进程的子进程。
-要在监视器中标识父关系和子关系，当应用程序调用\texttt {fork}，\texttt {clone}或\texttt {pthread\_create}时，\libipc {}首先生成一个用于配对的秘密并将其发送到监视器，然后调用\emph {libc}中的原始函数。
-在fork之后，子进程为监视器创建一个新的共享内存队列并发送秘密（子进程继承父内存空间并知道该秘密）。
-因此，监视器可以将子进程与父进程配对。
+要在管程中标识父关系和子关系，当应用程序调用\texttt {fork}，\texttt {clone}或\texttt {pthread\_create}时，\libipc {}首先生成一个用于配对的秘密并将其发送到管程，然后调用\emph {libc}中的原始函数。
+在fork之后，子进程为管程创建一个新的共享内存队列并发送秘密（子进程继承父内存空间并知道该秘密）。
+因此，管程可以将子进程与父进程配对。
 
 \textbf {监视行动。}
 在fork，exec或线程创建时，每个现有套接字需要将发送方添加到发送方向，将接收方添加到接收方向。
@@ -331,13 +331,13 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 套接字只能在容器内共享，并且容器中的所有进程都会一起迁移，因此迁移后可以取消分配原始主机上的内存。
 
 \textbf {监控状态的迁移。}
-监视器跟踪侦听套接字信息，活动线程和每个连接的等待列表以及共享内存机密。
-在迁移期间，旧监视器会转储已迁移容器的状态并将它们发送到新监视器。
+管程跟踪侦听套接字信息，活动线程和每个连接的等待列表以及共享内存机密。
+在迁移期间，旧管程会转储已迁移容器的状态并将它们发送到新管程。
 
 \textbf {建立新的沟通渠道。}
 迁移后，所有通信通道都已过时，因为共享内存在主机上是本地的，而RDMA不支持热迁移 \cite{nsdi19freeflow,slim}。
-首先，新主机上的迁移容器需要与本地监视器建立连接。
-本地监视器指示以下过程。
+首先，新主机上的迁移容器需要与本地管程建立连接。
+本地管程指示以下过程。
 两个容器之间的主机内连接可能变为主机间，因此\libipc {}在这种情况下创建RDMA连接。
 两个容器之间的主机间连接可能成为主机内部，\libipc {}创建共享内存连接。
 最后，\libipc {}重新建立剩余的主机间RDMA和主机内共享内存连接。

@@ -79,7 +79,7 @@ while (true) { // main event loop
 要了解套接字的成本，首先需要了解套接字的功能。
 现代操作系统中的TCP套接字通常具有三个功能:（1）寻址，找到并连接到另一个应用程序；（2）提供可靠且有序的通信通道，由整数\emph {文件描述符}（File Descriptor）标识；（3）来自多个频道的多重事件，例如poll和epoll。 大多数Linux应用程序使用准备驱动的I / O多路复用模型。 操作系统告诉应用程序哪些文件描述符已准备好接收或发送，然后应用程序可以准备缓冲区并发出接收或发送操作。
 
-从概念上讲，Linux网络堆栈由三层组成。首先，VFS层为应用程序提供套接字API（例如\emph {connect}，\emph {send}，\emph {epoll}）。套接字连接是双向，可靠且有序的管道，由整数\emph {文件描述符}（文件描述符）标识。
+从概念上讲，Linux网络协议栈由三层组成。首先，VFS层为应用程序提供套接字API（例如\emph {connect}，\emph {send}，\emph {epoll}）。套接字连接是双向，可靠且有序的管道，由整数\emph {文件描述符}（文件描述符）标识。
 其次，传统的TCP / IP传输层提供I / O复用，拥塞控制，丢失恢复，路由和QoS功能。
 第三，网卡层与网卡硬件（或用于主机内套接字的虚拟环回接口）通信以发送和接收分组。
 众所周知，VFS层贡献了很大一部分成本 \cite {clark1989analysis,boyd2010analysis}。
@@ -262,12 +262,12 @@ RDMA提供与TCP / IP相当的基于硬件的传输，因此需要将传输协�
 虽然现代网卡支持LSO和LRO~ \cite {lsolro}在缓冲区中批量处理多个数据包，但本章的目标是完全消除开销。
 
 \parab {I / O多路复用。}
-对于传统的网卡，接收到的不同连接的数据包通常在环形缓冲区中混合，因此网络堆栈需要将数据包分类到相应的套接字缓冲区中。
+对于传统的网卡，接收到的不同连接的数据包通常在环形缓冲区中混合，因此网络协议栈需要将数据包分类到相应的套接字缓冲区中。
 现代网卡支持接收数据包转向 \cite {mellanox}，它可以将特定连接映射到专用环形缓冲区，该缓冲区由高性能套接字系统使用 \cite {jeong2014mtcp,lin2016scalable,libvma}。
 本章利用RDMA网卡中的类似功能，将接收到的数据包解复用到QP。
 
 \parab {中断处理。}
-Linux网络堆栈分为系统调用和中断上下文，因为它处理来自应用程序和硬件设备的事件。
+Linux网络协议栈分为系统调用和中断上下文，因为它处理来自应用程序和硬件设备的事件。
 TCP拥塞控制中的ACK时钟 \cite {mprdma}要求及时响应收到的数据包。
 中断上下文不一定与应用程序在同一核心上，导致核心位置不佳和核心间同步。
 但是，对于RDMA 网卡，需要精确计时的数据包处理由网卡硬件处理。
@@ -296,7 +296,7 @@ Slim~ \cite {slim}将三次内核往返减少到一次。
 \label{socksdirect:subsec:per-byte-overhead}
 
 \parab {内容（payload）复制。}
-在大多数套接字系统中，\texttt {send}和\texttt {recv}的语义会导致应用程序和网络堆栈之间的内存复制。 对于非阻塞\texttt {send}，系统需要将数据复制出缓冲区，因为应用程序可能会在\texttt {send}返回后立即覆盖缓冲区。 简单地删除拷贝可能会违反应用程序的正确性。
+在大多数套接字系统中，\texttt {send}和\texttt {recv}的语义会导致应用程序和网络协议栈之间的内存复制。 对于非阻塞\texttt {send}，系统需要将数据复制出缓冲区，因为应用程序可能会在\texttt {send}返回后立即覆盖缓冲区。 简单地删除拷贝可能会违反应用程序的正确性。
 零拷贝\texttt {recv}甚至比\texttt {send}更难。
 Linux提供了基于准备就绪的事件模型，即应用程序知道传入的数据（例如通过\texttt {epoll}）然后调用\texttt {recv}，因此网卡接收但未传递给应用程序的数据必须 存储在系统缓冲区中。
 因为\texttt {recv}允许应用程序提供任何缓冲区作为数据目标，所以系统需要将数据从系统复制到应用程序缓冲区。
@@ -323,7 +323,7 @@ LOS~ \cite {huang2017high}将文件描述符空间划分为用户和内核部分
 \parab {新连接调度。}
 多个进程和线程可以侦听同一端口以接受传入连接。
 在Linux中，处理\texttt {accept}调用的核心在传入连接的队列上进行竞争。
-本章利用委托比锁 \cite {roghanchi2017ffwd}更快并使用监视器守护程序来分派新连接的事实。
+本章利用委托比锁 \cite {roghanchi2017ffwd}更快并使用管程守护程序来分派新连接的事实。
 
 
 %Most modern applications use socket in an event-driven style. similar to Figure~\ref{socksdirect:fig:socket-pseudo-code}.
@@ -419,13 +419,13 @@ LOS~ \cite {huang2017high}将文件描述符空间划分为用户和内核部分
 
 
 
-\parab {内核网络堆栈优化:}第一类工作是优化内核TCP / IP堆栈。 FastSocket~ \cite {lin2016scalable}，Affinity-Accept~ \cite {pesterev2012improving}，FlexSC~ \cite {soares2010flexsc}和零拷贝套接字 \cite {thadani1995efficient,chu1996zero,linux-zero-copy}实现良好的兼容性和隔离性。
+\parab {内核网络协议栈优化:}第一类工作是优化内核TCP / IP协议栈。 FastSocket~ \cite {lin2016scalable}，Affinity-Accept~ \cite {pesterev2012improving}，FlexSC~ \cite {soares2010flexsc}和零拷贝套接字 \cite {thadani1995efficient,chu1996zero,linux-zero-copy}实现良好的兼容性和隔离性。
 
 MegaPipe~ \cite {han2012megapipe}和StackMap~ \cite {yasukata2016stackmap}提出了新的API来实现零拷贝和改进I / O多路复用，代价是需要修改应用程序。
 但是，大量的内核开销仍然存在。
 支持零拷贝的挑战是套接字语义。
 
-\parab {用户空间TCP / IP堆栈:}第二类工作完全绕过内核TCP / IP堆栈并在用户空间中实现TCP / IP。
+\parab {用户空间TCP / IP协议栈:}第二类工作完全绕过内核TCP / IP协议栈并在用户空间中实现TCP / IP。
 在这个类别中，IX~ \cite {belay2017ix}和Arrakis~\cite {peter2016arrakis}是新的操作系统架构，它使用虚拟化来确保安全性和隔离性。 IX利用LwIP~ \cite {dunkels2001design}在用户空间中实现TCP / IP，同时使用内核转发每个数据包以实现性能隔离和QoS。相比之下，Arrakis将QoS卸载到网卡，因此绕过数据平面的内核。
 这些工作使用网卡在同一主机中的应用程序之间转发数据包。
 如表 \ref {socksdirect:tab:operation-performance} 所示，从CPU到网卡的往返（hairpin）延迟远远高于核心间缓存迁移延迟。
@@ -437,7 +437,7 @@ SandStorm~ \cite {marinos2014network}，mTCP~ \cite {jeong2014mtcp}，Seastar~ \
 FaSST~ \cite {kalia2016fasst}和eRPC~ \cite {kalia2018datacenter}提供RPC API而不是套接字。
 LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS~ \cite {huang2017high}符合标准套接字API。
 
-用户空间TCP / IP堆栈提供了比Linux更好的性能，但它仍然不接近RDMA和共享内存。
+用户空间TCP / IP协议栈提供了比Linux更好的性能，但它仍然不接近RDMA和共享内存。
 一个重要原因是现有的工作都不支持在线程和进程之间共享套接字，导致fork和容器热迁移中的兼容性问题，以及多线程锁开销。
 
 首先，当进程fork时，只有父进程和子进程中的一个可以使用现有套接字。

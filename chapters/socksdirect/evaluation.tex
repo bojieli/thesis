@@ -40,7 +40,7 @@
 每个线程都固定在CPU内核上。在收集数据之前，进行了足够的预热测试。
 对于延迟，本节使用一个乒乓应用程序报告平均往返时间，误差条代表1％和99％百分位数。
 对于吞吐量，一方保持发送数据而另一方不断接收数据。
-本节将比较Linux，原始RDMA写原语（write verb），Rsocket~ \cite {rsockets}和LibVMA~ \cite {libvma}，这是针对Mellanox 网卡优化的用户空间TCP / IP堆栈。
+本节将比较Linux，原始RDMA写原语（write verb），Rsocket~ \cite {rsockets}和LibVMA~ \cite {libvma}，这是针对Mellanox 网卡优化的用户空间TCP / IP协议栈。
 本节没有评估mTCP~ \cite {jeong2014mtcp}，因为底层DPDK库对Mellanox ConnectX-4网卡的支持有限。由于批处理，mTCP具有比RDMA高得多的延迟，报告的吞吐量为每秒1.7~M包~~ \cite {kalia2018datacenter}。
 
 \subsection{微基准测试}
