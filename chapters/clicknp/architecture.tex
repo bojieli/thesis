@@ -6,10 +6,12 @@
 \label{clicknp:subsec:sysarch}
 
 图 \ref{clicknp:fig:clicknp} 显示了 \name 的体系结构。
-\name 以 Catapult Shell 架构构 建\cite {putnam2014reconfigurable}。
-\textit {shell}包含许多可重用的逻辑位，这些逻辑对所有应用程序都是通用的，并将它们抽象为一组明确定义的接口，例如，PCIe，直接内存访问（DMA），DRAM内存管理单元（MMU），和以太网MAC。
-\name FPGA程序合成为 Catapult \textit {用户逻辑}。
-但是，由于\name 依赖于商品高层次综合工具链来生成FPGA 硬件描述语言，并且不同的工具可以为shell管理的资源生成自己的（和不同的）接口，需要一个\textit {高层次综合的特定运行时}（Board Specific Package，BSP），用于执行高层次综合特定接口与shell接口之间的转换。
+\name 基于 Catapult Shell 架构构建 \cite {putnam2014reconfigurable}。
+Catapult \textit {shell} 包含许多对所有应用程序通用的可重用逻辑模块。
+Shell 将它们抽象为一组明确定义的接口，例如，PCIe、直接内存访问（DMA）、DRAM内存管理单元（MMU）和以太网MAC。
+用 \name 编写的 FPGA 程序被编译为 Catapult \textit {用户逻辑}（role）。
+用户逻辑调用 shell 提供的接口访问外部资源。
+由于\name 依赖于商业高层次综合工具链来生成 FPGA 硬件描述语言，需要一个\textit {高层次综合的特定运行时}（Board Specific Package，BSP），用于执行高层次综合特定接口与shell接口之间的转换。
 
 
 \begin{figure}
@@ -81,49 +83,123 @@ flit的格式如图 \ref {clicknp:fig:element}（b）所示。每个flit包含�
 
 \subsubsection{语言}
 
+
 \name 元件（element）可以声明为面向对象语言（如 C++）中的一个对象。
 不幸的是，许多现有的高层次综合工具仅支持C语言。
 为了利用商业高层次综合工具，可以编写一个编译器，将面向对象的语言（例如 C++）转换为C，但这种努力并非易事。
 本文采用一种替代路径来扩展C语言以支持元件声明。
-图 \ref {clicknp:fig:lang}（a）显示了元件 \textit {Counter}的代码片段，它只计算传递了多少个数据包。元件由 \textbf {.element}关键字定义，后跟元件名称和输入/输出端口数。
-关键字 \textbf {.state} 定义元件的状态变量，\textbf {.init}，\textbf {.handler} 和 \textbf {.signal}指定初始化，处理和信号处理函数元件。
-实现了一组内置函数来对输入和输出端口进行操作，如表 \ref {clicknp:tab:built-in} 中所述。
 
-与Click类似，\name 也使用简单脚本来指定网络功能的配置。配置有两部分：\textit {声明} 和 \textit {连接}，遵循Click语言的类似语法 \cite {kohler2000click}。
+
+
+
+\begin{figure}[htbp]
+\lstset{ emph={%
+		element, init, state, handler, signal,include
+	}, emphstyle={\bfseries .},
+	morekeywords={test_input_port,get_input_port,read_input_port,from_tor, to_tor, set_output_port, host, set_signal} 
+}
+\small
+\centering
+\begin{tabular}{c}
+\begin{lstlisting}
+element Count (NetworkStream in -> NetworkStream out) {
+  state {
+    ulong count;
+  }
+  init {
+    count = 0;
+  }
+  handler {
+    if (test_input_port(in)) {
+      flit x;
+      x = read_input_port(in);
+      if (x.flit.fd.sop)
+        count = count + 1;
+      set_output_port(out, x);
+    }
+  }
+  signal {
+    ClSignal p;
+    p.Sig.LParam[0] = count;
+    set_signal(p);
+  }
+}
+\end{lstlisting}
+\end{tabular}
+	\caption{数据包计数器元件的代码。}
+	\label{clicknp:fig:count-element}
+\end{figure}
+
+
+图 \ref{clicknp:fig:count-element} 显示了元件 \textit {Counter}的代码片段，它只计算传递了多少个数据包。元件由 \textbf {.element} 关键字定义，后跟元件名称和输入/输出端口声明。
+关键字 \textbf {.state} 定义元件的状态变量，\textbf {.init}，\textbf {.handler} 和 \textbf {.signal} 指定初始化、数据处理和信号处理函数元件。
+表 \ref {clicknp:tab:built-in} 列出了操作输入和输出端口的内置函数。
+
+
+\begin{table}
+	\centering
+	\caption{\name\ 管道上的内置操作。}
+	\label{clicknp:tab:built-in}
+	\small
+	\begin{tabular}{p{.4\textwidth}|p{.5\textwidth}}
+		\toprule
+		uint get\_input\_port() & 获取具有可用数据的所有输入端口的位图。 \\
+		\midrule
+		bool test\_input\_port(uint id) & 测试id指示的输入端口。 \\
+		\midrule
+		flit read\_input\_port(uint id) & 读取id指示的输入端口。 \\
+		\midrule
+		flit peek\_input\_port(uint id) & 获取id指示的输入端口数据，但不取走。 \\
+		\midrule
+		void set\_output\_port(uint id, flit x) & 将flit设置为输出端口。 处理程序返回时，flit将写入管道。\\
+		\midrule
+		ClSignal read\_signal() & 从信号端口读取信号。\\
+		\midrule
+		void set\_signal(ClSignal p) & 在信号端口上设置输出信号。\\
+		\midrule
+		return (uint bitmap) & \textbf{.handler} 的返回值指定下一次迭代时要读取的输入端口的位图。 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+
+与Click类似，\name 也使用简单脚本来指定网络功能的配置，如图 \ref{clicknp:fig:logger-config} 所示。配置有两部分：\textit {声明} 和 \textit {连接}，遵循Click语言的类似语法 \cite {kohler2000click}。
 值得注意的是，在 \name 中，可以使用关键字 \textbf {host}来注释元件，这将导致元件被编译为CPU二进制文件并在CPU上执行。
+
+
+\begin{figure}[htbp]
+\lstset{ emph={%
+		element, init, state, handler, signal,include
+	}, emphstyle={\bfseries .},
+	morekeywords={get_input_port,read_input_port,from_tor, to_tor, set_output_port, host, set_signal} 
+}
+\small
+\centering
+\begin{tabular}{c}
+\begin{lstlisting}
+Count :: cnt @ 
+Tee :: tee 
+host PktLogger :: logger
+
+from_tor -> cnt -> tee [1] -> to_tor
+tee [2] -> logger
+\end{lstlisting}
+\end{tabular}
+	\caption{抓包工具元件间互连的 \name 配置文件。使用 \textbf {host}关键字注释的元件在CPU上编译和执行。 用 ``@'' 注释的元件需要从管理器线程接收控制信号。\textbf {``From\_tor''} 和 \textbf {``to\_tor''}是两个内置元件，代表FPGA上以太网端口的输入和输出。}
+	\label{clicknp:fig:logger-config}
+\end{figure}
+
+
 
 \iffalse
 \textbf{Verilog 元件。}
 \fi
 
-\begin{table}
 
-\centering
-\caption{\name\ 管道上的内置操作。}
-\label{clicknp:tab:built-in}
-\scalebox{0.9}{
-\begin{tabular}{p{.4\textwidth}|p{.5\textwidth}}
-\toprule
-uint get\_input\_port() & 获取具有可用数据的所有输入端口的位图。 \\
-\midrule
-bool test\_input\_port(uint id) & 测试id指示的输入端口。 \\
-\midrule
-flit read\_input\_port(uint id) & 读取id指示的输入端口。 \\
-\midrule
-flit peek\_input\_port(uint id) & 获取id指示的输入端口数据，但不取走。 \\
-\midrule
-void set\_output\_port(uint id, flit x) & 将flit设置为输出端口。 处理程序返回时，flit将写入管道。\\
-\midrule
-ClSignal read\_signal() & 从信号端口读取信号。\\
-\midrule
-void set\_signal(ClSignal p) & 在信号端口上设置输出信号。\\
-\midrule
-return (uint bitmap) & \textbf{.handler} 的返回值指定下一次迭代时要读取的输入端口的位图。 \\
-\bottomrule
-\end{tabular}
-}
-\end{table}
 
+
+
+\iffalse
 \begin{figure}[htbp]
 \small \lstset{style=numbers}
 
@@ -173,10 +249,11 @@ tee [2] -> logger
 {\normalsize \centering (b)} 
 \end{tabular}
 \caption{用 \name 语言写入元件并指定配置的示例。 使用 \textbf {host}关键字注释的元件在CPU上编译和执行。 用“@”注释的元件需要从管理器线程接收控制信号。
-	\textbf {``From\_tor''} 和 \textbf {``to\_tor''}是两个内置元件，代表FPGA上以太网端口的输入和输出。 处理函数的返回值指定了将在下一轮中检查的输入端口的位掩码。}
+	}
 \label{clicknp:fig:lang}
 
 \end{figure}
+\fi
 
 \subsubsection{\name 工具链}
 \label{clicknp:subsec:toolchain}
