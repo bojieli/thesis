@@ -180,8 +180,8 @@ tee [2] -> logger
 
 \subsubsection{\name 工具链}
 \label{clicknp:subsec:toolchain}
-\name 工具链包含一个 \name 编译器作为前端，一个 C / C++ 编译器（例如，Visual Studio或GCC）和一个高层次综合工具（例如，Altera OpenCL SDK或Xilinx Vivado 高层次综合）作为后端。
-如图\ref{clicknp:fig:clicknp}所示，要编写 \name 程序，开发人员需要将代码分为三部分：
+\name 工具链包含一个 \name 编译器作为前端，一个 C / C++ 编译器（例如，Visual Studio或GCC）和一个支持 OpenCL 语言的高层次综合工具（例如，Altera OpenCL SDK或Xilinx SDAccel）作为后端。
+如图 \ref{clicknp:fig:clicknp} 所示，要编写 \name 程序，开发人员需要将代码分为三部分：
 （1）一组元件，每个元件实现概念上简单的操作，
 （2）指定这些元件之间连接的配置文件，以及（3）主机管理器，它初始化每个元件并在运行时控制它们的行为，例如，根据管理员的输入。
 这三部分源代码被送入 \name 编译器并转换为主程序和FPGA程序的中间源文件。

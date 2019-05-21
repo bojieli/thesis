@@ -19,71 +19,41 @@
 	\label{clicknp:fig:sw-hw-codesign}
 \end{figure}
 
-现代多租户数据中心提供共享基础设施，以低成本托管来自不同客户（即租户）的许多不同类型的服务。
-为确保安全性和性能隔离，每个租户都部署在\textit{虚拟化网络}环境中。
-数据中心运营商需要灵活的网络功能（Network Function，网络功能）来实施隔离
-同时保证服务水平协议（Service Level Aggrement，SLA）。
-
-传统的基于硬件的网络设备不灵活，因此几乎所有现有的云提供商，例如Microsoft，Amazon和VMWare，已经在服务器上的管理程序软件中实现了\textit{虚拟化}网络功能，以最大限度地提高灵活性，包括负载均衡、流量整形和防火墙等。
-
-但是，软件网络功能有两个基本限制 - 都源于软件包处理的性质。
-首先，用软件处理数据包的容量有限。
-现有的软件网络功能通常需要多个内核来实现10~Gbps的速率~\cite{comb,martins2014clickos}。
-但最新的网络链接已经扩大到40至100~Gbps~\cite{mellanox-100g}。
-虽然可以在服务器中添加更多内核，但这样做会增加成本，不仅在资本支出方面，而且在运营费用增加时会产生更多的能源。
-%
-其次，在软件中处理数据包会产生大量且高度可变的延迟。 这种延迟的范围可能
-从几十微秒到几毫秒~\cite{martins2014clickos,ananta,duet}。
-对于许多低延迟应用（例如，股票交易），这种增加的延迟是不可接受的。
-
-% hardware accelerating
-为了克服软件包处理的局限性同时保持灵活性，最近的工作已经提出使用图形处理单元（GPU）~\cite{packetshader}，网络处理器（NP）~\cite {cavium,netronome}或可重新配置的硬件（现场可编程门阵列，即FPGA）来加速网络功能~\cite{netfpga,smartnic,rubow2010chimpp}。
-与GPU相比，FPGA更节能~\cite {fpga-vs-gpu,fpga-vs-gpu2}。
-与专用NP相比，FPGA更具\emph{灵活性}，因为它可以使用任何服务的任何硬件逻辑进行虚拟重新配置。
-最后，FPGA价格低廉，并且已经在数据中心大规模部署~\cite {smartnic,putnam2014reconfigurable}。
-
-这项工作探索了使用FPGA加速数据中心软件网络功能的机会。
-使用FPGA作为加速器的主要挑战是\textit{可编程性}。
-传统上，FPGA用硬件描述语言（硬件描述语言）编程，例如Verilog和V硬件描述语言，它们仅暴露低级构建块，如门，寄存器，多路复用器和时钟。
-虽然程序员可以手动调整逻辑以实现最大性能，但编程复杂性很高，导致生产率低和调试困难。
-实际上，FPGA的可编程性缺乏使得软件程序员的大型社区多年来远离这种技术~\cite{bacon2013fpga}。
-
-本文介绍\name{}，这是一个FPGA加速平台，用于在商用服务器上进行高度灵活和高性能的网络功能处理。
-\name{}通过三个步骤解决FPGA的编程挑战。
-首先，提供了一个模块化架构，类似于众所周知的Click模型\cite {kohler2000click}，其中复杂的网络功能是使用简单明确的元件组成的。
-\footnote{这也是系统名称\textit{Click Network Processor}的来源。}
+本章介绍 \name{}，一个用于在商用服务器上进行高度灵活和高性能的网络功能处理的FPGA加速平台。
+\name{} 通过三个步骤解决 FPGA 的编程挑战。
+首先，提供了一个模块化架构，类似于第 \ref{background:sec:network-function} 节介绍的 Click 模型 \cite {kohler2000click}，复杂的网络功能可以使用简单的元件组成。
+\footnote{这也是系统名称 \textit{Click Network Processor} （ClickNP）的来源。}
 其次，\name 元件是用高级C语言编写的，并且是跨平台的。
-\name 元件可以通过利用商业高层次综合（High-Level Synthesis，高层次综合）工具\cite {vivado,aoc,sdaccel}在CPU或FPGA的低级硬件描述语言（硬件描述语言）上编译成二进制文件。
+\name 元件可以通过利用商业高层次综合（High-Level Synthesis，HLS）工具 \cite {vivado,aoc,sdaccel} 在 FPGA 上编译成硬件描述语言和硬件模块，或在 CPU 上使用标准 C++ 编译器编译成机器指令。
 最后，高性能PCIE I/O通道可在CPU和FPGA上运行的元件之间提供高吞吐量和低延迟通信。
-这种PCIE I/O通道不仅可以实现CPU-FPGA的联合处理 - 允许程序员自由地对其处理进行分区，而且对调试也有很大的帮助，因为程序员可以在主机上轻松运行有问题的元件并使用熟悉的软件诊断工具。
+PCIE I/O通道不仅可以实现CPU-FPGA的联合处理 -- 允许程序员自由地在 CPU 和 FPGA 间划分任务，而且对调试也有很大的帮助，因为程序员可以在主机上轻松地运行有问题的元件，并使用熟悉的软件调试工具。
 %虽然以前的工作\cite{Click2NetFPGA}尝试过类似的方法，但与之相比，\name{}实现了两个数量级以上的性能改进。
 
-\name{}使用一组优化技术来有效地利用FPGA中的大规模并行性。
-首先，\name{}将每个元件组织成FPGA中的逻辑块，并将它们与先进先出（FIFO）缓冲区连接起来。
+\name{} 使用一系列优化技术来有效地利用FPGA中的大规模并行性。
+首先，\name{} 将每个元件组织成FPGA中的逻辑块，并将它们与先进先出（FIFO）缓冲区连接起来。
 因此，所有这些元件块都可以完全并行运行。
-对于每个元件，都会仔细编写处理函数以最小化操作之间的依赖关系，从而允许高层次综合工具生成最大并行逻辑。
-此外，开发了\textit {延迟写入}和\textit {内存散射}技术来解决读写依赖性和伪内存依赖性，现有的高层次综合工具无法解决这些问题。
+对于每个元件，本章仔细编写处理函数以最小化操作之间的依赖关系，从而允许高层次综合工具生成最大并行逻辑。
+此外，开发了\textit {延迟写入}和\textit {内存散射}技术来解决读写依赖性和伪内存依赖性，这些问题是现有高层次综合工具无法解决的。
 最后，通过在不同阶段仔细平衡操作并匹配其处理速度，可以最大化管道的总体吞吐量。
-通过所有这些优化，\name{}实现了高数据包处理吞吐量
-每秒高达2亿个数据包\footnote {\name{} 网络功能的实际吞吐量可能受以太网端口数据速率限制。}，具有超低延迟（大多数数据包大小$ 2 \mu$s）。
-与具有GPU加速的CPU和CPU上最先进的软件网络功能相比，这大约是10倍和2.5倍的吞吐量增益~\cite {packetshader}，同时将延迟分别降低10倍和100倍。
+通过所有这些优化，\name{}实现了每秒高达2亿个数据包的数据包吞吐量 \footnote {\name{} 网络功能的实际吞吐量可能受以太网端口数据速率限制。}，并具有超低延迟（对大多数数据包大小，延迟小于 $2 \mu$s）。
+与 GPU 和 CPU 上最先进的软件网络功能相比，这大约是10倍和2.5倍的吞吐量增益~\cite {packetshader}，同时将延迟分别降低10倍和100倍。
 
-本章实现了\name 工具链，它可以与各种商业高层次综合工具集成〜\cite {vivado,aoc}，包括Intel FPGA OpenCL SDK，Xilinx Vivado和SDAccel。
-还实现了大约100个常用元件，其中20％是从Click直接重新计算的。
+本章实现了\name 工具链，它可以与各种商业高层次综合工具集成 \cite {vivado,aoc}，包括Intel FPGA OpenCL SDK 和 Xilinx SDAccel。
+本章还实现了大约200个常用元件，其中20\%与Click中的对应元件功能相同，参考Click的代码重新实现。
 本章将使用这些元件构建五个演示网络功能：
-（1）高速数据包捕获和发包工具，
+（1）高速数据包发包和抓包工具，
 （2）支持精确匹配和通配符匹配的防火墙，
 （3）IPSec网关，
 （4）一个可以处理3200万个并发流的四层负载均衡器，
-（5）pFabric调度器\cite {pfabric}执行严格优先级流程调度，具有40亿个优先级。
-本章将在戴尔服务器和Altera Stratix V FPGA板的测试平台上评估这些网络功能\cite {putnam2014reconfigurable}。
-结果表明，所有这些网络功能都可以通过FPGA大大加速，并且可以在任何数据包大小下使40Gbps的线速饱和，同时具有极低的延迟和可忽略的CPU开销。
+（5）pFabric调度器 \cite {pfabric} 执行严格优先级流调度（flow scheduling），具有40亿个优先级。
+评估结果表明，所有这些网络功能都可以通过FPGA大大加速，并且可以在任何数据包大小下使40Gbps的线速饱和，同时具有极低的延迟和可忽略的CPU开销。
 
 总之，本章的贡献是：
-（1）\name 语言和工具链的设计与实现;
-（2）在FPGA上高效运行的高性能数据包处理模块的设计和实现;
-（3）五个FPGA加速网络功能的设计和评估。
-据本文所知，\name 是第一个用于通用网络功能的FPGA加速数据包处理平台，完全用高级语言编写，并能实现40~Gbps的线速。
+（1）\name 语言和工具链的设计与实现；
+（2）在FPGA上高效运行的高性能数据包处理模块的设计和实现；
+（3）FPGA加速网络功能的设计和评估。
+据作者所知，\name 是第一个用于通用网络功能、完全用高级语言编写并能实现40~Gbps线速的FPGA加速数据包处理平台。
+
 \egg{
 \smalltitle{Roadmap.} The roadmap of the paper is as follows: \S\ref{clicknp:sec:background} discuss the background.
 \S\ref{clicknp:sec:architecture} presents the \name\ architecture and design. 
