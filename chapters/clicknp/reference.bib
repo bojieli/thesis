@@ -43,6 +43,7 @@
  location = {Madrid, Spain},
  url = {http://doi.acm.org/10.1145/1544012.1544032},
  doi = {10.1145/1544012.1544032},
+ pages={20},
  acmid = {1544032},
 } 
 
@@ -52,6 +53,7 @@
  title = {RouteBricks: Exploiting Parallelism to Scale Software Routers},
  booktitle = {Proc. ACM SOSP},
  year = {2009},
+ pages={15--28},
  isbn = {978-1-60558-752-3},
  location = {Big Sky, Montana, USA},
  url = {http://doi.acm.org/10.1145/1629575.1629578},
@@ -87,57 +89,42 @@
  ISSN={0367-7508}, 
  month={Oct},}
 
-@Inproceedings {fpga-vs-gpu,
-abstract     = {<p>High Performance Computing (HPC) or scientific codes are being executed across
-                a wide variety of computing platforms from embedded processors to massively
-                parallel GPUs.
-
-                We present a comparison of the Basic Linear Algebra Subroutines (BLAS) using
-                double-precision floating point on an FPGA, CPU and GPU. On the CPU and GPU, we
-                utilize standard libraries on state-of-the-art devices. On the FPGA, we have
-                developed parameterized modular implementations for the dotproduct and Gaxpy or
-                matrix-vector multiplication. In order to obtain optimal performance for any
-                aspect ratio of the matrices, we have designed a high-throughput accumulator to
-                perform an efficient reduction of floating point values. To support scalability
-                to large data-sets, we target the BEE3 FPGA platform. We use performance and
-                energy efficiency as metrics to compare the different platforms. Results show
-                that FPGAs offer comparable performance as well as 2.7 to 293 times better energy
-                efficiency for the test cases that we implemented on all three platforms.</p>},
-author       = {Srinidhi Kestur and John D. Davis and Oliver Williams},
-booktitle    = {IEEE Computer Society Symposium on VLSI},
-month        = {July},
-title        = {BLAS Comparison on FPGA, CPU and GPU},
-url          = {http://research.microsoft.com/apps/pubs/default.aspx?id=130834},
-year         = {2010},
+@inproceedings{fpga-vs-gpu,
+	title={Blas comparison on fpga, cpu and gpu},
+	author={Kestur, Srinidhi and Davis, John D and Williams, Oliver},
+	booktitle={2010 IEEE computer society annual symposium on VLSI},
+	pages={288--293},
+	year={2010},
+	organization={IEEE}
 }
 
 @inproceedings{rollback-mb,
- author = { Justine Sherry and Peter Gao and Soumya Basu and Aurojit Panda and Arvind Krishnamurthy and Christian Macciocco and Maziar Manesh and Joao Martins and Sylvia Ratnasamy and Luigi Rizzo and Scott Shenker},
- title = {Rollback Recovery for Middleboxes},
- booktitle = {Proc. ACM SIGCOMM},
- year = {2015},
-} 
-
-
-
-
-
+	title={Rollback-recovery for middleboxes},
+	author={Sherry, Justine and Gao, Peter Xiang and Basu, Soumya and Panda, Aurojit and Krishnamurthy, Arvind and Maciocco, Christian and Manesh, Maziar and Martins, Jo{\~a}o and Ratnasamy, Sylvia and Rizzo, Luigi and others},
+	booktitle={ACM SIGCOMM Computer Communication Review},
+	volume={45},
+	number={4},
+	pages={227--240},
+	year={2015},
+	organization={ACM}
+}
 
 @inproceedings{fpga-vs-gpu2,
- author = {B Betkaoui and D B Thomas and W Luk },
- title = {Comparing performance and energy efficiency of FPGAs and GPUs for high productivity computing},
- booktitle = {2010 International Conference on Field-Programmable Technology},
- year = {2010},
-} 
+	title={Comparing performance and energy efficiency of FPGAs and GPUs for high productivity computing},
+	author={Betkaoui, Brahim and Thomas, David B and Luk, Wayne},
+	booktitle={2010 International Conference on Field-Programmable Technology},
+	pages={94--101},
+	year={2010},
+	organization={IEEE}
+}
 
 @inproceedings{comb,
- author = {Sekar, Vyas and Egi, Norbert and Ratnasamy, Sylvia and Reiter, Michael K. and Shi, Guangyu},
- title = {Design and Implementation of a Consolidated Middlebox Architecture},
- booktitle = {Proc. USENIX NSDI},
- year = {2012},
- url = {http://dl.acm.org/citation.cfm?id=2228298.2228331},
- acmid = {2228331},
-} 
+	title={Design and implementation of a consolidated middlebox architecture},
+	author={Sekar, Vyas and Egi, Norbert and Ratnasamy, Sylvia and Reiter, Michael K and Shi, Guangyu},
+	booktitle={Presented as part of the 9th $\{$USENIX$\}$ Symposium on Networked Systems Design and Implementation ($\{$NSDI$\}$ 12)},
+	pages={323--336},
+	year={2012}
+}
 
 @ARTICLE{cuckoo, 
  author={Pagh, Rasmus and Rodler, Flemming Friche}, 
@@ -148,17 +135,15 @@ year         = {2010},
 
 
 @inproceedings{pfabric,
- author = {Alizadeh, Mohammad and Yang, Shuang and Sharif, Milad and Katti, Sachin and McKeown, Nick and Prabhakar, Balaji and Shenker, Scott},
- title = {pFabric: Minimal Near-optimal Datacenter Transport},
- booktitle = {Proc. ACM SIGCOMM},
- year = {2013},
- isbn = {978-1-4503-2056-6},
- numpages = {12},
- url = {http://doi.acm.org/10.1145/2486001.2486031},
- doi = {10.1145/2486001.2486031},
- acmid = {2486031},
- keywords = {datacenter network, flow scheduling, packet transport},
-} 
+	title={pfabric: Minimal near-optimal datacenter transport},
+	author={Alizadeh, Mohammad and Yang, Shuang and Sharif, Milad and Katti, Sachin and McKeown, Nick and Prabhakar, Balaji and Shenker, Scott},
+	booktitle={ACM SIGCOMM Computer Communication Review},
+	volume={43},
+	number={4},
+	pages={435--446},
+	year={2013},
+	organization={ACM}
+}
 
 @misc{aoc,
 	title={{Altera SDK for OpenCL.}},
@@ -196,68 +181,56 @@ year         = {2010},
 	note={https://netronome.com/product/nfp-6xxx/},
 }
 
-@inproceedings{duet,
- author = {Gandhi, Rohan and Liu, Hongqiang Harry and Hu, Y. Charlie and Lu, Guohan and Padhye, Jitendra and Yuan, Lihua and Zhang, Ming},
- title = {Duet: Cloud Scale Load Balancing with Hardware and Software},
- booktitle = {Proc. ACM SIGCOMM},
- year = {2014},
- isbn = {978-1-4503-2836-4},
- location = {Chicago, Illinois, USA},
- url = {http://doi.acm.org/10.1145/2619239.2626317},
- doi = {10.1145/2619239.2626317},
- acmid = {2626317},
- keywords = {SDN, datacenter, load balancing},
-} 
+@article{duet,
+	title={Duet: Cloud scale load balancing with hardware and software},
+	author={Gandhi, Rohan and Liu, Hongqiang Harry and Hu, Y Charlie and Lu, Guohan and Padhye, Jitendra and Yuan, Lihua and Zhang, Ming},
+	journal={ACM SIGCOMM Computer Communication Review},
+	volume={44},
+	number={4},
+	pages={27--38},
+	year={2015},
+	publisher={ACM}
+}
 
 @inproceedings{ananta,
- author = {Patel, Parveen and Bansal, Deepak and Yuan, Lihua and Murthy, Ashwin and Greenberg, Albert and Maltz, David A. and Kern, Randy and Kumar, Hemant and Zikos, Marios and Wu, Hongyu and Kim, Changhoon and Karri, Naveen},
- title = {Ananta: Cloud Scale Load Balancing},
- booktitle = {Proc. ACM SIGCOMM},
- year = {2013},
- isbn = {978-1-4503-2056-6},
- location = {Hong Kong, China},
- url = {http://doi.acm.org/10.1145/2486001.2486026},
- doi = {10.1145/2486001.2486026},
- acmid = {2486026},
- keywords = {distributed systems, server load balancing, software defined networking},
-} 
+ title={Ananta: Cloud scale load balancing},
+ author={Patel, Parveen and Bansal, Deepak and Yuan, Lihua and Murthy, Ashwin and Greenberg, Albert and Maltz, David A and Kern, Randy and Kumar, Hemant and Zikos, Marios and Wu, Hongyu and others},
+ booktitle={ACM SIGCOMM Computer Communication Review},
+ volume={43},
+ number={4},
+ pages={207--218},
+ year={2013},
+ organization={ACM}
+}
 
 @inproceedings{netfpga,
- author = {Naous, Jad and Gibb, Glen and Bolouki, Sara and McKeown, Nick},
- title = {NetFPGA: Reusable Router Architecture for Experimental Research},
- booktitle = {Proc. PRESTO},
- year = {2008},
- isbn = {978-1-60558-181-1},
- location = {Seattle, WA, USA},
- url = {http://doi.acm.org/10.1145/1397718.1397720},
- doi = {10.1145/1397718.1397720},
- acmid = {1397720},
- keywords = {modular design, netfpga, reuse},
-} 
+	title={NetFPGA: reusable router architecture for experimental research},
+	author={Naous, Jad and Gibb, Glen and Bolouki, Sara and McKeown, Nick},
+	booktitle={Proceedings of the ACM workshop on Programmable routers for extensible services of tomorrow},
+	pages={1--7},
+	year={2008},
+	organization={ACM}
+}
 
 @inproceedings{packetshader,
- author = {Han, Sangjin and Jang, Keon and Park, KyoungSoo and Moon, Sue},
- title = {PacketShader: A GPU-accelerated Software Router},
- booktitle = {Proc. ACM SIGCOMM},
- year = {2010},
- isbn = {978-1-4503-0201-2},
- url = {http://doi.acm.org/10.1145/1851182.1851207},
- doi = {10.1145/1851182.1851207},
- acmid = {1851207},
- keywords = {CUDA, GPU, software router},
-} 
+title={PacketShader: a GPU-accelerated software router},
+author={Han, Sangjin and Jang, Keon and Park, KyoungSoo and Moon, Sue},
+journal={ACM SIGCOMM Computer Communication Review},
+volume={41},
+number={4},
+pages={195--206},
+year={2011},
+publisher={ACM}
+}
 
 
 @inproceedings{vmware-multi-tenancy,
- author = {Koponen, Teemu and Amidon, Keith and Balland, Peter and Casado, Mart\'{\i}n and Chanda, Anupam and Fulton, Bryan and Ganichev, Igor and Gross, Jesse and Gude, Natasha and Ingram, Paul and others},
- title = {Network Virtualization in Multi-tenant Datacenters},
- booktitle = {Proc. USENIX NSDI},
- year = {2014},
- isbn = {978-1-931971-09-6},
- url = {http://dl.acm.org/citation.cfm?id=2616448.2616468},
- acmid = {2616468},
- address = {Berkeley, CA, USA},
-} 
+title={Network virtualization in multi-tenant datacenters},
+author={Koponen, Teemu and Amidon, Keith and Balland, Peter and Casado, Mart{\'\i}n and Chanda, Anupam and Fulton, Bryan and Ganichev, Igor and Gross, Jesse and Ingram, Paul and Jackson, Ethan and others},
+booktitle={11th $\{$USENIX$\}$ Symposium on Networked Systems Design and Implementation ($\{$NSDI$\}$ 14)},
+pages={203--216},
+year={2014}
+}
 
 @misc{smartnic,
 	author={Albert Greenberg},
@@ -283,8 +256,9 @@ year         = {2010},
 @inproceedings{martins2014clickos,
 	title={ClickOS and the art of network function virtualization},
 	author={Martins, Joao and Ahmed, Mohamed and Raiciu, Costin and Olteanu, Vladimir and Honda, Michio and Bifulco, Roberto and Huici, Felipe},
-	booktitle={Proc. USENIX NSDI},
-	year={2014},
+	booktitle={11th $\{$USENIX$\}$ Symposium on Networked Systems Design and Implementation ($\{$NSDI$\}$ 14)},
+	pages={459--473},
+	year={2014}
 }
 
 @misc{broadcomethernet,
@@ -326,11 +300,15 @@ year         = {2010},
 	publisher={ACM}
 }
 
-@inproceedings{putnam2014reconfigurable,
+@article{putnam2014reconfigurable,
 	title={A reconfigurable fabric for accelerating large-scale datacenter services},
-	author={Putnam, Andrew and Caulfield, Adrian M and Chung, Eric S and Chiou, Derek and Constantinides, Kypros and Demme, John and Esmaeilzadeh, Hadi and Fowers, Jeremy and Gopal, Gopi Prashanth and Gray, Jordan and others},
-	booktitle={Proc. Intl. Symp. on Computer Architecture (ISCA)},
-	year={2014}
+	author={Putnam, Andrew and Caulfield, Adrian M and Chung, Eric S and Chiou, Derek and Constantinides, Kypros and Demme, John and Esmaeilzadeh, Hadi and Fowers, Jeremy and Gopal, Gopi Prashanth and Gray, Jan and others},
+	journal={ACM SIGARCH Computer Architecture News},
+	volume={42},
+	number={3},
+	pages={13--24},
+	year={2014},
+	publisher={ACM}
 }
 
 @article{bacon2013fpga,
@@ -369,13 +347,12 @@ year         = {2010},
 	organization={ACM}
 }
 
-@inproceedings {Click2NetFPGA,
-	author = {Teemu Rinta-aho and Mika Karlstedt and Madhav P. Desai},
-	title = {The Click2NetFPGA Toolchain},
-	booktitle = {Proc. USENIX ATC},
-	year = {2012},
-	isbn = {978-931971-93-5},
-	url = {https://www.usenix.org/conference/atc12/technical-sessions/presentation/rinta-aho}
+@inproceedings{Click2NetFPGA,
+	title={The click2netfpga toolchain},
+	author={Rinta-Aho, Teemu and Karlstedt, Mika and Desai, Madhav P},
+	booktitle={Presented as part of the 2012 $\{$USENIX$\}$ Annual Technical Conference ($\{$USENIX$\}$$\{$ATC$\}$ 12)},
+	pages={77--88},
+	year={2012}
 }
 
 @article{stratix2012device,
@@ -388,21 +365,26 @@ year         = {2010},
 @inproceedings{czajkowski2012opencl,
 	title={OpenCL for FPGAs: Prototyping a compiler},
 	author={Czajkowski, Tomasz S and Neto, David and Kinsner, Michael and Aydonat, Utku and Wong, Jason and Denisenko, Dmitry and Yiannacouras, Peter and Freeman, John and Singh, Deshanand P and Brown, Stephen D},
-	booktitle={Int'l Conf. on Engineering of Reconfigurable Systems and Algorithms (ERSA)},
-	year={2012}
+	booktitle={Proceedings of the International Conference on Engineering of Reconfigurable Systems and Algorithms (ERSA)},
+	pages={1},
+	year={2012},
+	organization={The Steering Committee of The World Congress in Computer Science, Computer}
 }
 
 @inproceedings{bai2014pias,
-	title={PIAS: Practical Information-Agnostic Flow Scheduling for Data Center Networks},
+	title={PIAS: Practical information-agnostic flow scheduling for data center networks},
 	author={Bai, Wei and Chen, Li and Chen, Kai and Han, Dongsu and Tian, Chen and Sun, Weicheng},
-	booktitle={Proc. ACM HotNets},
-	year={2014}
+	booktitle={Proceedings of the 13th ACM Workshop on Hot Topics in Networks},
+	pages={25},
+	year={2014},
+	organization={ACM}
 }
 
 @inproceedings{grosvenor2015queues,
-	title={Queues Don’t Matter When You Can JUMP Them!},
+	title={Queues Don’t Matter When You Can $\{$JUMP$\}$ Them!},
 	author={Grosvenor, Matthew P and Schwarzkopf, Malte and Gog, Ionel and Watson, Robert NM and Moore, Andrew W and Hand, Steven and Crowcroft, Jon},
-	booktitle={Proc. USENIX NSDI},
+	booktitle={12th $\{$USENIX$\}$ Symposium on Networked Systems Design and Implementation ($\{$NSDI$\}$ 15)},
+	pages={1--14},
 	year={2015}
 }
 
@@ -418,23 +400,27 @@ year         = {2010},
 }
 
 @inproceedings{yu2013software,
-	title={Software Defined Traffic Measurement with OpenSketch.},
+	title={Software Defined Traffic Measurement with OpenSketch},
 	author={Yu, Minlan and Jose, Lavanya and Miao, Rui},
-	booktitle={Proc. USENIX NSDI},
+	booktitle={Presented as part of the 10th $\{$USENIX$\}$ Symposium on Networked Systems Design and Implementation ($\{$NSDI$\}$ 13)},
+	pages={29--42},
 	year={2013}
 }
 
 @inproceedings{lockwood2007netfpga,
 	title={NetFPGA--an open platform for gigabit-rate network switching and routing},
 	author={Lockwood, John W and McKeown, Nick and Watson, Greg and Gibb, Glen and Hartke, Paul and Naous, Jad and Raghuraman, Ramanan and Luo, Jianying},
-	booktitle={Proc. IEEE Intl. Conf. on Microelectronic Systems Education (MSE)},
-	year={2007}
+	booktitle={2007 IEEE International Conference on Microelectronic Systems Education (MSE'07)},
+	pages={160--161},
+	year={2007},
+	organization={IEEE}
 }
 
 @inproceedings{rizzo2012netmap,
-	title={netmap: A Novel Framework for Fast Packet I/O.},
+	title={Netmap: a novel framework for fast packet I/O},
 	author={Rizzo, Luigi},
-	booktitle={Proc. USENIX ATC},
+	booktitle={21st USENIX Security Symposium (USENIX Security 12)},
+	pages={101--112},
 	year={2012}
 }
 
@@ -447,8 +433,10 @@ year         = {2010},
 @inproceedings{yoshino2008performance,
 	title={Performance optimization of TCP/IP over 10 gigabit ethernet by precise instrumentation},
 	author={Yoshino, Takeshi and Sugawara, Yutaka and Inagami, Katsushi and Tamatsukuri, Junji and Inaba, Mary and Hiraki, Kei},
-	booktitle={Proc. IEEE Intl. Conf. on High Performance Computing, Networking, Storage and Analysis (SC)},
-	year={2008}
+	booktitle={SC'08: Proceedings of the 2008 ACM/IEEE Conference on Supercomputing},
+	pages={1--12},
+	year={2008},
+	organization={IEEE}
 }
 
 @article{mckeown2008openflow,
@@ -507,31 +495,42 @@ year         = {2010},
 }
 
 
-@inproceedings{jang2015silo,
-	title={Silo: Predictable Message Latency in the Cloud},
+@article{jang2015silo,
+	title={Silo: Predictable message latency in the cloud},
 	author={Jang, Keon and Sherry, Justine and Ballani, Hitesh and Moncaster, Toby},
-	booktitle={Proc. ACM SIGCOMM},
-	year={2015}
+	journal={ACM SIGCOMM Computer Communication Review},
+	volume={45},
+	number={4},
+	pages={435--448},
+	year={2015},
+	publisher={ACM}
 }
 
 @inproceedings{mittal2015timely,
-	title={TIMELY: RTT-based congestion control for the datacenter},
+	title={TIMELY: RTT-based Congestion Control for the Datacenter},
 	author={Mittal, Radhika and Dukkipati, Nandita and Blem, Emily and Wassel, Hassan and Ghobadi, Monia and Vahdat, Amin and Wang, Yaogong and Wetherall, David and Zats, David and others},
-	booktitle={Proc. ACM SIGCOMM},
-	year={2015}
+	booktitle={ACM SIGCOMM Computer Communication Review},
+	volume={45},
+	number={4},
+	pages={537--550},
+	year={2015},
+	organization={ACM}
 }
 
-% begin application reference
 @misc{ipset,
 	title={Linux IP sets},
 	note={http://ipset.netfilter.org/}
 }
 
-@inproceedings{gandhi2014duet,
+@article{gandhi2015duet,
 	title={Duet: Cloud scale load balancing with hardware and software},
 	author={Gandhi, Rohan and Liu, Hongqiang Harry and Hu, Y Charlie and Lu, Guohan and Padhye, Jitendra and Yuan, Lihua and Zhang, Ming},
-	booktitle={Proc. ACM SIGCOMM},
-	year={2014}
+	journal={ACM SIGCOMM Computer Communication Review},
+	volume={44},
+	number={4},
+	pages={27--38},
+	year={2015},
+	publisher={ACM}
 }
 
 @misc{f5loadbalance,
@@ -564,7 +563,9 @@ year         = {2010},
 @inproceedings{bhagwan2000fast,
 	title={Fast and scalable priority queue architecture for high-speed network switches},
 	author={Bhagwan, Ranjita and Lin, Bill},
-	booktitle={Proc. INFOCOM},
+	booktitle={Proceedings IEEE INFOCOM 2000. Conference on Computer Communications. Nineteenth Annual Joint Conference of the IEEE Computer and Communications Societies (Cat. No. 00CH37064)},
+	volume={2},
+	pages={538--547},
 	year={2000},
 	organization={IEEE}
 }
@@ -597,15 +598,18 @@ year         = {2010},
 	title={CTR-mode encryption},
 	author={Lipmaa, Helger and Rogaway, Phillip and Wagner, David},
 	booktitle={First NIST Workshop on Modes of Operation},
+	volume={39},
 	year={2000},
 	organization={Citeseer}
 }
 
 @inproceedings{barbette2015fast,
-	title={Fast Userspace Packet Processing},
+	title={Fast userspace packet processing},
 	author={Barbette, Tom and Soldani, Cyril and Mathy, Laurent},
-	booktitle={Proc. ANCS},
-	year={2015}
+	booktitle={2015 ACM/IEEE Symposium on Architectures for Networking and Communications Systems (ANCS)},
+	pages={5--16},
+	year={2015},
+	organization={IEEE}
 }
 
 @inproceedings{bosshart2013forwarding,
@@ -623,36 +627,38 @@ year         = {2010},
 	url={http://dell.com/}
 }
 
-% end application reference
-
 @inproceedings{rubow2010chimpp,
-	title={Chimpp: A Click-based programming and simulation environment for reconfigurable networking hardware},
+	title={Chimpp: A click-based programming and simulation environment for reconfigurable networking hardware},
 	author={Rubow, Erik and McGeer, Rick and Mogul, Jeff and Vahdat, Amin},
-	booktitle={Proc. ANCS},
-	year={2010}
+	booktitle={Proceedings of the 6th ACM/IEEE Symposium on Architectures for Networking and Communications Systems},
+	pages={36},
+	year={2010},
+	organization={ACM}
 }
 
 @inproceedings{lavasani2012compiling,
 	title={Compiling high throughput network processors},
 	author={Lavasani, Maysam and Dennison, Larry and Chiou, Derek},
-	booktitle={Proc. FPGA},
-	year={2012}
+	booktitle={Proceedings of the ACM/SIGDA international symposium on Field Programmable Gate Arrays},
+	pages={87--96},
+	year={2012},
+	organization={ACM}
 }
 
 @inproceedings {mqecn,
-	author = {Wei Bai and Li Chen and Kai Chen and Haitao Wu},
-	title = {Enabling ECN in Multi-Service Multi-Queue Data Centers},
-	booktitle = {Proc. USENIX NSDI},
-	year = {2016},
-	isbn = {978-1-931971-29-4},
-	url = {https://www.usenix.org/conference/nsdi16/technical-sessions/presentation/bai},
+title={Enabling $\{$ECN$\}$ in Multi-Service Multi-Queue Data Centers},
+author={Bai, Wei and Chen, Li and Chen, Kai and Wu, Haitao},
+booktitle={13th $\{$USENIX$\}$ Symposium on Networked Systems Design and Implementation ($\{$NSDI$\}$ 16)},
+pages={537--549},
+year={2016}
 }
 
 
 @inproceedings{lee2015flosis,
 	title={FloSIS: a highly scalable network flow capture system for fast retrieval and storage efficiency},
 	author={Lee, Jihyung and Lee, Sungryoul and Lee, Junghee and Yi, Yung and Park, KyoungSoo},
-	booktitle={Proc. USENIX ATC},
+	booktitle={2015 $\{$USENIX$\}$ Annual Technical Conference ($\{$USENIX$\}$$\{$ATC$\}$ 15)},
+	pages={445--457},
 	year={2015}
 }
 
@@ -668,15 +674,19 @@ year         = {2010},
 @inproceedings{jiang2013scalable,
 	title={Scalable ternary content addressable memory implementation using FPGAs},
 	author={Jiang, Weirong},
-	booktitle={Proc. ANCS},
-	year={2013}
+	booktitle={Proceedings of the ninth ACM/IEEE symposium on Architectures for networking and communications systems},
+	pages={71--82},
+	year={2013},
+	organization={IEEE Press}
 }
 
 @inproceedings{bachrach2012chisel,
 	title={Chisel: constructing hardware in a scala embedded language},
 	author={Bachrach, Jonathan and Vo, Huy and Richards, Brian and Lee, Yunsup and Waterman, Andrew and Avi{\v{z}}ienis, Rimas and Wawrzynek, John and Asanovi{\'c}, Krste},
-	booktitle={Proc. ACM Annual Design Automation Conf.},
-	year={2012}
+	booktitle={DAC Design Automation Conference 2012},
+	pages={1212--1221},
+	year={2012},
+	organization={IEEE}
 }
 
 @article{wester2015transformation,
