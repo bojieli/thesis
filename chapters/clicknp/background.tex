@@ -104,7 +104,9 @@ Click2NetFPGA~\cite {Click2NetFPGA} 利用高层次综合工具，直接将 Clic
 但是网络功能面临着连续的数据包流，应该始终在运行。
 第四，OpenCL不支持CPU和FPGA之间的联合数据包处理，CPU上的数据包处理只能在 OpenCL 框架以外进行。
 
-由于网络数据包处理是流式处理，并行执行的核之间应当通过管道（FIFO）而非共享内存来通信，如图 \ref{intro:fig:element_conn} 所示。FPGA 内的处理逻辑与网络和主机之间也应当通过管道来通信。
+下文将介绍 \name{}，一种新颖的FPGA加速网络功能平台，满足灵活性、模块化、高性能、低延迟和 CPU/FPGA 联合处理的要求。
+
+网络数据包处理属于流式处理。ST-Accel \cite{ruan2018st} 指出，在 FPGA 中通过 FIFO 进行流式处理的效率比共享内存更高，可以达到更低的延迟和更高的吞吐量。为此，在 \name	框架内，FPGA 的处理逻辑模块以及网络和主机之间也应当通过 FIFO 管道来通信，如图 \ref{intro:fig:element_conn} 所示。
 
 \begin{figure}[htbp]
 	\centering
@@ -113,8 +115,6 @@ Click2NetFPGA~\cite {Click2NetFPGA} 利用高层次综合工具，直接将 Clic
 	\label{intro:fig:element_conn}
 \end{figure}
 
-
-下文将介绍 \name{}，一种新颖的FPGA加速网络功能平台，满足灵活性、模块化、高性能、低延迟和 CPU/FPGA 联合处理的要求。
 
 \egg{
 Today's data centers rely on a wide range of network functions to implement network virtualization, ensure security (e.g. firewalls and intrusion detection/prevention systems), perform measurements and improve performance (e.g. traffic scheduling). As data centers are moving towards 40 Gbps bandwidth at end hosts, where the line-rate is 60 M packets per second for minimum-sized packets, higher throughput requirement is imposed upon network processors. Furthermore, as data center services are evolving rapidly, programmability becomes indispensable for network processors. However, existing network processors has a large mismatch to the performance and programmability requirements.

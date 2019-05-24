@@ -689,28 +689,23 @@
 }
 
 @article{serving-dnns-real-time-datacenter-scale-project-brainwave,
-	author = {Chung, Eric and Fowers, Jeremy and Ovtcharov, Kalin and  and Caulfield, Adrian and Massengill, Todd and Liu, Ming and Ghandi, Mahdi and Lo, Daniel and Reinhardt, Steve and Alkalay, Shlomi and Angepat, Hari and Chiou, Derek  and Forin, Alessandro and Burger, Doug and Woods, Lisa and Weisz, Gabriel and Haselman, Michael and Zhang, Dan},
-	title = {Serving DNNs in Real Time at Datacenter Scale with Project Brainwave},
-	year = {2018},
-	month = {March},
-	abstract = {To meet the computational demands required of deep learning, cloud operators are turning toward specialized hardware for improved efficiency and performance. Project Brainwave, Microsoft's principal infrastructure for AI serving in real time, accelerates deep neural network (DNN) inferencing in major services such as Bing’s intelligent search features  and Azure. Exploiting distributed model parallelism and pinning over low-latency hardware microservices, Project Brainwave serves state-of-the-art, pre-trained DNN models with high efficiencies at low batch sizes. A high-performance, precision-adaptable FPGA soft processor is at the heart of the system, achieving up to 39.5 TFLOPs of effective performance at Batch 1 on a state-of-the-art Intel Stratix 10 FPGA.},
-	publisher = {IEEE},
-	url = {https://www.microsoft.com/en-us/research/publication/serving-dnns-real-time-datacenter-scale-project-brainwave/},
-	pages = {8-20},
-	journal = {IEEE Micro},
-	volume = {38},
+	title={Serving dnns in real time at datacenter scale with project brainwave},
+	author={Chung, Eric and Fowers, Jeremy and Ovtcharov, Kalin and Papamichael, Michael and Caulfield, Adrian and Massengill, Todd and Liu, Ming and Lo, Daniel and Alkalay, Shlomi and Haselman, Michael and others},
+	journal={IEEE Micro},
+	volume={38},
+	number={2},
+	pages={8--20},
+	year={2018},
+	publisher={IEEE}
 }
 
 @inproceedings{a-configurable-cloud-scale-dnn-processor-for-real-time-ai,
-	author = {Fowers, Jeremy and Ovtcharov, Kalin and Papamichael, Michael and Massengill, Todd and Liu, Ming and Lo, Daniel and Alkalay, Shlomi and Haselman, Michael and Adams, Logan and Ghandi, Mahdi and Heil, Stephen and Patel, Prerak and Sapek, Adam and Weisz, Gabriel and Woods, Lisa and Lanka, Sitaram and Reinhardt, Steve and Caulfield, Adrian and Chung, Eric and Burger, Doug},
-	title = {A Configurable Cloud-Scale DNN Processor for Real-Time AI},
-	year = {2018},
-	month = {June},
-	abstract = {Interactive AI-powered services require low-latency evaluation of deep neural network (DNN) models—aka “realtime AI”. The growing demand for computationally expensive, state-of-the-art DNNs, coupled with diminishing performance gains of general-purpose architectures, has fueled an explosion of specialized Neural Processing Units (NPUs). NPUs for interactive services should satisfy two requirements: (1) execution of DNN models with low latency, high throughput, and high efficiency, and (2) flexibility to accommodate evolving state-of-the-art models (e.g., RNNs, CNNs, MLPs) without costly silicon updates. This paper describes the NPU architecture for Project Brainwave, a production-scale system for real-time AI. The Brainwave NPU achieves more than an order of magnitude improvement in latency and throughput over state-of-the-art GPUs on large RNNs at a batch size of 1. The NPU attains this performance using a single-threaded SIMD ISA paired with a distributed microarchitecture capable of dispatching over 7M operations from a single instruction. The spatially distributed microarchitecture, scaled up to 96,000 multiply-accumulate units, is supported by hierarchical instruction decoders and schedulers coupled with thousands of independently addressable high-bandwidth on-chip memories, and can transparently exploit many levels of fine-grain SIMD parallelism. When targeting an FPGA, microarchitectural parameters such as native datapaths and numerical precision can be “synthesis specialized” to models at compile time, enabling high FPGA performance competitive with hardened NPUs. When running on an Intel Stratix 10 280 FPGA, the Brainwave
-	NPU achieves performance ranging from ten to over thirty-five teraflops, with no batching, on large, memory-intensive RNNs.},
-	publisher = {ACM},
-	url = {https://www.microsoft.com/en-us/research/publication/a-configurable-cloud-scale-dnn-processor-for-real-time-ai/},
-	edition = {Proceedings of the 45th International Symposium on Computer Architecture, 2018},
+	title={A configurable cloud-scale dnn processor for real-time ai},
+	author={Fowers, Jeremy and Ovtcharov, Kalin and Papamichael, Michael and Massengill, Todd and Liu, Ming and Lo, Daniel and Alkalay, Shlomi and Haselman, Michael and Adams, Logan and Ghandi, Mahdi and others},
+	booktitle={Proceedings of the 45th Annual International Symposium on Computer Architecture},
+	pages={1--14},
+	year={2018},
+	organization={IEEE Press}
 }
 
 @misc{accelerating-deep-convolutional-neural-networks-using-specialized-hardware,
@@ -728,17 +723,14 @@
 	url = {https://www.microsoft.com/en-us/research/publication/accelerating-deep-convolutional-neural-networks-using-specialized-hardware/},
 }
 
+
 @inproceedings{toward-accelerating-deep-learning-scale-using-specialized-hardware-datacenter,
-	author = {Ovtcharov, Kalin and Ruwase, Olatunji and Kim, Joo-Young and Fowers, Jeremy and Strauss, Karin and Chung, Eric},
-	title = {Toward Accelerating Deep Learning at Scale Using Specialized Hardware in the Datacenter},
-	year = {2015},
-	month = {August},
-	abstract = {This Talk: Are FPGAs a Promising Target in the Datacenter for Deep learning.
-	
-	A video of Eric Chung's presentation is available here.},
-	publisher = {IEEE},
-	url = {https://www.microsoft.com/en-us/research/publication/toward-accelerating-deep-learning-scale-using-specialized-hardware-datacenter/},
-	edition = {Proceedings of the 27th IEEE HotChips Symposium on High-Performance Chips (HotChips 2015)},
+	title={Toward accelerating deep learning at scale using specialized hardware in the datacenter},
+	author={Ovtcharov, Kalin and Ruwase, Olatunji and Kim, Joo-Young and Fowers, Jeremy and Strauss, Karin and Chung, Eric S},
+	booktitle={2015 IEEE Hot Chips 27 Symposium (HCS)},
+	pages={1--38},
+	year={2015},
+	organization={IEEE}
 }
 
 @misc{microsoft-wired-fpga,
@@ -785,7 +777,7 @@
 	abstract = {Cluster fabric interconnects that use 3D torus topologies are increasingly being deployed in data center clusters. In our prior work, we demonstrated that by using these topologies and letting applications implement custom routing protocols and perform operations on path, it is possible to increase performance and simplify development. However, these beneﬁts cannot be achieved using mainstream point-to-point networking stacks such as TCP/IP or MPI, which hide the underlying topology and do not allow the implementation of any in-network operations. In this paper we describe CamCubeOS, a novel key-based communication stack, purposely designed from scratch for 3D torus fabric interconnects. We note that many of the applications used in clusters are key-based. Therefore, we designed CamCubeOS to natively support key-based operations. We select a virtual topology that perfectly matches the underlying physical topology and we use the keyspace to expose the physical locality, thus avoiding the typical overhead incurred by overlay-based approaches. We report on our experience in building several applications on top of CamCubeOS and we evaluate their performance and feasibility using a prototype and large-scale simulations.},
 	publisher = {ACM Press},
 	url = {https://www.microsoft.com/en-us/research/publication/camcubeos-a-key-based-network-stack-for-3d-torus-cluster-topologies/},
-	pages = {73-84},
+	pages = {73--84},
 	edition = {The 22nd ACM International Symposium on High Performance Parallel and Distributed Computing (HPDC'13)},
 }
 
@@ -807,35 +799,23 @@
 }
 
 @inproceedings{a-scalable-high-bandwidth-architecture-for-lossless-compression-on-fpgas,
-	author = {Fowers, Jeremy and Kim, Joo-Young and Burger, Doug and Hauck, Scott},
-	title = {A Scalable High-Bandwidth Architecture for Lossless Compression on FPGAs},
-	year = {2015},
-	month = {May},
-	abstract = {
-	
-	Data compression techniques have been the subject of intense study over the past several decades due to exponential increases in the quantity of data stored and transmitted by computer systems. Compression algorithms are traditionally forced to make tradeoffs between throughput and compression quality (the ratio of original file size to compressed file size). FPGAs represent a compelling substrate for streaming applications such as data compression thanks to their capacity for deep pipelines and custom caching solutions. Unfortunately, data hazards in compression algorithms such as LZ77 inhibit the creation of deep pipelines without sacrificing some amount of compression quality. In this work we detail a scalable fully pipelined FPGA accelerator that performs LZ77 compression and static Huffman encoding at rates up to 5.6 GB/s. Furthermore, we explore tradeoffs between compression quality and FPGA area that allow the same throughput at a fraction of the logic utilization in exchange for moderate reductions in compression quality. Compared to recent FPGA compression studies, our emphasis on scalability gives our accelerator a 3.0x advantage in resource utilization at equivalent throughput and compression ratio.
-	
-	
-	},
-	publisher = {IEEE – Institute of Electrical and Electronics Engineers},
-	url = {https://www.microsoft.com/en-us/research/publication/a-scalable-high-bandwidth-architecture-for-lossless-compression-on-fpgas/},
-	edition = {The 23rd IEEE International Symposium on Field-Programmable Custom Computing Machines},
+	title={A scalable high-bandwidth architecture for lossless compression on fpgas},
+	author={Fowers, Jeremy and Kim, Joo-Young and Burger, Doug and Hauck, Scott},
+	booktitle={2015 IEEE 23rd Annual International Symposium on Field-Programmable Custom Computing Machines},
+	pages={52--59},
+	year={2015},
+	organization={IEEE}
 }
 
 @inproceedings{r2c2,
-	author = {Costa, Paolo and Ballani, Hitesh and Razavi, Kaveh and },
-	title = {R2C2: A Network Stack for Rack-scale Computers},
-	year = {2015},
-	month = {August},
-	abstract = {
-	
-	Rack-scale computers, comprising a large number of micro-servers connected by a direct-connect topology, are poised to replace servers as the building block in data centers. We focus on the problem of routing and congestion control across the rack's network, and find that high path diversity in rack topologies, in combination with workload diversity across it, means that traditional solutions are inadequate.
-	
-	We present R2C2, a network stack for rack-scale computers providing flexible and efficient routing and congestion control. R2C2 leverages the fact that rack topologies allow for low-overhead broadcasting to ensure that all nodes in the rack are aware of all network flows. We thus achieve rate-based congestion control without any probing; each node independently determines the sending rate for its flows while respecting the provider's allocation policies. For routing, nodes dynamically choose the routing protocol for their flows in order to maximize aggregate throughput. Through a prototype deployed across a rack emulation platform and a packet-level simulator, we show that R2C2 achieves very low queuing for diverse and bursty workloads, and that routing flexibility can provide significant throughput gains.
-	},
-	publisher = {ACM - Association for Computing Machinery},
-	url = {https://www.microsoft.com/en-us/research/publication/r2c2-a-network-stack-for-rack-scale-computers/},
-	edition = {SIGCOMM 2015},
+	title={R2C2: A network stack for rack-scale computers},
+	author={Costa, Paolo and Ballani, Hitesh and Razavi, Kaveh and Kash, Ian},
+	booktitle={ACM SIGCOMM Computer Communication Review},
+	volume={45},
+	number={4},
+	pages={551--564},
+	year={2015},
+	organization={ACM}
 }
 
 @article{satyanarayanan2009case,
@@ -965,19 +945,19 @@
 	organization={ACM}
 }
 
-@inproceedings{Kocher2018spectre,
-	author = {Paul Kocher and Jann Horn and Anders Fogh and and Daniel Genkin and Daniel Gruss and Werner Haas and Mike Hamburg and Moritz Lipp and Stefan Mangard and Thomas Prescher and Michael Schwarz and Yuval Yarom},
-	title = {Spectre Attacks: Exploiting Speculative Execution},
-	booktitle = {40th IEEE Symposium on Security and Privacy (S\&P'19)},
-	year = {2019},
+@article{Kocher2018spectre,
+	title={Spectre attacks: Exploiting speculative execution},
+	author={Kocher, Paul and Genkin, Daniel and Gruss, Daniel and Haas, Werner and Hamburg, Mike and Lipp, Moritz and Mangard, Stefan and Prescher, Thomas and Schwarz, Michael and Yarom, Yuval},
+	journal={arXiv preprint arXiv:1801.01203},
+	year={2018}
 }
 
-
 @inproceedings{Lipp2018meltdown,
-	author = {Moritz Lipp and Michael Schwarz and Daniel Gruss and Thomas Prescher and Werner Haas and Anders Fogh and Jann Horn and Stefan Mangard and Paul Kocher and Daniel Genkin and Yuval Yarom and Mike Hamburg},
-	title = {Meltdown: Reading Kernel Memory from User Space},
-	booktitle = {27th {USENIX} Security Symposium ({USENIX} Security 18)},
-	year = {2018},
+	title={Meltdown: Reading kernel memory from user space},
+	author={Lipp, Moritz and Schwarz, Michael and Gruss, Daniel and Prescher, Thomas and Haas, Werner and Fogh, Anders and Horn, Jann and Mangard, Stefan and Kocher, Paul and Genkin, Daniel and others},
+	booktitle={27th $\{$USENIX$\}$ Security Symposium ($\{$USENIX$\}$ Security 18)},
+	pages={973--990},
+	year={2018}
 }
 
 @article{asanovic2014instruction,
@@ -1071,15 +1051,12 @@
 }
 
 @inproceedings{direct-universal-access-making-data-center-resources-available-to-fpga,
-	author = {Shu, Ran and Cheng, Peng and Chen, Guo and Guo, Zhiyuan and Qu, Lei and Xiong, Yongqiang and Chiou, Derek  and Moscibroda, Thomas},
-	title = {Direct Universal Access: Making Data Center Resources Available to FPGA},
-	year = {2019},
-	month = {March},
-	abstract = {FPGAs have been deployed at massive scale in data centers. Using currently available communication architectures, however, it is difficult for FPGAs to access and utilize the various heterogenous resources available in data centers (DRAM, CPU, GPU,...). In this paper, we present Direct Universal Access (DUA), a communication architecture that provides uniform access for FPGA to these data center resources.
-	
-	Without being limited by machine boundaries, DUA provides global names and a common interface for communicating across various resources, the underlying network automatically routing traffic and managing resource multiplexing. Our benchmarks show that DUA provides simple and fair-share resource access with small logic area overhead (&lt;10%) and negligible latency (&lt;0.2µs). We also build two practical multi-FPGA applications—deep crossing and regular expression matching—on top of DUA to demonstrate its usability and efficiency.},
-	publisher = {USENIX},
-	url = {https://www.microsoft.com/en-us/research/publication/direct-universal-access-making-data-center-resources-available-to-fpga/},
+	title={Direct universal access: making data center resources available to FPGA},
+	author={Shu, Ran and Cheng, Peng and Chen, Guo and Guo, Zhiyuan and Qu, Lei and Xiong, Yongqiang and Chiou, Derek and Moscibroda, Thomas},
+	booktitle={Proceedings of the 16th USENIX Conference on Networked Systems Design and Implementation},
+	pages={127--140},
+	year={2019},
+	organization={USENIX Association}
 }
 
 @inproceedings{minturn2015nvm,
@@ -1775,9 +1752,17 @@
 	organization={ACM}
 }
 
-@inproceedings{toms,
+@article{toms,
 	title={Near-Optimal Total Order Message Scattering in Data Center Networks},
 	author={Gefei Zuo},
 	booktitle={SOSP Student Research Competition 2017},
 	year={2017}
+}
+
+@inproceedings{ruan2018st,
+	title={ST-Accel: A high-level programming platform for streaming applications on FPGA},
+	author={Ruan, Zhenyuan and He, Tong and Li, Bojie and Zhou, Peipei and Cong, Jason},
+	booktitle={Proc. 26th IEEE Int. Symp. Field-Programm. Custom Comput. Mach.(FCCM)},
+	pages={9--16},
+	year={2018}
 }
