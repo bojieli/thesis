@@ -24,7 +24,7 @@
 \end{figure}
 
 
-由于云服务的快速迭代，这些虚拟化的网络、存储功能还需要灵活性、可编程性和可调试性，传统上往往用运行在通用处理器上的软件实现。除了虚拟化开销，传统操作系统的开销也不容忽视。这些图 \ref{intro:fig:virt-architecture} 中蓝色方框所示的软件开销被称为 ``数据中心税''（data center tax） \cite{barroso2009datacenter,barroso2013datacenter,barroso2018datacenter}。
+由于云服务的快速迭代，这些虚拟化的网络、存储功能还需要灵活性、可编程性和可调试性，传统上往往用运行在通用处理器上的软件实现。除了虚拟化开销，传统操作系统的开销也不容忽视。这些图 \ref{intro:fig:virt-architecture} 中阴影背景的方框所示的软件开销被称为 ``数据中心税''（data center tax） \cite{barroso2009datacenter,barroso2013datacenter,barroso2018datacenter}。
 在 1 Gbps 网络和机械硬盘的时代，网络、存储虚拟化以及操作系统网络、存储协议栈引入的 CPU 开销和延迟是可以接受的。
 在网络、存储、定制化计算硬件越来越快的趋势下，数据中心税不仅浪费了可观的 CPU 资源，还导致应用程序无法充分利用硬件的低延迟和高吞吐量 \cite{barroso2017attack}。
 例如，本文第 \ref{chapter:clicknp} 章将说明，计算节点需要分配一部分 CPU 核专门用来实现网络和存储虚拟化，这部分核将无法出售给客户。
