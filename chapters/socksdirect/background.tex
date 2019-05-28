@@ -38,6 +38,7 @@
 接下来进入事件循环，对每个接收到的事件，如果是新连接，就调用 \texttt{accept} 接收之，并加入事件监视；如果是已有连接上有数据到达，就接收该连接上的所有数据（因为有接收缓冲区大小限制，一次 \texttt{recv} 可能接收不完）；如果对端已经准备好接收（即接收缓冲区有空闲空间），就将待发送的数据发送出去。
 
 \begin{figure}[htbp]
+\small
 \begin{lstlisting}[style=myCStyle]
 int lfd = socket(...); // listen file descriptor (fd)
 bind(lfd, listen_addr_and_port, ...);
