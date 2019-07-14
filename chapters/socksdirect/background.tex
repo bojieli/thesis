@@ -107,9 +107,9 @@ while (true) { // main event loop
 			类型 & 开销 & 本章的解决方案 \\
 			\hline
 			\hline
-			每操作 & 内核穿越（系统调用） & User space library (\S\ref{socksdirect:sec:architecture}) \\
+			每操作 & 内核穿越（系统调用） & 用户态库 (\S\ref{socksdirect:sec:architecture}) \\
 			\hline
-			每操作 & 并发线程和进程的套接字文件描述符锁 & 无锁套接字共享 (\S\ref{socksdirect:subsec:fork}) \\
+			每操作 & 并发线程和进程的套接字文件描述符锁 & 基于令牌的套接字共享 (\S\ref{socksdirect:subsec:fork}) \\
 			\hline
 			\hline
 			每数据包 & 传输层协议（TCP/IP） & 使用 RDMA 或共享内存 (\S\ref{socksdirect:subsec:lockless-queue}) \\
@@ -140,14 +140,14 @@ while (true) { // main event loop
 
 \parab {内核穿越（kernel crossing）。}
 传统上，套接字API在内核中实现，因此需要针对每个套接字操作进行内核穿越（即系统调用）。更糟糕的是，为防止 Meltdown \cite {Lipp2018meltdown} 攻击，内核页表隔离（KPTI）补丁 \cite {kpti} 使内核穿越变得4倍昂贵，如表 \ref {socksdirect:tab:operation-performance} 所示。
-本章的目标是绕过内核而不影响安全性。
+本章的目标是绕过内核而不影响安全性（\S\ref{socksdirect:sec:architecture}）。
 
 \parab {套接字文件描述符锁。}
 许多应用程序都是多线程的，原因有两个。
 首先，与FreeBSD不同，用于在Linux中读写磁盘文件的异步接口无法利用操作系统缓存和缓冲区，因此应用程序继续使用多线程和同步接口 \cite {nginx-multi-thread}。
 其次，许多Web应用程序框架更喜欢用同步编程模型处理每个用户请求，因为同步编程模型更容易编写和调试 \cite {barroso2017attack}。
 进程中的多个线程共享套接字连接。此外，在进程fork之后，父进程和子进程共享现有套接字。套接字也可以通过Unix域套接字传递给另一个进程。为了保护并发操作，Linux内核为每个套接字操作获取每个套接字锁 \cite {boyd2010analysis,han2012megapipe,lin2016scalable}。表 \ref {socksdirect:tab:operation-performance} 表明，即使没有多核争用，受原子操作保护的共享内存队列相比无锁队列的延迟可达 4 倍，吞吐量也只有无锁队列的 22\%。
-本章的目标是通过优化常见情况并删除常用套接字操作中的同步来最小化同步开销。
+本章的目标是通过优化常见情况并删除常用套接字操作中的同步操作来尽可能降低同步开销（\S\ref{socksdirect:subsec:fork}）。
 
 %\parab{Intra-host communication.}
 %Most existing approaches for intra-host socket either use kernel network stack or 网卡 loopback.
@@ -183,7 +183,7 @@ while (true) { // main event loop
 
 \begin{table}[t]
 	\centering
-	\caption{往返延迟和单核吞吐量操作（测试平台设置在\S \ref {socksdirect:subsec:methodology}中）。 如果未指定，则消息大小为8个字节。}
+	\caption{往返延迟和单核吞吐量操作（测试平台设置在\S \ref {socksdirect:subsec:methodology} 中）。未特别说明的情况下，消息大小为8个字节。}
 	\label{socksdirect:tab:operation-performance}
 	\small
 		\begin{tabular}{l|l|l|}
@@ -255,8 +255,8 @@ TCP/IP协议处理、拥塞控制和丢包恢复在每个发送和接收的数�
 此外，丢包检测，基于速率的拥塞控制和TCP状态机使用定时器，很难实现微秒级粒度和低开销 \cite{jeong2014mtcp}。
 幸运的是，近年来在许多数据中心见证了RDMA的大规模部署 \cite {guo2016rdma,zhu2015congestion,mittal2015timely}。
 RDMA将传输协议卸载到RDMA 网卡，提供了与TCP/IP相当的基于硬件的传输层。
+对于主机间套接字，本章的目标是利用 RDMA 硬件传输层的高吞吐量、低延迟和接近零的 CPU 开销（\S\ref{socksdirect:subsubsec:fork_rdwr}）。
 对于主机内套接字，本章的目标是完全绕过传输层。
-对于主机间套接字，本章的目标是利用 RDMA 硬件传输层。
 
 \parab {缓冲管理。}
 传统上，CPU通过\emph {环形缓冲区}（ring buffer）从网卡发送和接收数据包。
@@ -266,29 +266,31 @@ RDMA将传输协议卸载到RDMA 网卡，提供了与TCP/IP相当的基于硬�
 表 \ref {socksdirect:tab:operation-performance} 显示了环形缓冲区的成本。
 此外，为了确保可以接收MTU大小的分组，每个接收缓冲区应该具有至少一个MTU的大小。
 但是，许多数据包小于MTU~ \cite {thompson1997wide}，因此内部碎片会降低内存利用率。
-虽然现代网卡支持LSO和LRO~ \cite {lsolro} 以批量处理多个数据包，但本章的目标是完全消除缓冲区管理的开销。
+虽然现代网卡支持LSO和LRO~ \cite {lsolro} 以批量处理多个数据包，但本章的目标是完全消除缓冲区管理的开销（\S\ref{socksdirect:subsec:lockless-queue}）。
 
 \parab {I/O多路复用。}
 对于传统的网卡，接收到的不同连接的数据包通常在环形缓冲区中混合，因此网络协议栈需要将数据包分类到相应的套接字缓冲区中。
 现代网卡支持接收数据包转向 \cite {mellanox}，它可以将特定连接映射到专用环形缓冲区，该缓冲区由高性能套接字系统使用 \cite {jeong2014mtcp,lin2016scalable,libvma}。
-本章利用RDMA网卡中的类似功能，将接收到的数据包解复用（demultiplex）到专用的环形缓冲区。
+本章利用RDMA网卡中的类似功能，将接收到的数据包解复用（demultiplex）到每个连接专属的环形缓冲区。
 
 \parab {中断处理。}
 Linux网络协议栈分为系统调用和中断上下文，因为它处理来自应用程序和硬件设备的事件。
-TCP拥塞控制中的ACK时钟（ACK clocking）\cite {mprdma} 要求及时响应收到的数据包。
-中断上下文不一定与应用程序在同一核心上，导致核心间的缓存迁移和核心间同步。
-但是，RDMA 网卡硬件实现了需要精确计时的数据包处理，因此主机 CPU 不再需要处理精确计时的中断。
-因此，\libipc {} 可以运行每个套接字操作直到完成（run-to-completion），并使用轮询等待阻塞操作。
+例如，当应用程序调用 send 时，网络协议栈进程上下文中将数据包发送出去（如果窗口允许）。当网卡接收到该数据包时，网卡向 CPU 发送一个中断，然后网络协议栈在中断上下文中处理接收到的数据包。
+TCP拥塞控制中的ACK时钟（ACK clocking）机制 \cite {mprdma} 要求及时处理中断和定时器。
+中断上下文不一定与应用程序在同一核心上，导致 CPU 核的局部性下降。
+但是，RDMA 网卡硬件实现了需要精确计时的数据包处理，因此主机 CPU 不再需要处理大部分数据平面的中断。
 
 
 
 \parab {进程唤醒。}
 当进程调用远程过程调用（RPC）并等待回复时，是否应让CPU切换到准备运行的其他进程？
 Linux的答案是肯定的，这个进程切换的唤醒睡眠过程需要3到5 $\mu$s，如表 \ref {socksdirect:tab:operation-performance} 所示。
-在主机内RPC的往返时间内，两个进程唤醒贡献了超过一半的延迟。
-注意到通过RDMA的主机间RPC延迟甚至低于唤醒成本，许多系统使用轮询，每个核仅运行一个线程。
+在主机内 RPC 的往返时间内，两次进程唤醒贡献了超过一半的延迟。
+对于通过 RDMA 的主机间 RPC，小于 MTU 大小的小消息在网络上的往返延迟甚至低于进程唤醒的延迟。
+为此，许多分布式系统和用户态协议栈使用轮询来避免唤醒开销。
+然而，简单的轮询方法会为每个线程消耗一个 CPU 核，不能扩放到大量线程。
 为了隐藏微秒级RPC延迟 \cite {barroso2017attack}，通过 \texttt {sched\_yield} 的协作上下文切换比进程唤醒要快得多。
-本章的目标是高效地在多个线程之间共享核心。
+本章的目标是高效地在多个线程之间共享核心（\S\ref{socksdirect:subsec:process-mux}）。
 
 \parab {容器网络。}
 许多容器部署使用隔离的网络命名空间，这些容器通过虚拟覆盖网络（virtual overlay network）进行通信。
@@ -296,7 +298,7 @@ Linux的答案是肯定的，这个进程切换的唤醒睡眠过程需要3到5 
 这种架构会在每个数据包上产生多个上下文切换和内存拷贝的开销，虚拟交换机成为瓶颈 \cite {pfefferle2015hybrid}。
 Slim~ \cite {slim} 将三次内核往返减少到一次。
 最近的几个工作 \cite {martins2014clickos,roghanchi2017ffwd,huang2017high,nsdi19freeflow} 将所有操作委托给作为守护进程运行的虚拟交换机，因此它增加了数据路径上的延迟和CPU成本。
-本章的解决方案是集中式的控制平面和分布式的数据平面。
+本章的解决方案是集中式的控制平面和分布式的数据平面（\S\ref{socksdirect:subsec:connection-management}）。
 
 
 \subsubsection{每字节的开销}
@@ -307,7 +309,7 @@ Slim~ \cite {slim} 将三次内核往返减少到一次。
 零拷贝\texttt {recv}甚至比\texttt {send}更难。
 Linux提供了基于准备就绪的事件模型，即应用程序知道传入的数据（例如通过\texttt {epoll}）然后调用\texttt {recv}，因此网卡接收但未传递给应用程序的数据必须存储在系统缓冲区中。
 因为\texttt {recv}允许应用程序提供任何缓冲区作为数据目标，所以系统需要将数据从系统复制到应用程序缓冲区。
-本章的目标是在标准套接字应用程序中为较大有效载荷传输实现零拷贝。
+本章的目标是在标准套接字应用程序中为较大有效载荷传输实现零拷贝（\S\ref{socksdirect:subsec:zerocopy}）。
 
 
 
@@ -320,17 +322,17 @@ Linux提供了基于准备就绪的事件模型，即应用程序知道传入的
 用户空间中的Linux兼容套接字 \cite {libvma,rsockets} 通常在内核中打开一个文件以获取每个套接字的虚拟文件描述符，因此它们仍然需要内核文件描述符分配。
 LOS~ \cite {huang2017high} 将文件描述符空间划分为用户和内核部分，但违反了Linux分配最小可用文件描述符的属性。
 但是，许多应用程序，如Redis~ \cite {redis} 和Memcached~ \cite {memcached} 都依赖于此属性。
-本章的目标是在保持兼容性的同时绕过内核套接字文件描述符分配。
+本章的目标是在保持兼容性的同时绕过内核套接字文件描述符分配（\S\ref{socksdirect:subsec:connection-management}）。
 
 \parab {TCP控制块管理中的锁。}
 在建立连接期间，Linux获取几个全局锁来分配TCB（TCP Control Block，TCP控制块）。
 最近的工作，如MegaPipe~ \cite {han2012megapipe} 和FastSocket~ \cite {lin2016scalable} 通过对全局表进行分区来减少锁争用，但正如表~ \ref {socksdirect:tab:operation-performance} 所示，非争用自旋锁是仍然很贵。
-本章将工作分发到每个进程中的用户空间库\libipc {}。
+本章将工作分发到每个进程中的用户空间库\libipc {} （\S\ref{socksdirect:subsec:connection-management}）。
 
 \parab {新连接调度。}
 多个进程和线程可以侦听同一端口以接受传入连接。
 在Linux中，处理\texttt {accept}调用的核心在传入连接的队列上进行竞争。
-本章利用委托（delegation）比锁 \cite {roghanchi2017ffwd} 更快的事实，使用管程守护程序来分派新连接。
+本章利用委托（delegation）比锁 \cite {roghanchi2017ffwd} 更快的事实，使用管程守护程序来分派新连接（\S\ref{socksdirect:subsec:connection-management}）。
 
 
 %Most modern applications use socket in an event-driven style. similar to Figure~\ref{socksdirect:fig:socket-pseudo-code}.
@@ -442,31 +444,29 @@ MegaPipe~ \cite {han2012megapipe}和StackMap~ \cite {yasukata2016stackmap}提出
 SandStorm~ \cite {marinos2014network}，mTCP~ \cite {jeong2014mtcp}，Seastar~ \cite {seastar}和F-Stack~ \cite {fstack}提出了新的API，因此需要修改应用程序。
 大多数API更改旨在支持零拷贝，标准API仍然会复制数据。
 FaSST~ \cite {kalia2016fasst}和eRPC~ \cite {kalia2018datacenter}提供RPC API而不是套接字。
-LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}和LOS~ \cite {huang2017high}符合标准套接字API。
+LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}，LOS~ \cite {huang2017high} 和 TAS~\cite{taseurosys19} 符合标准套接字API。
 
 用户空间TCP / IP协议栈提供了比Linux更好的性能，但它仍然不接近RDMA和共享内存。
 一个重要原因是现有的工作都不支持在线程和进程之间共享套接字，导致fork和容器热迁移中的兼容性问题，以及多线程锁开销。
 
-首先，当进程fork时，只有父进程和子进程中的一个可以使用现有套接字。
-但是，许多Web服务 \cite {apache,nginx,php-fpm,python-gunicorn,vsftpd}和键值存储 \cite {memcached}都有一个主进程来接受连接并（可选）读取请求头，然后它可以fork一个子进程来处理请求，其中子进程需要访问套接字。
-同时，父进程仍需要通过现有套接字接受新连接。
+首先，在 LibVMA 和 RSocket 中，当进程fork后，对于父进程在 fork 前创建的套接字，子进程或者获取所有已有套接字的所有权，或者不能访问任何套接字（即这些套接字仍归父进程所有）。没有办法独立地控制每个套接字的所有权。
+但是，许多Web服务 \cite {apache,nginx,php-fpm,python-gunicorn,vsftpd}和键值存储 \cite {memcached} 都有一个主进程来从监听套接字中接受新连接，然后它可能 fork 一个子进程来处理请求，子进程需要访问新连接的套接字。
+与此同时，父进程仍需要通过监听套接字接受新连接。
 这使得此类Web服务无法正常工作。
 更棘手的情况是父进程和子进程可以通过现有套接字同时写入日志服务器。
 
-其次，容器热迁移与fork有关。
-它类似于fork容器（到新主机），子容器应该仍然能够访问套接字。
-
-第三，多线程在应用程序中很常见。
+第二，多线程在应用程序中很常见。
 应用程序在套接字操作中承担竞争条件的风险，或者每次操作必须采用套接字文件描述符锁。
-后一种方法保证了正确性，但即使没有争用，锁也会损害性能。
+后一种方法保证了正确性，但即使没有锁之间的争用（contention），锁也会损害性能。
 
 \parab {卸载到网卡的传输:}
 为了降低操作系统通信原语的开销，一系列工作将套接字系统的一部分卸载到网卡硬件上。
 TCP 卸载引擎（TCP Offload Engine，TOE） \cite {tcp-chimney-offload} 将部分或全部的 TCP / IP 协议栈卸载到网卡，但由于通用处理器的性能按摩尔定律迅速增长，这些专用硬件的性能优势有限，仅在专用领域中获得成功，例如 iSCSI HBA 存储卡 \cite {iscsi-hba} 和无状态卸载（例如校验和、接收侧扩放（RSS）、大发送数据卸载（LSO）、大接收数据卸载（LRO） \cite {lsolro}）。
 近年来，由于数据中心的硬件趋势和应用需求，\emph {有状态}卸载的故事开始复兴 \cite {chuanxiong-rdma-keynote}。
 因此，RDMA \cite {infiniband2000infiniband} 在生产数据中心中广泛使用 \cite {guo2016rdma}。
+RDMA 提供了两类抽象：读写远程共享内存的单边原语，以及类似套接字发送接收语义的双边原语。
 与基于软件的 TCP / IP 网络协议栈相比，RDMA 使用硬件卸载来提供超低延迟和接近零的 CPU 开销。
-为了使套接字应用程序能够使用 RDMA，RSocket \cite {rsockets}，SDP~ \cite {socketsdirect} 和 UNH EXS~ \cite {russell2008extended} 将套接字操作转换为 RDMA 原语。
+为了使套接字应用程序能够使用 RDMA，RSocket \cite {rsockets}，SDP~ \cite {socketsdirect} 和 UNH EXS~ \cite {russell2008extended} 将套接字操作转换为双边 RDMA 原语。
 它们具有相似的设计，其中 RSocket 的开发最活跃，是套接字转换 RDMA 的事实标准。
 FreeFlow~ \cite {nsdi19freeflow} 利用 RDMA 网卡提供容器（container）覆盖网络（overlay network），它利用共享内存进行主机内部通信，利用 RDMA 进行主机间通信。
 FreeFlow 使用 RSocket 将套接字转换为 RDMA。

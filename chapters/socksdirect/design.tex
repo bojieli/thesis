@@ -8,7 +8,8 @@
 
 为了简化部署和开发 \cite {andromeda}，以及消除内核交叉开销，本章在用户空间而不是内核中实现\sys{}。
 要使用\sys{}，应用程序通过设置\texttt {LD\_PRELOAD}环境变量来加载用户空间库\libipc {}。 \libipc {} 拦截标准C库（glibc）中与文件描述符操作相关的所有Linux API，在用户空间中实现套接字功能。
-从安全的角度来看，因为\libipc {}驻留在应用程序地址空间中，它的行为不可信。例如，如果恶意应用程序在\libipc {}中强制执行，则可能会绕过防火墙策略。此外，如表 \ref{socksdirect:tab:socket-api} 所示，尽管大多数套接字操作可以在调用者本地或连接的两端之间实现，还有很多套接字操作需要中心化的协调。例如，TCP端口号是一个需要集中分配的全局资源 \cite {lin2016scalable,nsdi19freeflow}。因此，需要在\libipc {}之外的可信组件来强制实施访问控制和管理全局资源。
+从安全的角度来看，因为\libipc {}驻留在应用程序地址空间中，它的行为不可信。例如，一个恶意程序可能向 RDMA QP 中直接写入任意的消息，从而绕过 \libipc{} 库中的安全检查。
+此外，如表 \ref{socksdirect:tab:socket-api} 所示，尽管大多数套接字操作可以在调用者本地或连接的两端之间实现，还有很多套接字操作需要中心化的协调。例如，TCP端口号是一个需要集中分配的全局资源 \cite {lin2016scalable,nsdi19freeflow}。因此，需要在\libipc {}之外的可信组件来强制实施访问控制和管理全局资源。
 
 \begin{table*}[htbp]
 	\centering
@@ -46,8 +47,8 @@
 		\textbf{\textit{epoll\_ctl}} & Local \\
 		\bottomrule
 		\toprule
-		\multicolumn{2}{c|}{Data Transmission} &
-		\multicolumn{2}{c}{Process Mgmt} \\
+		\multicolumn{2}{c|}{数据传输} &
+		\multicolumn{2}{c}{进程管理} \\
 		\midrule
 		API & 类别 &
 		API & 类别 \\
@@ -80,7 +81,11 @@
 
 
 
-为此，本章在每个主机上设计一个\emph {monitor} 守护进程（下称 \textit{管程}）来协调控制平面操作，例如连接创建。管程是系统服务。在每个主机中，所有加载\libipc {}的应用程序必须与主机的管程建立共享内存（共享内存）队列，从而形成控制平面。在数据平面上，应用程序构建对等队列以直接通信，从而减轻了管程守护程序的负担。图 \ref {socksdirect:fig:architecture} 显示了\sys {}的体系结构。
+为此，本章在每个主机上设计一个\emph {monitor} 守护进程（下称 \textit{管程}）来协调控制平面操作，例如连接创建。
+为了保证隔离性，我们把所有应用程序和管程作为一个不共享数据结构的分布式系统，使用消息通信作为唯一的通信机制。
+在每个主机中，所有加载\libipc {}的应用程序必须与主机的管程建立共享内存（共享内存）队列，从而形成控制平面。在数据平面上，应用程序构建端到端（peer-to-peer）的队列以直接通信，从而减轻了管程守护程序的负担。
+管程是一个单线程的用户态程序，从所有应用程序的端到端队列中轮询消息。
+图 \ref {socksdirect:fig:architecture} 显示了\sys {}的体系结构。
 
 
 \begin{figure}[htbp]
@@ -107,11 +112,11 @@
 %connection request is always sent to the local monitor.
 %For local peers, the monitor just construct a shared memory queue between the two applications , %so they can communicate directly.
 
-对于\emph {主机间}（inter-host）通信，两个主机的管程都参与其中。当应用程序连接到远程主机时，其本地管程会建立常规TCP连接，并检测远程主机是否支持\sys {}。
-如果是这样，它会在两个管程之间建立一个RDMA队列，以便可以更快地创建两个主机之间的未来连接。远程端的管程调度与目标的连接，并帮助两个应用程序建立RDMA队列，如图 \ref {socksdirect:fig:architecture} 中的主机1和2之间。如果远程主机不支持\sys {}，它将继续使用TCP连接，如图 \ref {socksdirect:fig:architecture} 中的主机1和3之间。详细的连接管理协议在第 \ref {socksdirect:subsec:connection-management} 节中介绍。
+对于\emph {主机间}（inter-host）通信，两个主机的管程都参与其中。当应用程序连接到远程主机时，其本地管程会建立常规TCP连接，并检测远程主机是否支持 \sys {} 和 RDMA。
+如果都支持，两个管程之间会建立一个RDMA队列，以便两个主机之间未来的套接字连接可以更快创建。远程端的管程调度与目标的连接，并帮助两个应用程序建立RDMA队列，如图 \ref {socksdirect:fig:architecture} 中的主机1和2之间。如果远程主机不支持\sys {}，它将继续使用TCP连接，如图 \ref {socksdirect:fig:architecture} 中的主机1和3之间。详细的连接管理协议在第 \ref {socksdirect:subsec:connection-management} 节中介绍。
 
 为了确保线程安全并避免锁，以及支持fork和容器热迁移，本章针对只有一对发送和接收线程处于活动状态的常见情况进行了优化，同时确保所有情况下的正确性（第 \ref {socksdirect:subsec:fork} 节）。
-为了消除缓冲区管理开销，设计了一个环形缓冲区，每个主机间消息平摊下来只需要一次RDMA写操作，每个主机内消息需要一个缓存迁移（第 \ref {socksdirect:subsec:lockless-queue}  节）。
+为了消除缓冲区管理开销，设计了一个环形缓冲区，每个主机间消息平摊下来只需要一次RDMA写操作，每个主机内消息需要一次缓存迁移（第 \ref {socksdirect:subsec:lockless-queue}  节）。
 本章进一步设计了一种零拷贝机制，可以在发送和接收端消除较大消息的数据拷贝（第 \ref {socksdirect:subsec:zerocopy} 节）。
 最后，第 \ref {socksdirect:subsec:process-mux} 节提供了事件通知机制。
 
@@ -142,7 +147,7 @@
 \label{socksdirect:sec:design}
 
 
-\subsection{无锁套接字共享}
+\subsection{基于令牌的套接字共享}
 \label{socksdirect:subsec:fork}
 
 
@@ -184,7 +189,7 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 本章的解决方案是每个 \emph {套接字队列}（套接字的一个传输方向）有一个 \emph {发送令牌} 和一个 \emph {接收令牌}。
 每个令牌都由一个 \emph {活跃线程} 持有，它具有发送或接收的权限。
 因此，在任何时间点只有一个活动的发送方线程和一个活动的接收方线程。
-套接字队列在线程和进程之间共享，允许来自一个发送方和一个接收方的无锁访问（详细信息将在第 \ref {socksdirect:subsec:lockless-queue} 节中讨论）。
+套接字队列在线程和进程之间共享，允许来自一个发送方和一个接收方的并发无锁访问（详细信息将在第 \ref {socksdirect:subsec:lockless-queue} 节中讨论）。
 当另一个线程想要发送或接收时，它应该请求 \emph {接管}（take over）令牌。
 
 
@@ -192,7 +197,7 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.6\textwidth]{images/queue_arch}
-	\caption{无锁套接字与两个发送器和两个接收器线程共享。 虚线箭头表示每个套接字的活动发送方和接收方。 每个线程跟踪其活动套接字并通过独占队列与管程通信。}
+	\caption{两个发送方和两个接收方线程共享一个基于令牌的套接字。虚线箭头表示每个套接字的活动发送方和接收方。每个线程跟踪其活动套接字并通过独占队列与管程通信。}
 	\label{socksdirect:fig:queue-arch}
 \end{figure}
 
@@ -229,19 +234,20 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 
 当一个线程没有发送令牌但想要通过套接字发送时，非活动线程需要\emph {接管}令牌。
 如果在非活动线程和活动线程之间创建直接通信通道，则需要点对点的队列，其数量为线程数的平方，或者是具有锁的共享队列。
-为了避免这两种开销，在\emph {接管}过程中使用监控守护进程作为代理。
+为了避免这两种开销，在\emph {接管}过程中使用管程作为代理。
+由于接管是不频繁的操作，管程一般不会成为瓶颈。
 此消息传递设计还具有以下优点：发送方进程可以位于不同的主机上，这在容器热迁移中非常有用。
 
 接管过程如下：
-非活动发送方向管程发送\emph {接管}命令，管程将其添加到等待列表并将命令代理到活动发送方。
+非活动发送方通过共享内存队列向管程发送\emph {接管}命令。管程轮询来自各个共享内存队列的消息，将发送方添加到等待列表中，并将命令代理到目前的活动发送方。
 当活动发送方收到请求时，它会将发送令牌发送给管程。
 管程将令牌授予等待列表中的第一个非活动发送方，并更新活动发送方。
 非活动发送方可以在收到令牌后发送。
 此机制无死锁，因为至少有一个发送方或管程持有发送令牌。
 它也是无饥饿的，因为每个发送方最多可以出现在等待列表中一次，并按FIFO顺序提供。
-
 接收器侧的接管过程类似。
 
+接管过程需要 0.6 微秒，因此，如果多个进程并发地通过同一个套接字发送，总吞吐量可能下降到 1.6 M 次操作每秒。但是，如果我们简单地使用锁，通常情况的吞吐量将下降到 5 M 次操作每秒，远低于基于令牌的套接字共享所能达到的 27 M 次操作每秒吞吐量。
 
 %\begin{figure}[t]
 %	\centering
@@ -261,14 +267,15 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 要在exec之后附加共享内存，\libipc {}将连接到管程以获取其父进程的共享内存密钥。
 在fork之后，因为父进程看不到子进程创建的套接字，所以子进程创建一个新的共享内存来存储新套接字的元数据和缓冲区。
 
-现在需要共享连接到对等端的底层传输。
-共享内存传输不需要特别小心，因为fork / exec之前创建的共享内存仍然在fork / exec之后共享。
+下面考虑底层传输层机制。
+基于共享内存的传输层不需要特殊处理，因为fork / exec之前创建的共享内存仍然在fork / exec之后共享。
 但是，RDMA在fork / exec后存在问题，因为DMA内存区域不在共享内存中。
 它们在fork之后变为写时复制，而网卡仍然从原始物理页面DMA，因此子进程不能使用现有的RDMA资源。
 而在exec之后，整个RDMA上下文将被清除。
 本章的解决方案是让子进程在fork / exec之后重新初始化RDMA资源（PD，MR等）。
 当子进程使用在fork之前创建的套接字时，它会要求管程与远程端点重新建立RDMA QP。
 因此，对端进程可能会看到一个套接字的两个或更多QP，但它们链接到套接字元数据和缓冲区的唯一拷贝。
+下一节（\S\ref{socksdirect:subsec:lockless-queue}）我们将看到，我们仅使用 RDMA 单边写原语，因此使用任何一个 QP 都是等效的。
 图 \ref {socksdirect:fig:fork-memory} 显示了一个fork示例。
 
 
@@ -334,7 +341,7 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 内存状态包括套接字队列，因此不会丢失正在传输（已发送但未接收）的数据。
 套接字只能在容器内共享，并且容器中的所有进程都会一起迁移，因此迁移后可以取消分配原始主机上的内存。
 
-\textbf {监控状态的迁移。}
+\textbf {管程状态的迁移。}
 管程跟踪侦听套接字信息，活动线程和每个连接的等待列表以及共享内存密钥。
 在迁移期间，旧管程会转储已迁移容器的状态并将它们发送到新管程。
 

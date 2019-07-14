@@ -33,7 +33,7 @@ Nginx和响应生成器位于同一主机中，而请求生成器位于不同的
 
 本节使用redis-benchmark和8字节GET请求来测量Redis~ \cite {redis}延迟。
 使用Linux，平均延迟为38.9 $ \mu s $，1 ％和99 ％百分位31.6和56.1 $ \mu s $。
-使用\sys {}，平均延迟为14.1 $ \mu s $（比Linux低64％），1 ％和99 ％百分位数8.4和19.1 $ \mu s $。
+使用\sys {}，平均延迟为14.1 $ \mu s $（比Linux低64％），1 ％和99 ％百分位数8.4和19.1 $ \mu s$。
 
 %Figure: line chart, y axis: throughput, lines: (intra-, inter-) x (\sys{}, libvma, Linux). x axis: number of concurrent clients.
 
@@ -53,6 +53,8 @@ Nginx和响应生成器位于同一主机中，而请求生成器位于不同的
 本节使用RPClib~ \cite {rpclib}来测量RPC延迟。
 在主机内的两个进程中运行RPClib中的示例1~KiB RPC，需要45 $ \mu $s。 在两个主机上，RPC需要79 $ \mu$s。
 使用\sys {}，主机内延迟变为21 $ \mu s $（减少53％），主机间为46 $ \mu$s （减少42％）。
+
+然而，\sys{} 不是万能药。即使使用了 \libipc{}, RPClib 的性能仍然远远低于最先进的 RPC 库，如 eRPC \cite{kalia2018datacenter}，由于 RPClib 的开销成为性能瓶颈。
 
 \subsubsection{网络功能流水线}
 

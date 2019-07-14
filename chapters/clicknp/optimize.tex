@@ -87,17 +87,17 @@ morekeywords={get_input_port,read_input_port,from_tor, to_tor, set_output_port, 
 (a) \vspace{3pt} \\
 {
 \begin{lstlisting}[escapechar=@]
-    r = read_input_port (PORT_1);
+    r = read_input_port (in);
 S1: y = mem[r.x]+1;
 S2: mem[r.x] = y;
-    set_output_port (PORT_1, y);
+    set_output_port (out, y);
 \end{lstlisting} 
 }\\
 (b) \vspace{3pt}\\
 {
 \small
 \begin{lstlisting}[escapechar=@]
-    r = read_input_port (PORT_1);
+    r = read_input_port (in);
 P1: if ( r.x == buf_addr ) {
        y_temp = buf_val;
     } else {
@@ -107,7 +107,7 @@ P1: if ( r.x == buf_addr ) {
 S1: y = y_temp + 1;
 S2: buf_addr = r.x;
     buf_val  = y;
-    set_output_port (PORT_1, y);
+    set_output_port (out, y);
 \end{lstlisting} 
 }\\
 (c)
@@ -198,32 +198,21 @@ S2: A[idx].cnt ++;
 例如，在图 \ref {clicknp:fig:unbalance}（a）中，\textbf {S1}是一个循环操作。
 由于每次迭代需要一个周期（\textbf {S2}），整个循环将需要$N$周期才能完成，从而显着降低了管道吞吐量。
 图 \ref {clicknp:fig:unbalance}（b）显示了另一个示例，它在BRAM中为DDR中的全局表（\textit {gmem}）实现了一个缓存。
-虽然``else''分支很少被击中，但它会在管道中产生一个胖阶段（需要数百个周期！），并且大大减慢了处理速度。
+虽然 ``else'' 分支很少被击中，但它会在管道中产生一个胖阶段（需要数百个周期！），大大减慢了处理速度。
 
-\name 使用两种技术来平衡管道内的各个阶段。首先，尽可能地\textit {unroll}循环。
+\name 使用两种技术来平衡管道内的各个阶段。首先，尽可能地展开（\textit {unroll}）循环。
 展开时，循环操作有效地分解为一系列小操作，每个操作都可以在一个循环中完成。
 值得注意的是，展开循环将复制循环体中的操作，从而增加面积成本。
 因此，它可能仅适用于具有简单主体和少量迭代的循环。
 在网络功能中，这种小循环是相当常见的，例如计算校验和，移位数据包有效负载并迭代可能的配置。
-ClickNP编译器提供\textbf {unroll}指令来展开循环。
-虽然许多高层次综合工具支持循环展开已知次数的迭代，但ClickNP扩展此功能以展开循环，其循环次数未知但在程序员指定的上限之下。
-
-\iffalse
-\textbf{提供 pragma 让程序员指定最高循环次数}
-\fi
+ClickNP编译器提供 \textbf {unroll} 指令来展开循环。
+虽然许多高层次综合工具支持循环展开已知次数的迭代，但很多现实应用的迭代次数是不固定的。
+ClickNP 允许程序员指定循环次数的上限，从而编译器可以展开循环。
 
 其次，如果元件同时具有重量级和轻量级操作，可以尝试将单个元件中的每种类型的操作分开。
-例如，要实现一个缓存，如图 \ref {clicknp:fig:unbalance}（b）所示，将慢“`else”分支移动到另一个元件中。
-这样，快速路径和慢速路径将异步运行。
-如果缓存未命中很少，则整个处理速度由快速路径决定。
-第 \ref {clicknp:sec:application} 节将返回到这一点。
-目前，\name 编译器不能为程序员自动执行此类分离。
-
-\iffalse
-\textbf{讨论 async}。
-
-\textbf{更新 ClickNP 语法，端口名称}。
-\fi
+例如，在缓存元件的实现中，如图 \ref {clicknp:fig:unbalance}（b）所示，较慢的 ``else'' 分支被移动到另一个元件中，使得快速路径和慢速路径异步运行。
+如果缓存不命中率很低，则整个元件的处理速度由快速路径决定。
+\name 编译器提供 ``\texttt{async}'' 原语，包裹在 async 代码块中。
 
 
 \begin{figure}
@@ -241,11 +230,12 @@ morekeywords={get_input_port,read_input_port,from_tor, to_tor, set_output_port, 
 \small
 \begin{lstlisting}[escapechar=@]
 .handler {
-   r = read_input_port (PORT_1);
+   r = read_input_port (in);
    ushort *p = (ushort*) &r.fd.data;
-S1:for (i = 0; i<N; i++) {
+S1: for (i = 0; i<N; i++) {
 S2:  sum += p[i];
    }
+   set_output_port (out, sum);
 }
 \end{lstlisting} 
 } \\
@@ -254,18 +244,18 @@ S2:  sum += p[i];
 \small 
 \begin{lstlisting}[escapechar=@]
 .handler {
-   r = read_input_port (PORT_1);
+   r = read_input_port (in);
    idx = hash (r.x);
-S1:if ( cache[idx].key == r.x ) {
+S1: if ( cache[idx].key == r.x ) {
      o = cache[idx].val;
-S2:} else {
+S2: } else {
      o = gmem[r.x];
      k = cache[idx].key;
      gmem[k] = cache[idx].val;
      cache[idx].key = r.x;
      cache[idx].val = o;
    }
-   set_output_port (PORT_1, o);
+   set_output_port (out, o);
 }
 \end{lstlisting} 
 } \\
