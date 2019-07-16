@@ -354,6 +354,7 @@ pFabric显示在数据中心中实现接近最佳的流完成时间。
 	\label{clicknp:fig:pfabric}
 \end{figure}
 
+\iffalse
 \subsection{容错的 LTE SPGW}
 
 
@@ -502,7 +503,7 @@ The latency breakdown is:
 2.	Communication. Input, output and channel transfer takes 640 + 128 + 640 + 64 + 640 = 2112 cycles
 3.	Dense\_layers pipeline latency. 139 cycles per layer, total 556 cycles.
 The total latency is 6508 cycles (31.9 us), slightly higher than 30.9 us measured latency. This is because computation, communication and pipeline latency are overlapped in the pipeline.
-
+\fi
 
 \egg{
 \textbf{Stateful L4 load balancer.} We compare our ClickNP implementation with Linux Virtual Server (LVS) \cite{lvs} using both real-world traffic trace on a L4 load balancer \cite{gandhi2014duet} and synthetic traces to simulate adversary scenarios.
