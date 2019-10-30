@@ -2,27 +2,127 @@
 \section{系统实现}
 \label{clicknp:sec:impl}
 
-\subsection{\name 工具链和硬件实现}
+\subsection{\name 工具链与硬件平台}
 
-\iffalse
-\textbf{图：编译生成的 OpenCL 代码示例，（1）只包含顺序和选择结构，不包含分支结构，（2）非阻塞（每个流水级有最坏时钟周期数的保证）。可以避免 handler 阻塞 signal。}
-\fi
+本章实现了一个\name 编译器，作为\name 工具链的前端（\S \ref {clicknp:subsec:toolchain}）。
+对于宿主程序，使用Visual C++作为后端。进一步集成了 Altera OpenCL SDK（即 Intel FPGA SDK for OpenCL） \cite {aoc} 和 Xilinx SDAccel \cite {vivado}作为FPGA程序的后端。
+\name 编译器包含约 2 万行 C++、flex 和 bison 代码，它们解析配置文件和元件声明，执行第 \ref {clicknp:sec:optimization} 节所述的优化，并生成特定于每个商业高层次综合工具的代码。
 
-本文实现了一个\name 编译器，作为\name 工具链的前端（\S \ref {clicknp:subsec:toolchain}）。
-对于宿主程序，使用Visual C++作为后端。进一步集成了Altera OpenCL SDK（v15.1）\cite {aoc}和Xilinx Vivado HLS（v2015.4）\cite {vivado}作为FPGA程序的后端。
-\name 编译器包含约 1 万行 C++、flex 和 bison 代码，它们解析配置文件和元件声明，执行第 \ref {clicknp:sec:optimization} 节所述的优化，并生成特定于每个商业高层次综合工具的代码。
-使用 Altera OpenCL 时，每个\name 元件都被编译成 \textit {kernel}，元件之间的连接被转换为Altera 扩展通道（channel）。
-使用Xilinx Vivado HLS 时，将每个元件编译成IP内核，并使用AXI流（stream）来实现元件之间的连接。
-元件也可以编译为CPU二进制文件，管理器线程将为每个主机元件创建一个工作线程。
-主机和FPGA元件之间的每个连接都映射到PCIe I / O通道的\textit {插槽}（\S \ref {clicknp:subsec:pcie}）。
+对于在 FPGA 上运行的元件，每个元件被编译成中间 C 代码，进而通过高层次综合工具编译成一个逻辑模块。
+使用 Altera OpenCL 高层次综合工具时，每个 \name 元件都被编译成 \textit {kernel}，元件之间的连接被编译为Altera 扩展通道（channel），进而用 Avalon ST 接口实现；元件与板上 DRAM（即全局内存）之间使用 Avalon MM 接口通信。
+使用 Xilinx SDAccel 高层次综合工具时，将每个元件编译成IP核（IP core），并使用AXI流（stream）来实现元件之间的连接，实现AXI内存映射接口访问板上DRAM。
+在主机上运行的元件被编译为CPU二进制文件，管理进程将为每个主机元件创建一个工作线程。
+主机和FPGA元件之间的每条管道都映射到PCIe I/O通道的\textit {插槽}（\S \ref {clicknp:subsec:pcie}）。
 
-
-本章的硬件平台基于Altera Stratix V FPGA和Catapult shell \cite {putnam2014reconfigurable}。
+本文的硬件平台基于Altera Stratix V FPGA和Catapult shell \cite {putnam2014reconfigurable}。
 Catapult shell还包含一个OpenCL特定的运行时（BSP）。\name 用户逻辑通过 BSP 与shell通信。
 \name 用户逻辑运行在独立的时钟域内，BSP 将 shell 中处于不同时钟域的 PCIe DMA、DRAM 等接口通过异步 FIFO 转换为用户逻辑所在的时钟域。
 BSP 还提供了 OpenCL 内核启动、停止等管理功能。
 撰写本文时，作者还没有获得Xilinx硬件平台。
-因此，主系统评估基于使用\name + OpenCL的Altera平台，使用Vivado HLS生成的报告（例如频率和面积成本）来了解\name + Vivado的性能。
+因此，系统评估主要基于使用\name + OpenCL的Altera平台，使用Vivado HLS生成的报告（例如频率和面积成本）来了解\name + Vivado的性能。
+
+
+\subsubsection{适合高层次综合工具的中间 C 代码}
+
+当主机上电或 FPGA 被在线重配置后，各个 kernel 或 IP 核就开始并行运行。如图 \ref{clicknp:fig:intermediate-c} 所示，每个 kernel 首先执行初始化（init）函数，然后进入永不退出的循环，检查输入管道并执行事件处理（handler）函数，检查信号并执行事件处理函数。
+
+\begin{figure}[htbp]
+	\small
+	\centering
+	\begin{tabular}{c}
+\begin{lstlisting}
+void kernel() {
+  调用 init 函数；
+  声明并初始化输入输出缓冲区；
+  while (true) {
+    if (输入缓冲区有空闲 and 输入管道非空) {
+      从输入管道中搬移数据到输入缓冲区；
+    }
+    调用 handler 函数；
+    if (输出管道有空闲 or 输出缓冲区已满) {
+      从输出缓冲区搬移数据到输出管道；
+    }
+    if (输入事件管道非空) {
+      从输入事件管道读取输入事件；
+      调用 signal 函数；
+      将事件处理响应写入输出事件管道；
+    }
+  }
+}
+\end{lstlisting}
+	\end{tabular}
+	\caption{Kernel 中间 C 代码的伪代码。}
+	\label{clicknp:fig:intermediate-c}
+\end{figure}
+
+高层次综合工具将中间 C 代码变换成硬件描述语言，中间 C 代码中的每层循环或者被完全展开（unroll）成流水线化的逻辑模块，或者被实现成状态机，每个时钟周期执行循环的一次迭代。循环展开仅适用于循环次数在编译时静态可知，且循环次数较小的情况。对于实现成状态机的循环，由于循环的各次迭代之间可能存在数据依赖，且一次迭代的流水线逻辑可能需要若干个时钟周期才能执行完毕，相邻两次循环迭代间可能需要若干时钟周期的间隔。高层次综合工具需要根据依赖关系和循环体的流水线延迟信息，计算相邻两次迭代的最小间隔（initiation interval，II）。II 越小，吞吐量越高。因此，我们希望尽量减小 II。
+
+目前，高层次综合工具为计算密集型操作设计。计算密集型操作往往由多层嵌套循环构成，编译器使用的循环变换方法通常适用于控制流编译时静态可知（static control part）、完美嵌套循环（perfectly nested loop）的程序。然而，图 \ref{clicknp:fig:intermediate-c} 的程序中 while 循环的执行次数在编译时不可知，且由于输入输出缓冲区搬移代码的存在，handler 和 signal 函数中的循环均不是完美嵌套循环。早期版本的高层次综合工具由于完备性问题，不仅对较为复杂的源程序可能出现编译失败、编译时间过长等错误，还可能分析出过多不必要的内存依赖，导致 II 过大，甚至导致 II 静态分析失败，内层循环无法并行。
+
+本文希望绕过现有高层次综合工具的嵌套循环优化。注意到网络功能中的元件计算逻辑相对简单，每个时钟周期处理的数据量也很有限（如一个 flit），很多循环的执行次数可以在编译时静态确定（例如处理一个 flit 的每个字节）。因此，\name 将 handler 和 signal 函数中的所有循环进行展开（unroll）或压平（flatten），使生成的中间 C 代码仅有 while 一层循环，而不再有嵌套循环，如图 \ref{clicknp:fig:flatten} 所示。\name 的默认策略是展开循环次数可在编译时确定的循环，并压平所有其他循环。用户也可以通过嵌入在源程序中的编译选项（pragma）指定展开和压平的策略。这样，高层次综合工具只需分析单层循环，减小了出错的可能性。展开循环体还有一个重要的好处：便于编译优化。传统编译器往往很难优化用循环表示的向量操作，但 \name 进行循环展开后向量操作被分解为逐点操作，高层次综合工具就可以进行常量传播、死代码消除等一系列优化，并将每个点的操作映射到 FPGA 上的逻辑门。
+
+\name 可以生成性能分析报告。在每个元件内，分析报告包括每个变量的存储方式，每个循环的展开或压平策略，相邻两次迭代的最小间隔（II）以及导致 II 瓶颈的依赖关系链。在计算图层次上，分析报告包括每个元件的延迟、吞吐量和时钟频率。
+
+\begin{figure}
+	\lstset{style=numbers}
+	
+	\centering
+	\renewcommand{\baselinestretch}{0.75}
+	\begin{tabular}{c}
+		{
+			\small
+\begin{lstlisting}[escapechar=@]
+while (true) {
+  Packet pkt = read_input_port(in);
+  uchar checksum = 0;
+  #pragma unroll 2
+  for (int i = 0; i < pkt.num_flits(); i++) {
+    flit f = pkt.filt(i);
+    for (int j = 0; j < FLIT_BYTES; j++)
+      checksum ^= f.bytes[j];
+  }
+  write_output_port(out, checksum);
+}
+\end{lstlisting} 
+		} \\
+		(a) 原始的 C 中间代码（示意代码）。  \\
+		{
+			\small 
+\begin{lstlisting}[escapechar=@]
+uchar checksum = 0;
+Packet pkt;
+int i = 0;
+while (true) {
+  if (i == 0)
+    pkt = read_input_port(in);
+  if (i < pkt.num_flits()) {
+    flit f = pkt.filt(i);
+    checksum ^= f.bytes[0]; checksum ^= f.bytes[1];
+    ...
+    checksum ^= f.bytes[FLIT_BYTES - 1];
+    i++;
+  }
+  if (i < pkt.num_flits()) {
+    flit f = pkt.filt(i);
+    checksum ^= f.bytes[0]; checksum ^= f.bytes[1];
+    ...
+    checksum ^= f.bytes[FLIT_BYTES - 1];
+    i++;
+  }
+  if (i == pkt.num_flits()) {
+    write_output_port(out, checksum);
+    i = 0;
+  }
+}
+\end{lstlisting} 
+		} \\
+		(b) 循环展开和压平后的结果。
+	\end{tabular}
+	\caption{循环展开和压平。对 i 循环按照并行度 2 进行展开，并压平；j 循环完全展开：变换的结果是每个时钟周期计算 2 个 flit 的所有字节。}
+	\label{clicknp:fig:flatten}
+\end{figure}
+
+\subsubsection{编译速度优化}
 
 FPGA 编程的一个限制是编译时间相当长。一个网络数据包简单转发的功能就需要 3 小时来编译。编译时间主要由高层次综合、IP 核生成、硬件描述语言逻辑综合、FPGA 布局布线、时序分析等几个阶段构成。
 本章采用几项技术来缩短 FPGA 编译时间。
@@ -63,11 +163,11 @@ FPGA 编程的一个限制是编译时间相当长。一个网络数据包简单
 \subsection{\name 元件库}
 \label{clicknp:subsec:lib}
 
-本文实现了一个包含近 200 个元件的\name 元件库。
-其中一部分（20％）直接来自Click Modular Router，但使用\name 编程框架重新编写。
+本文实现了一个包含近 200 个元件的 \name{} 元件库。
+其中一部分（约20％）直接来自Click Modular Router，但使用 \name{} 编程框架重新编写。
 这些元件涵盖了网络功能的大量基本操作，包括数据包解析，校验和计算，封装/解封，哈希表，最长前缀匹配（LPM），速率限制，加密和数据包调度。
-由于\name 的模块化体系结构，每个元件的代码大小都是适中的。
-元件的平均代码行数（Line of Code，LoC）是80，最复杂的元件 \textit {PacketBuffer} 有196行C代码。
+由于\name 有模块化的体系结构，每个元件的代码大小都是适中的。
+元件的平均代码行数（Line of Code，LoC）是80，最复杂的元件 \textit {PacketBuffer} 有196行C代码\footnote{代码行数是指 ClickNP 元件代码，不包括主机控制程序和测试代码。}。
 
 
 \begin{sidewaystable}[htbp]
@@ -114,8 +214,8 @@ FPGA 编程的一个限制是编译时间相当长。一个网络数据包简单
 但是，表格底部的元件只处理数据包头（元数据）。因此，使用每秒数据包来测量吞吐量更有意义。
 值得注意的是，表 \ref {clicknp:tab:elements} 中测量的吞吐量是相应元件可以实现的最大吞吐量。
 当它们在真正的网络功能中工作时，其他组件，例如以太网端口，可能是瓶颈。
-作为参考，表 \ref {clicknp:tab:elements} 将优化版本与本文最初在FPGA上的实现进行比较，而不应用\S \ref {clicknp:sec:optimization} 中讨论的技术以及CPU实现。
-很明显，经过优化后，所有这些元件都可以非常有效地处理数据包，与初始的FPGA实现相比，速度提高了7倍~117倍，与一个CPU内核上的软件实现相比，速度提高了21％。
+作为参考，表 \ref {clicknp:tab:elements} 比较了优化后的 FPGA 版本、不应用 \S\ref {clicknp:sec:optimization} 所述技术的 FPGA 简单实现以及 CPU 实现。
+很明显，经过优化后，所有这些元件都可以非常高效地处理数据包，与初始的FPGA实现相比，速度提高了7至117倍，与一个CPU内核上的软件实现相比，速度提高了21％。
 这种性能提升来自于利用FPGA中的巨大并行性的能力。
 考虑到FPGA的功耗（大约30W）和CPU（每个核心大约5W），\name 元件的能耗效率比CPU高4到120倍。
 
@@ -129,24 +229,11 @@ HashTCAM和RateLimiter具有适度的逻辑资源使用，因为这些元件具�
 总而言之，本文使用的FPGA芯片有足够的容量来支持包含少量元件的有意义的网络功能。
 
 
-
 \subsection{PCIE I/O 通道}
 \label{clicknp:subsec:pcie}
 
 如前所述，\name 的一个关键属性是支持联合CPU / FPGA处理。
 本章通过设计高吞吐量，低延迟的PCIe I / O通道来实现这一目标。
-为此，本文扩展了OpenCL运行时，添加一个新的I / O通道，并连接到shell中的PCIe交换机。
-PCIe交换机将仲裁新添加的I / O通道与shell中的其他组件（例如DDR内存控制器）之间的访问。
-
-
-\iffalse
-\textbf{图：ClickNP element，channel，signal 菊花链，command hub 的示例}
-\fi
-
-在FPGA中，一个名为\textit {CmdHub}的特殊元件由\name 编译器自动生成，使用FIFO缓冲区将数据从不同的插槽重定向到相应的FPGA元件。
-\textit {CmdHub}还用于将控制信号从管理器线程分发到FPGA元件。
-为了识别目标元件，在信号消息中嵌入元件ID，并且\textit {CmdHub}可以读取ID并再次通过FIFO缓冲器将信号消息转发到相应的元件。
-
 \name 支持灵活的 I/O 操作。如图 \ref{clicknp:fig:pcie-io} 所示，\name 提供了基于槽位（slot）和工作队列（work queue）两种与主机 CPU 通信的抽象，还提供了裸 DMA 操作的接口。
 
 
@@ -176,12 +263,12 @@ CPU 上的槽位抽象可以在中断或轮询模式下工作。
 
 
 图 \ref {clicknp:fig:pcie} 显示了具有不同插槽数和批量大小的PCIe I/O通道的基准测试结果。
-作为基线，还测量了OpenCL全局内存（global memory）操作的性能 -- 到目前为止，这是OpenCL \cite {opencl} 中为CPU/FPGA通信提供的唯一方法。
-可以看到，单个插槽的最大吞吐量约为8.4~Gbps。
+作为基线，还测量了OpenCL全局内存（global memory）操作的性能 -- 到目前为止，这是OpenCL \cite {opencl} 中CPU与FPGA间通信提供的唯一方法。
+在图 \ref {clicknp:fig:pcie} 中可以看到，单个插槽的最大吞吐量约为8.4~Gbps。
 通过4个插槽，PCIe I/O通道的总吞吐量可达25.6~Gbps \footnote{这是本章写作时使用的 PCIe Gen2 x8 硬核的实际最高性能。事实上该 FPGA 支持 PCIe Gen3 x8 硬核，第 \ref{chapter:kvdirect} 章通过替换硬核和优化 shell，实现了 2 倍的 PCIe I/O 通道吞吐量。}。
-但是，OpenCL的吞吐量低得惊人，低于1~Gbps。这是因为全局内存API旨在传输 GB 级的大量数据。这可能适用于具有大数据集的应用程序，但不适用于需要强流处理（stream prpocessing）功能的网络功能。
+但是，OpenCL的吞吐量低得惊人，甚至低于1~Gbps。这是因为全局内存API旨在传输 GB 级的大量数据。这可能适用于具有大数据集的应用程序，但不适用于需要强流处理（stream prpocessing）功能的网络功能。
 同样，图 \ref {clicknp:fig:pcie}（b）显示了通信延迟。由于OpenCL未针对流处理进行优化，因此OpenCL延迟高达1~ms，通常是网络功能无法接受的。
-相比之下，PCIe I/O 通道在轮询模式下具有非常低的 1 $\mu$s 的延迟（一个 CPU 核重复轮询状态寄存器），而在中断模式下的延迟为 9 $\mu$ s（几乎没有CPU开销） 。
+相比之下，PCIe I/O 通道在轮询模式下具有非常低的 1 $\mu$s 的延迟（一个 CPU 核持续轮询状态寄存器），而在中断模式下的延迟为 9 $\mu$s（几乎没有CPU开销） 。
 
 \begin{figure}[htbp]
 	\centering
@@ -197,42 +284,36 @@ CPU 上的槽位抽象可以在中断或轮询模式下工作。
 	\label{clicknp:fig:pcie}
 \end{figure}
 
+为了给 FPGA 元件发送信号，\name 编译器自动在 FPGA 中生成一个名为\textit {CmdHub} 的特殊元件。
+\textit {CmdHub} 将主机管理程序下发的控制信号通过管道分发到FPGA元件，FPGA元件再将信号处理函数的结果通过管道返回给 \textit {CmdHub}，进而返回给主机管理程序。
+为了避免一对多管道连接带来的布局布线困难，\textit {CmdHub} 与所有元件构成一条菊花链，从 CmdHub 开始，按照元件连接图的拓扑排序依次穿过所有元件，最后回到 CmdHub。
+为了在菊花链中识别目标元件，信号消息中嵌入了元件ID，每个元件仅处理匹配元件 ID 的信号消息，而对其他信号消息直接转发。
+ 
 
-\subsection{Verilog 元件}
 
-对于一些元件（如乘法器阵列和调度器），高层次综合工具难以生成高效的硬件逻辑。为了节约面积和降低延迟，这些元件需要用硬件描述语言来编写。在 \name 中，每个元件被编译成一个 OpenCL 核（kernel），它被高层次综合工具编译成一个 Verilog 模块，使用 Altera Avalon ST 或 Xilinx AXI 接口连接管道，使用 Altera Avalon MM 或 Xilinx AXI 接口连接全局内存。为了把开发者用硬件描述语言编写的 Verilog 元件集成到系统中，开发者需要编写一个接口相同的空元件作为占位符（或功能相同的高级语言元件用于 CPU 调试与测试），并用 \textbf{verilog} 关键字在 \name 配置文件中声明。编译工具链会将高层次综合工具为占位符元件生成的 Verilog 模块替换为开发者的实现。
+\subsection{调试}
+\label{clicknp:subsec:debug}
 
-
-\iffalse
-\subsection{调试与测试}
-
-\name 提供三种方法用于调试与测试。
+\name 提供两种方法用于调试。
 
 \textbf{CPU 功能仿真。}
-\name 元件使用类 C 的高级语言编写，因此一个元件可以编译成 CPU 上运行的一个线程，而管道就是线程之间的队列。开发者可以使用熟悉的调试工具来调试功能和单元测试。
+\name 元件使用类 C 的高级语言编写，因此一个元件可以编译成 CPU 上运行的一个线程，而管道就是线程之间的队列。开发者可以使用熟悉的软件调试工具进行功能仿真。
 
-\textbf{时钟精确的硬件逻辑仿真。}
-元件之间的通信管道有死锁的可能，在 CPU 功能仿真时由于时序与硬件逻辑不一致，不一定能发现问题。为此，\name 可以集成硬件开发者熟悉的硬件逻辑仿真框架，如 ModelSim。为了便于软件开发者使用，\name 封装了 printf 等日志语句。
 
-查看 \textbf{.state} 变量的值……
 
 \textbf{实际 FPGA 运行。}
-硬件逻辑仿真速度很慢，不能反映实际性能，且难以测试与 PCIe DMA、网络之间的交互。
+CPU 功能仿真存在局限。首先，元件之间的通信管道有死锁的可能，在 CPU 功能仿真时由于时序与硬件逻辑不一致，不一定能发现死锁问题；其次，CPU 仿真速度较慢，不能反映实际性能，且难以测试与 PCIe DMA、网络之间的交互；最后，功能仿真不能发现编译器中的错误。为此，实际应用在功能仿真通过后，一般用实际 FPGA 运行的方法调试。
 
-日志高速发送：通过 PCIe I/O 通道传输到主机上。
-
-SignalTap
-
-断点如何实现……
+由于 \name 语言中的变量名与 Verilog 中的不匹配，SignalTap 等用于 FPGA 在线调试的工具并不适用。因此，\name 需要定制的调试机制。首先，在调试模式下，\name 可以记录每条管道的输入输出日志，并通过 PCIe I/O 管道传输到主机内存上。第二，\name 允许用户在元件代码中插入 printf 语句，通过管道将包含变量值的调试信息发送到主机端。第三，\name 支持用户在编译时插入断点，以便调试交互式网络协议或模拟队列阻塞导致的死锁。断点被编译成管道的写操作（通知主机断点命中）和阻塞读操作（等待主机发送断点继续命令）。第四，\name 允许在运行过程中（包括断点命中时）随时查询或修改某个变量的值。当用户查询某个变量的值时，通过 signal 发送查询或修改命令，并返回变量的值。
 
 \subsection{元件热迁移和高可用}
+\label{subsec:clicknp:fault-tolerance}
 
-\textbf{虚拟机热迁移，计算节点对应的网卡状态；网络、存储节点热迁移（升级，扩容等），网卡状态；高可用性，故障恢复……}
+热迁移是数据中心网络功能需要支持的重要特性。当虚拟机热迁移时，计算节点对应的网卡内部状态需要热迁移到新节点，不然就需要在新节点上重新初始化网卡状态，带来软件的复杂性和迁移延迟。类似的，当网络、存储节点因升级、扩容等进行热迁移时，网卡状态也需要热迁移到新节点。此外，为了实现服务不间断的网络功能升级，需要将内部状态热迁移到另一节点，再将原节点下线进行升级。为了实现高可用性，当增加备份节点时，为了同步源节点和新增备份节点的内部状态，也需要热迁移技术。
 
-\textbf{热升级：不丢包，的时候原来的 FPGA 不处理了，buffer 起来。把旧 FPGA 的状态迁移到新 FPGA，让交换机开始往新 FPGA 的 buffer 里灌，然后从旧 FPGA 的 buffer 里把数据倒出来在新的 FPGA 里处理，处理完后开始处理新 FPGA 自己的 buffer，迁移结束。}
+当热迁移开始时，首先在交换机上进行配置，停止向旧 FPGA 发送数据包，而是将这些数据包缓冲在交换机内。然后通过第 \ref{clicknp:subsec:debug} 节的断点机制停止 FPGA 内各元件的运行，再将所有元件内变量的值、管道内的数据和全局内存的值导出到主机。接下来，在新 FPGA 上运行相同的 \name 程序，通过调试机制导入上述 FPGA 内部状态，并恢复各元件运行。最后，通知交换机修改路由表，将旧 FPGA 的地址指向新 FPGA 所在端口，发送交换机内缓冲的数据包，热迁移结束。
 
-\textbf{高可用：状态机复制的方法，两个 FPGA 收到相同的数据包序列，只要元件内部没有随机化或与时间相关的处理逻辑，就能保证两个 FPGA 收到的数据包序列相同。检测到备份节点故障，只需启动一个新的备份节点，然后执行热升级操作。检测到主节点故障，切换输出到备份节点（可能出现少量数据包丢失或重复，TCP 可以安全地处理这些情况）。}
-\fi
+为了实现网络功能的高可用，\name 采用状态机复制的方法。两个 FPGA 接收到相同的数据包序列，只要元件内部没有随机化或与时间相关的处理逻辑，也不接受主机的控制信号，就能保证两个 FPGA 的内部状态和发出的数据包序列相同。当检测到备份节点故障时，只需启动一个新的备份节点，然后执行状态热迁移。当检测到主节点故障时，需要切换到备份节点，此时可能出现少量输入数据包丢失或输出数据包重复，TCP 可以安全地处理这些情况。
 
 \egg{
 

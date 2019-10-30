@@ -6,12 +6,12 @@
 为了评估 \name 的灵活性，本文基于 \name 开发了几个常见的网络功能，可以在本文的测试床中运行。
 表 \ref {clicknp:tab:applications} 总结了每个网络功能中包含的元件数量和总代码行数，包括所有元件规范和配置文件。
 经验证实，\name 的模块化架构极大地改善了代码重用并简化了新网络功能的构建。
-如表 \ref {clicknp:tab:elements} 所示，在许多应用程序中有很多机会重用一个元件，例如，本文（A1-5）中所有五个网络功能都使用了L4\_Parser。
+如表 \ref {clicknp:tab:elements} 所示，在许多应用程序中有很多机会重用一个元件，例如，本文中所有的网络功能都使用了L4\_Parser。
 每个网络功能可能需要1个左右的时间才能让一个程序员进行开发和调试。
 联合CPU / FPGA处理的能力也将极大地帮助调试，因为可以将有问题的元件移动到CPU，以便轻松地打印日志来跟踪问题。
 
 本章在16台Dell R720服务器的测试台中评估\name。
-对于每个FPGA板，两个以太网端口都连接到架顶式（ToR）Dell S6000交换机\cite {dells6000}。
+对于每个FPGA板，两个以太网端口都连接到架顶式（Top-of-Rack）Dell S6000交换机\cite {dells6000}。
 所有\name 网络功能都在Windows Server 2012 R2上运行。
 本章比较\name 与其他最先进的软件网络功能。
 对于在Linux上运行的那些网络功能，使用内核版本为3.10的CentOS 7.2。
@@ -50,10 +50,12 @@ The wire loopback RTT of TrafficGen is 0.85$\mu$s for 64B packets and 1.39$\mu$s
 \subsection{数据包生成器和抓包工具}
 数据包生成器（PktGen）可以根据不同的配置文件生成各种流量模式。
 它可以生成不同大小的流，并根据给定的分布安排它们在不同的时间开始。
-生成的流可以进一步通过不同的流量整形器来控制流速及其突发性。
+生成的流可以进一步通过不同的流量整形器来控制流速及其突发性（burstiness）。
+
 抓包工具（PktCap）将收到的所有数据包重定向到 \textit {logger} 元件，这些元件通常位于主机中。
-由于单个记录器无法充分利用PCIe I / O通道容量，因此PktCap在FPGA中具有接收端缩放（RSS）元件，以根据流5元组的散列将数据包分发到多个记录器。
-由于PCIe通道的容量小于40G 网卡的容量，添加了一个\textit {提取器}（extractor）元件，它只提取数据包的重要字段（例如，如果有5个元组，DSCP和VLAN标记），并转发这些字段（总共16B） ，以及跨PCIe的记录器元件的时间戳（4B）。
+图 \ref{clicknp:fig:packet-capture} 展示了抓包工具的元件结构。
+由于单个抓包元件无法充分利用PCIe I/O通道容量，因此PktCap在FPGA中实现了接收端缩放（RSS）元件，以根据流5元组的哈希值将数据包分发到多个抓包元件。
+由于PCIe通道的吞吐量小于40G 网卡的吞吐量，添加了一个\textit {提取器}（extractor）元件，它只提取数据包的重要字段（例如，如果有5个元组，DSCP和VLAN标记），并通过PCIe转发这些字段（总共16B） 以及时间戳（4B）。
 PktCap就是一个展示联合CPU / FPGA处理重要性的例子。
 与FPGA相比，CPU具有更多的内存用于缓冲，并且可以轻松访问其他存储，例如，文献 \cite{lee2015flosis} 中的HDD / SSD驱动器，因此在CPU上运行记录器更有意义。
 
@@ -67,31 +69,24 @@ PktCap就是一个展示联合CPU / FPGA处理重要性的例子。
 
 
 \subsection{OpenFlow 防火墙}
-Openflow~\cite {mckeown2008openflow} 防火墙支持流的精确匹配和通配符匹配。
+Openflow~\cite {mckeown2008openflow} 防火墙支持流的精确匹配、前缀匹配和通配符模糊匹配。
+精确匹配表是使用Cuckoo Hashing~\cite{cuckoo} 实现的，可容纳精确匹配流5元组的128K条规则。
+前缀匹配表使用决策树实现，树的每一层存储在一个BRAM中，从而可以实现流水线处理。前缀匹配的最大延迟即为决策树的深度。
 
+模糊匹配需要TCAM。
+但是，TCAM在FPGA中很难高效实现，可容纳512条规则\footnote{每条规则匹配五元组的104位，下同。}的简单TCAM实现会占用FPGA的65％逻辑资源。
+为了降低面积开销，本章采用基于BRAM的TCAM \cite {jiang2013scalable}。
+基于BRAM的TCAM将待匹配的键分解为多个较小的键。每个键与一个BRAM关联，用键作为BRAM地址，查找结果为一个宽度为规则条数的比特位图（bitmap），表示每条规则是否匹配。BRAM的内容在规则修改时由主机管理程序预处理。最终的匹配结果即为各BRAM输出的比特位图的按位``与''中第一个有效位的位置。
+基于BRAM的TCAM用更多的内存空间来降低逻辑资源占用。具有2K条规则的BRAM TCAM需要占用14％的逻辑资源和43％的BRAM。
 
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=0.8\textwidth]{image/Firewall}
-	\caption{防火墙的元件结构。}
-	\label{clicknp:fig:firewall-arch}
-\end{figure}
-
-
-精确匹配表是使用Cuckoo Hashing \cite{cuckoo} 实现的，包含与流5元组匹配的128K条目。
-模糊匹配匹配基于TCAM。
-但是，具有512个104位条目的简单TCAM实现占用了FPGA的65％逻辑资源。
-相反，本章使用基于BRAM的TCAM \cite {jiang2013scalable}。
-基于BRAM的TCAM将搜索密钥分解为8位密钥，并使用它们来寻址查找表，这些表将内存换成逻辑区域。具有2K条目的BRAM TCAM需要14％逻辑和43％的BRAM。
-此外，本文设计了 HashTCAM，以利用流表中的许多条目共享相同的位掩码这一事实。
-HashTCAM将表空间划分为许多较小的哈希表，每个哈希表都与一个位掩码相关联。
-在查找哈希表之前，任何传入的数据包都将首先执行“和”操作。
-表中的每个条目也与优先级相关联。
+为了进一步降低逻辑资源和内存空间开销，注意到流表中的许多条目共享相同的位掩码这一事实，本文设计了 HashTCAM。
+HashTCAM将表空间划分为许多较小的哈希表，每个哈希表都与一个可配置的位掩码相关联，可以容纳位掩码相同的一组TCAM规则。
+输入的流5元组首先与位掩码执行``与''操作，再查找哈希表。
+表中的每个条目与优先级相关联。
 仲裁器（multiplexer）选择具有最高优先级的匹配条目。
-HashTCAM在功能和区域成本之间有更好的权衡。
-具有16K流条目和16个不同位掩码的HashTCAM（类似于Broadcom Trident II~\cite {broadcomethernet}）需要19％逻辑和22％BRAM。
-管理器程序总是尝试根据其位掩码对规则进行分组，并将具有大多数规则的组放入HashTCAM。
-然后将其余规则放入基于BRAM的TCAM中，这些规则不适合HashTCAM中的任何组。
+HashTCAM在规则条数和面积成本之间有更好的权衡。
+具有16K条规则和16个不同位掩码的HashTCAM（类似于Broadcom Trident II~\cite {broadcomethernet}）只需要占用板上19％的逻辑资源和22％的BRAM。
+主机管理程序尝试根据其位掩码对规则进行分组，并将具有大多数规则的组放入HashTCAM，然后将不适合HashTCAM中任何组的其余规则放入基于BRAM的TCAM中。
 
 
 
@@ -133,7 +128,7 @@ IPTables规则插入需要12 ms，这与表中现有规则的数量成比例。
 Dell S6000中的规则插入需要83.7 $\mu$s。
 对于\name{}，在HashTCAM表中插入一个规则需要6.3至9.5$\mu$s用于2至3次PCIe往返，而SRAM TCAM表平均需要44.9 $\mu$s来更新13个查找表。
 \name 数据平面吞吐量在规则插入期间不会降低。
-结论是 \name{} 防火墙在数据包处理方面具有与ASIC类似的性能，但具有灵活性和可重构性。
+结论是 \name{} 防火墙在数据包处理方面具有与ASIC类似的性能，但相比 ASIC 具有更好的灵活性和可重构性。
 
 
 \begin{figure*}[htbp]
@@ -163,6 +158,8 @@ Dell S6000中的规则插入需要83.7 $\mu$s。
 
 
 \subsection{IPSec网关}
+\label{clicknp:subsec:ipsec}
+
 软件网络功能的一个问题是，当数据包需要一些计算密集型处理时，CPU很快就会成为瓶颈，例如，IPSec \cite {packetshader}。
 IPSec数据面需要使用AES-256-CTR加密和SHA-1身份验证处理IPSec数据包。
 如 \S \ref {clicknp:subsec:lib} 所示，单个AES\_CTR元件只能实现27.8~Gbps的吞吐量。因此，需要两个AES\_CTR元件并行运行以实现线速率。
@@ -176,8 +173,9 @@ IPSec数据面需要使用AES-256-CTR加密和SHA-1身份验证处理IPSec数据
 
 还有一件棘手的事情。
 虽然SHA-1元件具有固定的延迟，但数据包的总延迟是不同的，即与数据包大小成比例。
-当在SHA-1计算中调度多个分组时，这些分组可能是无序的，例如，大分组后面的较小分组可能更早地完成。
-为了防止这种情况，在SHA-1元件之后进一步添加了一个\textit {reorder buffer}元件，该元件存储无序数据包并根据数据包的序列号恢复原始顺序。
+当在SHA-1计算中调度多个数据包时，这些数据包可能发生重排，例如，大数据包后面的较小数据包可能更早地完成。
+为了使输出的数据包与输入顺序相同，在SHA-1元件之后进一步添加了一个\textit {reorder buffer}元件，该元件存储乱序的数据包并根据数据包的序列号恢复原始顺序。
+图 \ref{clicknp:fig:IPSec-arch} 显示了 IPSec 网关的元件结构。
 
 
 \begin{figure}[htbp]
@@ -265,17 +263,17 @@ L4LB需要一次访问DDR内存。因此处理速度降低到11Mpps。
 由于LVS将VIP关联到仅一个CPU核心，因此其处理速率必须达到200Kpps。
 
 图 \ref {clicknp:fig:l4}（b）显示了不同负载条件下的延迟。
-在这个实验中，将并发流的数量修复为100万。
+在这个实验中，将并发流的数量固定为100万。
 可以看到，L4LB实现了4 $\mu$s 的非常低的延迟。
 然而，LVS会导致约50 $\mu$s 的延迟。
-当提供的负载高于100Kpps时，这种延迟会迅速上升，超过LVS的容量。
+当吞吐量负载高于100Kpps时，排队延迟会迅速上升，超过LVS的处理能力。
 
 最后，图 \ref {clicknp:fig:l4}（c）比较L4LB和LVS接受新流的能力。
-这个实验指示PktGen生成尽可能多的单包微流。
-可以看到，L4LB每秒可以接受高达10M的新流量。
-由于单个PCIe插槽每秒可以传输16.5M的传输，因此瓶颈仍然是DDR访问。
-\textit {DIPAlloc} 元件只是以循环方式分配DIP。
-对于复杂的分配算法，\textit {DIPAlloc} 的CPU核心将成为瓶颈，并且可以通过在更多CPU核心上复制 \textit {DIPAlloc} 元件来提高性能。
+这个实验指示PktGen生成尽可能多的单包微流（micro-flow）。
+可以看到，L4LB每秒可以接受高达10M条新连接。
+由于单个PCIe插槽每秒可以传输16.5M次数据，因此瓶颈仍然是DDR访问。
+为简单起见，本文中 \textit {DIPAlloc} 元件轮流（round-robin）分配DIP。
+对于复杂的分配算法，\textit {DIPAlloc} 的CPU核将成为瓶颈，并且可以通过在更多CPU核心上复制 \textit {DIPAlloc} 元件来提高性能。
 对于LVS，由于数据包处理能力有限，它每秒最多只能接受75K个新连接。
 
 
@@ -307,9 +305,9 @@ L4LB需要一次访问DDR内存。因此处理速度降低到11Mpps。
 
 本节使用\name 来实现一个最近提出的数据包调度规则--pFabric \cite {pfabric}。
 pFabric调度很简单。它只保留浅缓冲区（32个数据包），并始终使具有最高优先级的数据包出列。当缓冲区已满时，优先级最低的数据包将被丢弃。
-pFabric显示在数据中心中实现接近最佳的流完成时间。
+pFabric在数据中心中实现了接近最优的流完成时间。
 在原始论文中，作者提出使用二进制比较树（Binary Comparison Tree，BCT）来选择具有最高优先级的数据包。
-但是，虽然BCT只需要$O(log_2 N)$个周期来计算最高优先级的数据包，但在连续的选择过程之间存在依赖关系。这是因为只有当前一个选择完成后才能知道最高优先级的数据包，然后才能可靠地启动下一个选择过程。
+但是，虽然BCT只需要$O(log_2 N)$个周期来计算最高优先级的数据包，但在相邻两次选择过程之间存在依赖关系。这是因为只有当前一个选择完成后才能知道最高优先级的数据包，然后才能可靠地启动下一个选择过程。
 这种限制要求时钟频率至少为300MHz才能实现40Gbps的线速，这对当前的FPGA平台来说是不可能的。
 
 
@@ -344,8 +342,8 @@ pFabric显示在数据中心中实现接近最佳的流完成时间。
 本实验修改了一个软件TCP流生成器\cite {mqecn}，以便在数据包有效负载中放置流优先级，即流的总大小。
 本实验根据\cite {pfabric}中的数据挖掘工作负载生成流，并使用\textit {RateLimit}元件将限制出口端口进一步设置为10~Gbps。
 应用pFabric根据流优先级调度出口缓冲区中的流量。
-图 \ref {clicknp:fig:pfabric}显示了pFabric，具有Droptail队列的TCP的平均流完成时间（FCT）和理想值。
-该实验验证了pFabric在这种简单的场景中实现了接近理想的FCT。
+图 \ref{clicknp:fig:pfabric} 显示了pFabric 和具有Droptail队列的TCP的平均流完成时间（FCT）和理想值。
+该实验验证了pFabric在这种简单的场景中实现了接近最优的FCT。
 
 \begin{figure}[htbp]
 	\centering
@@ -354,9 +352,9 @@ pFabric显示在数据中心中实现接近最佳的流完成时间。
 	\label{clicknp:fig:pfabric}
 \end{figure}
 
-\iffalse
-\subsection{容错的 LTE SPGW}
+\subsection{容错的 EPC SPGW}
 
+LTE 核心网（EPC）的数据面使用 S-GW 和 P-GW 处理网络数据包，其处理流程与 IPSec 网关类似，如图 \ref{clicknp:fig:epc-arch} 所示。EPC SPGW 需要为每个 bearer（即用户）保存状态，每个数据包经过时都会修改 bearer 的状态。EPC SPGW 不仅需要高吞吐量、低延迟，还需要高容错性，即硬件故障对用户不可感知，且状态不会丢失。
 
 \begin{figure}[htbp]
 	\centering
@@ -366,162 +364,14 @@ pFabric显示在数据中心中实现接近最佳的流完成时间。
 \end{figure}
 
 
+高容错性采用第 \ref{subsec:clicknp:fault-tolerance} 节的状态机复制方法实现，元件结构如图 \ref{clicknp:fig:epc-element} 所示。每个用户需要约 300 字节的状态，FPGA 的片上内存可以缓存约 4K 用户的状态，而板上 BRAM 可以保存 10M 用户的状态，因此一块 FPGA 就可以支持最多 10M 个并发连接。在用户访问服从幂律分布的通常情况下，FPGA 的吞吐量可达 40 M 数据包每秒（pps）；在最坏情况下，由于缓存不命中，吞吐量可达 20 M pps。在正常情况下，FPGA 的 95\% 延迟为 4 $\mu$s。控制平面通过 PCIe I/O 管道实现，95\% 控制平面延迟为 1 $\mu$s，吞吐量为每秒 1M 次添加或删除用户操作。当添加一个新的备份节点时，需要将原有节点的用户状态备份到新节点，在网络空载时，该状态迁移过程可以充分利用 40 Gbps 带宽，仅需 0.8 秒即可实现状态复制。
+
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=1.0\textwidth]{image/EPC_element}
 	\caption{LTE SPGW 的元件结构。}
 	\label{clicknp:fig:epc-element}
 \end{figure}
-
-300-byte states per flow (bearer connection).
-FPGA BRAM caches 4K flow states.
-On-board DRAM holds 10M flow states.
-
-Capacity:
-10M concurrent bearer connections.
-Data plane (user traffic):
-Throughput: 40M pps (normal case), 20M pps (worst case), can saturate 40 Gbps network in normal case.
-Latency: 4 us (95\% percentile).
-Control plane
-1M add/remove bearers per second.
-CPU-FPGA latency: 1 us (95\% percentile).
-Dump all connection states in 0.8 second.
-
-\subsection{HTTPS RSA 加速}
-
-HTTPS是用于与Web服务进行安全连接的协议。互联网上对用户隐私的日益关注导致大多数Microsoft Web服务通过HTTPS提供访问。在过去的5年中，HTTPS流量的比例每6个月增长40％，现在占所有网络连接的40％以上。
-
-HTTPS提供三件事来确保安全性。首先，它在连接设置期间验证Web服务器的实体。其次，它加密用户和Web服务器之间的数据传输。第三，它检查数据的完整性。在这三种机制中，第一认证部分是计算密集程度最高的部分。
-
-如果没有HTTPS，单个CPU核心每秒可处理超过7,000个请求。使用HTTPS，由于连接设置中的TLS握手，吞吐量下降了35倍。 TLS握手的高计算开销一直是高流量网站部署HTTPS以确保安全性的主要障碍。
-
-在TLS握手中，Web服务器使用私钥执行解密。对于2048位私钥，解密涉及大约800万个整数乘法运算。 CPU核心需要逐个执行乘法运算。 FPGA是一种可重新配置的硬件，具有数千个可并行操作的乘法单元。但是，CPU上的程序可以任意长，而FPGA的存储程序资源非常有限。 TLS证书解析和协议处理很复杂，但需要比解密少得多的计算。因此，我们修改OpenSSL库以将解密卸载到FPGA，并将其他部分保留在CPU上。
-
-我们在Catapult FPGA平台上构建加速器，该平台已部署在Microsoft数据中心。 Catapult FPGA将Bing搜索排名提升了20倍，Azure网络提升了10倍以上。在这个Hackathon中，我们将FPGA应用于HTTPS加速。我们的初步实现可以支持每秒12,000次解密，比单CPU核心快20倍。在功效方面，FPGA的功耗比CPU低3倍。
-
-除了高性能和高功效外，我们的加速器设计还有两个优点。首先，FPGA主要使用低级硬件描述语言编程，这些语言难以编程且难以调试。我们利用Microsoft Research Asia的ClickNP框架，使用高级语言对FPGA进行编程。使用高级语言，软件开发人员还可以编写加速器代码，并且开发效率提高了几倍。
-
-其次，我们以模块化和可扩展的方式构建加速器。加速器需要与数据中心中的其他加速器共同定位，并且私钥大小经过多年的增长以提高安全性。在解密的每个步骤中有多个算法，其中一些算法较慢但占用的资源较少，其中一些算法速度较快但需要更多资源。我们的设计自动探索设计空间，并为给定的资源约束和私钥大小生成具有最佳吞吐量的硬件。
-
-总而言之，我们在可重新配置硬件上的HTTPS加速器将加速HTTPS Web服务器的连接设置20倍。该加速器基于已部署在Microsoft数据中心的Catapult FPGA，因此不需要额外的硬件。借助在数据中心部署的HTTPS加速器，Microsoft将能够以显着降低的成本为最终用户和云客户提供安全的Web服务。
-
-
-Parameterized elements
-
-design space exploration
-
-automatic loop flattening
-
-logic/memory coalescing
-
-
-
-
-
-
-\begin{figure}[htbp]
-	\centering
-	\includegraphics[width=1.0\textwidth]{image/https_accelerator}
-	\caption{HTTPS 加速器的元件结构。}
-	\label{clicknp:fig:https-accelerator}
-\end{figure}
-
-\begin{figure}[htbp]
-	\centering
-	\subfloat[修改前的同步调用模式。]{
-		\includegraphics[height=0.3\textwidth]{image/HTTPS_nginx_orig}
-		\label{clicknp:fig:https-nginx-orig}
-	}
-	\hspace{0.02\textwidth}
-	\subfloat[修改后的异步调用模式。]{
-		\includegraphics[height=0.3\textwidth]{image/https_nginx_new}
-		\label{clicknp:fig:https-nginx-new}
-	}
-	\caption{为隐藏加速器计算延迟，对 OpenSSL 软件的异步修改。}
-\end{figure}
-
-CPU   Stratix V     Arria 10
-1.2k  6K            12K
-0.85ms 3.5ms        1.75ms
-
-900 HTTPS without FPGA
-3.5k HTTPS with FPGA
-
-\subsection{神经网络推理}
-
-神经网络图
-
-三种类型的 sparse 矩阵，每个是 128 维向量。input sample 每种类型有 ncol 个 feature，要取出来相加。相加之后经过非线性模块，如 tanh(x + bias)。128 * 3 个 feature。再加上 128 个 dense feature，共 640 个 dense feature。
-
-三层 dense：
-640*128: no skip
-128*640: relu(tree + bias + residue)
-640*64: no skip
-64*640: relu(tree + bias + residue)
-
-\begin{table}[htbp]
-	\centering
-	\caption{不同稠密层并行度下神经网络推理的延迟。}
-	\label{clicknp:tab:neural-network}
-	\small
-	\begin{tabular}{l|r}
-		\toprule
-		稠密层并行度 & 每样本延迟 ($\mu$s) \\
-		\midrule
-		8 & 188.2 \\
-		16 & 98.2 \\
-		32 & 49.3 \\
-		64 & 26.1 \\
-		128 & 17.5 \\
-		256 & 资源不足 \\
-		\bottomrule
-	\end{tabular}
-\end{table}
-
-
-Throughput (10,000 samples in a batch): 17.5 us per sample
-
-Throughput bottleneck is DenseLayers
-Latency (1 sample in a batch): 29.6 us
-PCIe I/O: 4 us (PCIe I/O has much lower latency than OpenCL API (1.8 ms))
-Sparse layers: 5 us
-Rowstack: 3 us
-Dense layers: 17.5 us
-
-Latency breakdown of the 17.5 us version (170.9 MHz):
-1.	Computation. 640*128, 128*640, 640*64, 64*640 takes 5*128 + 1*640 + 5*64 + 1*640 = 2240 cycles (13.1 us).
-
-
-2.	Communication. This is overlapped with computation.
-3.	Denselayers pipeline latency. 144 cycles per layer, total 576 cycles (3.4 us).
-
-
-The 4 layers have 640*128 + 128*640 + 640*64 + 64*640 = 245760 float multiplications. 
-
-The latency breakdown is:
-1.	Computation. 640*128, 128*640, 640*64, 64*640 takes 1280 + 1280 + 640 + 640 = 3840 cycles (this 18.8 us is base latency)
-2.	Communication. Input, output and channel transfer takes 640 + 128 + 640 + 64 + 640 = 2112 cycles
-3.	Dense\_layers pipeline latency. 139 cycles per layer, total 556 cycles.
-The total latency is 6508 cycles (31.9 us), slightly higher than 30.9 us measured latency. This is because computation, communication and pipeline latency are overlapped in the pipeline.
-\fi
-
-\egg{
-\textbf{Stateful L4 load balancer.} We compare our ClickNP implementation with Linux Virtual Server (LVS) \cite{lvs} using both real-world traffic trace on a L4 load balancer \cite{gandhi2014duet} and synthetic traces to simulate adversary scenarios.
-The real-world trace contains 1.3M flows collected in two hours with 26Gbps average throughput and 45KB median flow size.
-The first adversary trace is round-robin scheduling packets from a large number of infinite UDP flows with 64B packet size to stress the load balancer under high concurrency.
-The second adversary trace is a lot of tiny UDP flows to test how many new connections the load balancer can process per second.
-
-Figure \ref{clicknp:fig:l4} shows that ClickNP L4 load balancer has 50\approx500x lower latency than LVS on real-world trace, supports 32M concurrent flows and able to accept \approx10M new flows per second.
-This performance is comparable to high-end hardware load balancers \cite{f5loadbalance}, while ours have low cost and high flexibility.
-Figure \ref{clicknp:fig:l4} also shows the importance of SRAM cache and pipelined DRAM access.
-Our board can perform at most 13.6M DRAM random reads per second, and our new flow allocation rate gets near this limit thanks to pipelined DRAM access.
-}
-
-\egg{
-First we test the performance under real-world data center traffic. We adopted the same traffic trace as DUET\cite{}, and picked the first ten minutes as testing data. Figure \ref{clicknp:fig:l4} shows the four experiments we performed on the L4 load balancer. We first use TCP traffic to evaluate the flow completion time (FCT) under different throughputs. Then we use UDP traffic to evaluate the latency. 
-
-Next we tested the performance with adversary traffic to thest the worst case performance. We fixed every flow to be one 1504 byte packet, and test the throughput under different flow numbers, and latency under different new flow rates.
-}
 
 \section{讨论：资源利用率}
 
@@ -535,8 +385,7 @@ Next we tested the performance with adversary traffic to thest the worst case pe
 
 本节将评估\name 网络功能的资源利用率。
 表 \ref {clicknp:tab:applications} 总结了结果。
-除了使用大多数BRAM来保存编码书的IPSec网关之外，所有其他网络功能仅使用中等资源（5 至 50 ％）。
-仍有空间容纳更复杂的网络功能。
+除了使用大多数BRAM来保存码表（code book）的IPSec网关之外，所有其他网络功能仅使用中等数量的资源（5 至 50 ％），仍有空间容纳更多的网络功能。
 
 
 \begin{table}[htbp]
@@ -572,11 +421,12 @@ Next we tested the performance with adversary traffic to thest the worst case pe
 接下来研究 \name 的细粒度模块化的开销。
 由于每个元件都将生成逻辑块边界并仅使用FIFO缓冲区与其他块进行通信，因此应该存在开销。
 为了衡量这种开销，创建一个只将数据从一个输入端口传递到输出端口的简单``\textit{空}''元件。
-此\textit {空}元件的资源利用率应该很好地捕获模块化的开销。
+此\textit {空}元件的资源利用率可以很好地体现模块化的开销。
 不同的高层次综合工具可能使用不同数量的资源，但都很低，最小值为0.15％，最大值为0.4％。
-因此，由于模块化，名称产生的开销很小。
+因此，细粒度模块化引入的开销很小。
+未来的工作还可以探索将计算流图中相邻的元件进行融合，以进一步降低元件的模块化开销。
 
-最后研究\name 与手写硬件描述语言相比生成的硬件描述语言代码的效率。
+最后研究 \name 与手写硬件描述语言相比生成的硬件描述语言代码的效率。
 为此，使用NetFPGA \cite {netfpga}作为参考。
 首先，提取NetFPGA中的关键模块，这些模块由经验丰富的Verilog程序员进行了优化，
 并在\name 中实现具有相同功能的对应元件。
@@ -587,7 +437,8 @@ Next we tested the performance with adversary traffic to thest the worst case pe
 然而，差异并不是很大。
 对于复杂模块（如表格顶部所示），相对面积成本小于2倍。
 对于微小模块（如表格底部所示），相对面积成本看起来更大，但绝对资源使用量很小。
-这是因为所有的高层次综合工具都会产生一个固定的开销，占据微小模块的面积成本。
+这是因为现有的高层次综合工具都会为每个元件生成固定的控制逻辑，产生面积开销。
+
 
 
 \begin{table}[htbp]
@@ -615,6 +466,171 @@ Next we tested the performance with adversary traffic to thest the worst case pe
 总之，\name 可以为FPGA生成高效的硬件描述语言，只需要适度的面积成本，可以构建实用的网络功能。
 展望未来，FPGA技术仍在迅速发展。例如，Intel的Arria 10 FPGA 和最新的 Stratix 10 FPGA 的面积分别是本文使用的芯片（Stratix V）的 2.5 倍和 10 倍。
 因此，高层次综合的面积成本将来将受到较少的关注。
+
+\section{扩展：计算密集型应用}
+
+一些网络功能是计算密集的，例如第 \ref{clicknp:subsec:ipsec} 节的 IPSec 网关需要对每个数据包的内容进行加密和签名。由于一个数据包的计算量过大，将整个计算流图完全展开成一条流水线的面积将超过 FPGA 的容量。因此需要\emph{用时间换空间}，对计算流图进行切分。由于计算过程中存在依赖关系，第 \ref{clicknp:subsec:ipsec} 节展示了如何利用\emph{保留站}将数据包的计算分为多个阶段，保存中间状态，并充分利用不同连接间的并行性。本节讨论两个计算量更大的应用：HTTPS RSA 加速和神经网络推断，以展示实现计算密集型应用的一般方法。
+
+\subsection{HTTPS RSA 加速}
+
+
+HTTPS是用于与Web服务进行安全连接的协议。随着用户对隐私的日益关注，越来越多的Web服务通过HTTPS提供访问。2010年以来，HTTPS流量的比例每6个月增长40％，2016年已经占到所有网络连接的40％以上。
+
+HTTPS提供三种机制来确保安全性。首先，当连接建立时，它使用验证Web服务器的身份，并创建双方的共享密钥。其次，它加密用户和Web服务器之间的数据传输。第三，它检查数据的完整性。在这三种机制中，连接建立是计算密集程度最高的部分，因为它需要进行非对称密钥操作（如 RSA 算法）。
+
+如果不启用HTTPS，单个CPU核心每秒可处理超过7,000个HTTP请求。使用HTTPS时，由于连接设置中的TLS握手，吞吐量下降到 1/35。TLS握手的高计算开销一直是高流量网站部署HTTPS以确保安全性的主要障碍。
+
+在TLS握手中，Web服务器使用RSA私钥执行解密。如图 \ref{clicknp:fig:https-accelerator}，RSA 解密在数学上是大整数的幂取模运算，其中底数、指数和模都是大整数。通过对指数进行二进制分解，大整数幂取模运算可用迭代多次的乘法取模运算实现。乘法取模运算又可以通过 Montgomery 算法转化为 3 次乘法、1 次加法和 1 次减法运算。对于2048位私钥，解密需要大约 800 万次 16 位整数乘法运算。尽管TLS证书解析和协议处理也很复杂，但需要的计算次数比解密少得多。因此，我们修改OpenSSL库以将RSA解密操作卸载到FPGA，并将其他部分保留在CPU上。
+
+显然，将整个 RSA 解密的过程完全展开成数字逻辑是不可行的，因此需要用时间换空间，构建较小规模的乘法和加法阵列，重复多次计算。对于 2048 位密钥，即使是最内层的 1024 位大整数乘法器都已经超过了 FPGA 的 DSP 数量限制，因此需要将大整数乘法进一步切分。在 Montgomery 算法中，3 次乘法显然可以复用同一乘法器阵列。图 \ref{clicknp:fig:https-accelerator} 中的模乘（ModMulti）控制器在乘法器、加法器和减法器之间搬移数据；二进制幂运算（Binary Exp）控制器在多次模乘运算之间搬移数据。此外，由于运算部件存在流水线延迟，而一次 RSA 解密的计算间存在依赖，如果仅进行一次 RSA 解密，很多运算部件将闲置。为了充分利用 FPGA 的并行性，需要多个 RSA 解密任务并发处理。模乘和二进制幂运算控制器需要管理并发任务的中间数据和执行状态，并调度不相关的子任务到计算部件。
+
+\begin{figure}[htbp]
+	\centering
+	\includegraphics[width=1.0\textwidth]{image/https_accelerator}
+	\caption{HTTPS 加速器的元件结构（简化图）。}
+	\label{clicknp:fig:https-accelerator}
+\end{figure}
+
+显然，手动实现控制器的缓存管理、任务切分、并发控制、数据搬移等逻辑是非常繁琐的。为此，我们希望从图 \ref{clicknp:fig:rsa-code} 所示的源代码自动生成控制器代码。
+
+
+\begin{figure}[t!]
+	\renewcommand{\baselinestretch}{0.75}
+	\small
+	\centering
+	\begin{tabular}{c}
+\begin{lstlisting}
+template<T> uint##(T*2) karatsuba(uint##T a, b) {
+    if (T > 256) { // karatsuba multiplication
+        const T' = T/2;
+        uint##T' a0 = a[T-1:T'], a1 = a[T'-1:0];
+        uint##T' b0 = b[T-1:T'], b1 = b[T'-1:0];
+        uint##T m0 = karatsuba<T'>(a0, b0);
+        uint##T m1 = karatsuba<T'>(a1, b1);
+        uint##T m2 = karatsuba<T'>(a0 + a1, b0 + b1);
+        return (m0 << T) + ((m2 - m0 - m1) << T') + m1;
+    }
+    else { // simple school book multiplication
+        uint32 t[T*2/16];
+        for (i=0; i<T; i+=16)
+            for (j=0; j<T; j+=16)
+                t[(i + j) / 16] += a[i+15:i] * b[j+15:j];
+        uint##(T*2) result;
+        for (i=0; i<T*2; i+=16) {
+            t[i+1] += t[i][31:16];
+            result[i+15:i] = t[i][15:0];
+        }
+    }
+}
+uint1024 ModMulti(uint1024 a, b, m, m') {
+    uint2048 t = karatsuba<1024>(a, b);
+    uint1024 n = karatsuba<1024>(t[1023:0], m')[1023:0];
+    uint1024 s = (t + karatsuba<1024>(m * n)) >> 1024;
+    return (s >= n) ? (s - n) : s;
+}
+uint1024 ModExp(uint1024 a, e, m, m') {
+    uint1024 square = a, result = 1;
+    for (i = 0; i < 1024; i++) {
+        if (e[i])
+            result = ModMulti(result, square, m);
+        square = ModMulti(square, square, m);
+    }
+    return result;
+}
+\end{lstlisting}
+	\end{tabular}
+	\caption{2048 位 RSA 解密所用大整数幂取模运算的 \name 示意代码。\name 模板（template）是用于生成递归结构代码的语法糖，在编译时会被展开，并消除无效代码。没有被声明为 inline 的函数被实现成独立的元件，就像 \texttt{async} 原语。}
+	\label{clicknp:fig:rsa-code}
+\end{figure}
+
+
+
+首先，\name 从最内层循环开始，尝试展开尽可能多层的循环，以并行执行尽可能多的计算。在有多个循环的情况下（如图 \ref{clicknp:fig:rsa-code} 中的乘法和加法），各循环的展开次数需要与计算数量匹配（如两个循环分别有 512 和 1024 次，则两个循环的展开次数比例为 1:2）。展开循环次数的上界取决于 FPGA 的硬件容量。一些程序的多层循环顺序可交换，切分不同层次循环所生成代码的数据局部性不同，从而所需的数据搬移数量不同。用户在编写 \name 代码时，应将数据局部性最强的循环放到最内层，这样编译器展开内层循环时，可以降低数据搬移开销。
+
+接下来，\name 生成控制器代码。为了生成延迟隐藏的并发执行代码，\name 用高层次综合工具编译计算部件（即展开后的循环）以及片上内存与计算部件之间数据搬移的代码，以计算其延迟和吞吐量。并发执行的任务数量即为延迟乘以吞吐量。控制器将每个任务的当前执行状态和中间数据保存在片上内存中，并向计算部件调度拆分后的子计算任务。
+
+
+\begin{table}[htbp]
+	\centering
+	\caption{2048 位 RSA 解密的性能。}
+	\label{clicknp:tab:https-rsa}
+	\small
+	\begin{tabular}{r|r|r|r}
+		\toprule
+		 & CPU & Stratix V FPGA & Arria 10 FPGA \\
+		\midrule
+吞吐量 & 1.2K & 6K & 12K \\
+延迟 & 0.85ms & 3.5ms & 1.75ms \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+如表 \ref{clicknp:tab:https-rsa}，对 2048 位 RSA 解密运算，FPGA 是单个 CPU 核性能的 5 至 10 倍，但延迟是 CPU 的 2 至 4 倍。这是因为 RSA 解密运算中的一大部分难以并行化，FPGA 的主频远低于 CPU。但 FPGA 可以充分利用任务级并行来提高吞吐量。
+
+在使用 FPGA 加速前，单个 CPU 核的 Nginx 服务器每秒可以处理约 900 次 HTTPS 握手。利用 FPGA 加速后，单个 CPU 核每秒可以处理约 3.5K 次 HTTPS 握手。
+
+
+\iffalse
+\begin{figure}[htbp]
+	\centering
+	\subfloat[修改前的同步调用模式。]{
+		\includegraphics[height=0.3\textwidth]{image/HTTPS_nginx_orig}
+		\label{clicknp:fig:https-nginx-orig}
+	}
+	\hspace{0.02\textwidth}
+	\subfloat[修改后的异步调用模式。]{
+		\includegraphics[height=0.3\textwidth]{image/https_nginx_new}
+		\label{clicknp:fig:https-nginx-new}
+	}
+	\caption{为隐藏加速器计算延迟，对 OpenSSL 软件的异步修改。}
+\end{figure}
+\fi
+
+\subsection{神经网络推断}
+
+神经网络推断是数据中心越来越重要的计算密集型场景。传统上，由于 FPGA 的开发成本高，基于 FPGA 的神经网络加速器往往使用固定的硬件逻辑，不同的神经网络映射到不同的微指令程序。然而，这种方法没有发挥 FPGA 可重构的优势。为多样的神经网络定制 FPGA 硬件逻辑的关键是高层次综合技术，它可以从算法描述自动生成硬件逻辑。事实上，由于 FPGA 可以实现几乎是任意的数据通路、流水线和计算单元，在计算不规则或存在复杂依赖的场景下，定制化的硬件逻辑比编译到基于 SIMD 的定制化指令更高效。
+
+一个典型的推理神经网络由若干稀疏层和稠密层组成。稀疏层主要是从较大的特征数组中随机读取，而稠密层主要进行矩阵或向量乘法。每个稀疏层和稠密层用一个 \name 元件表示，而神经网络的计算流图就是 \name 的元件间连接。如果将每个元件都实现为单独的硬件逻辑，则片上资源将会碎片化。对于一个特定的任务，同一时刻仅有少量计算元件在运行，从而单个任务的延迟将较长。因此，需要从不同的元件中提取公共计算部件。对网络功能，\name 并没有进行这项优化，因为网络功能的各种元件所进行的计算类型不同，难以提取公共部分。
+
+提取公共计算部件的方法是比较不同元件中循环的同构性，即是否可以通过替换所访问数组名和循环变量名的方式将两个循环的抽象语法树变得完全相同。如果若干不同元件中的循环同构，就可以将这些重构的循环抽取成一个新的 \texttt{async} 元件。例如，各稀疏层中访问全局内存可被提取成一个元件，各稠密层中的矩阵与向量乘法可被提取成一个元件，各稠密层中的 relu 激活函数可被提取成另一个元件。接下来，与 RSA 解密类似，\name 尽可能展开内层循环并生成控制器代码。由图 \ref{clicknp:tab:neural-network} 可见，循环展开的并行度越高，神经网络推理的延迟越低。
+
+\begin{table}[htbp]
+	\centering
+	\caption{不同稠密层并行度下神经网络推理的延迟。所用的神经网络由三个稀疏层和四个稠密层组成，三个并行执行的稀疏层获取的特征与输入的其他特征拼接在一起后进入稠密层。四个稠密层组成流水线，其中每层由矩阵与向量乘法、激活函数、归一化函数组成。}
+	\label{clicknp:tab:neural-network}
+	\small
+	\begin{tabular}{l|r}
+		\toprule
+		稠密层并行度 & 每样本延迟 ($\mu$s) \\
+		\midrule
+		8 & 188.2 \\
+		16 & 98.2 \\
+		32 & 49.3 \\
+		64 & 26.1 \\
+		128 & 17.5 \\
+		256 & 资源不足 \\
+		\bottomrule
+	\end{tabular}
+\end{table}
+
+
+\egg{
+	\textbf{Stateful L4 load balancer.} We compare our ClickNP implementation with Linux Virtual Server (LVS) \cite{lvs} using both real-world traffic trace on a L4 load balancer \cite{gandhi2014duet} and synthetic traces to simulate adversary scenarios.
+	The real-world trace contains 1.3M flows collected in two hours with 26Gbps average throughput and 45KB median flow size.
+	The first adversary trace is round-robin scheduling packets from a large number of infinite UDP flows with 64B packet size to stress the load balancer under high concurrency.
+	The second adversary trace is a lot of tiny UDP flows to test how many new connections the load balancer can process per second.
+	
+	Figure \ref{clicknp:fig:l4} shows that ClickNP L4 load balancer has 50\approx500x lower latency than LVS on real-world trace, supports 32M concurrent flows and able to accept \approx10M new flows per second.
+	This performance is comparable to high-end hardware load balancers \cite{f5loadbalance}, while ours have low cost and high flexibility.
+	Figure \ref{clicknp:fig:l4} also shows the importance of SRAM cache and pipelined DRAM access.
+	Our board can perform at most 13.6M DRAM random reads per second, and our new flow allocation rate gets near this limit thanks to pipelined DRAM access.
+}
+
+\egg{
+	First we test the performance under real-world data center traffic. We adopted the same traffic trace as DUET\cite{}, and picked the first ten minutes as testing data. Figure \ref{clicknp:fig:l4} shows the four experiments we performed on the L4 load balancer. We first use TCP traffic to evaluate the flow completion time (FCT) under different throughputs. Then we use UDP traffic to evaluate the latency. 
+	
+	Next we tested the performance with adversary traffic to thest the worst case performance. We fixed every flow to be one 1504 byte packet, and test the throughput under different flow numbers, and latency under different new flow rates.
+}
 
 
 \egg{

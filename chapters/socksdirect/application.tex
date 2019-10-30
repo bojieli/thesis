@@ -31,9 +31,9 @@ Nginx和响应生成器位于同一主机中，而请求生成器位于不同的
 
 \subsubsection{Redis 键值存储}
 
-本节使用redis-benchmark和8字节GET请求来测量Redis~ \cite {redis}延迟。
-使用Linux，平均延迟为38.9 $ \mu s $，1 ％和99 ％百分位31.6和56.1 $ \mu s $。
-使用\sys {}，平均延迟为14.1 $ \mu s $（比Linux低64％），1 ％和99 ％百分位数8.4和19.1 $ \mu s$。
+本节使用redis-benchmark客户端和8字节GET请求来测量Redis~ \cite {redis} 内存键值存储服务器的延迟。
+使用Linux时，平均延迟为38.9 $ \mu s $，1％和99％百分位延迟分别为31.6和56.1 $ \mu s $。
+使用\sys {} 后，平均延迟为14.1 $ \mu s $（比Linux低64％），1 ％和99 ％百分位数8.4和19.1 $ \mu s$。
 
 %Figure: line chart, y axis: throughput, lines: (intra-, inter-) x (\sys{}, libvma, Linux). x axis: number of concurrent clients.
 

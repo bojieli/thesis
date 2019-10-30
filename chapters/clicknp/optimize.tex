@@ -31,11 +31,11 @@
 \subsection{元件内并行}
 \label{clicknp:subsec:paral_in_elem}
 
-与在内存中以有限并行性执行指令的CPU不同，FPGA将操作合成为硬件逻辑，因此可以在没有指令负载开销的情况下并行处理。
+与在内存中以有限并行性执行指令的CPU不同，FPGA将操作合成为硬件逻辑，因此可以消除指令加载开销。
 如果数据在一个处理函数中需要多个相关操作，则高层次综合工具将以同步方式将这些操作调度到管道阶段。
 在每个时钟，一个阶段的结果移动到下一个阶段，同时，一个新的数据被输入到这个阶段，如图 \ref{clicknp:fig:dependency}（a）所示。
 这样，处理函数可以在每个时钟周期处理数据并实现最大吞吐量。
-但是，实际上，这种有效的流水线处理可能会在两种情况下发生：（1）操作中存在\textit {内存依赖}; （2）有\textit {不平衡} 的流水线阶段。
+但是，实际上，流水线处理可能会在两种情况下效率降低：（1）操作中存在\textit {内存依赖}; （2）有\textit {不平衡} 的流水线阶段。
 以下两个小节将详细讨论这两个问题，并提出解决方案。
 %Finally, in \S~\ref{clicknp:subsubsec:pipeline-control}, we discuss how to explicitly
 %control the pipelining to get better clock frequency in \name.
@@ -49,26 +49,27 @@
 因为每个内存访问都有一个周期延迟，并且程序的语义正确性很大程度上取决于操作的顺序，具有 \textit {内存依赖}的操作无法同时处理。
 如图 \ref {clicknp:fig:dependency}（b），\textbf {S1}和 \textbf {S2}相互依赖：\textbf {S2}必须延迟到\textbf {S1}结束 ，只有在\textbf {S2}完成后，\textbf {S1}才能对新的输入数据进行操作。
 因此，该函数将需要两个周期来处理一个数据。
-对于某些处理算法，内存依赖性可能相当复杂，但是由于 \name 的模块化体系结构，大多数元件只执行简单的任务，而\textit {读写操作}之间的内存依赖关系是最常见的情况，如图 \ref{clicknp:fig:dependency}（b）所示。
+对于某些数据包处理算法，内存依赖性可能相当复杂，但是由于 \name 的模块化体系结构，大多数元件只执行简单的任务，而\textit {读写操作}之间的内存依赖关系是最常见的情况，如图 \ref{clicknp:fig:dependency}（b）所示。
 
 消除此内存依赖性的一种方法是仅将数据存储在寄存器中。
-由于寄存器足够快，可以在一个周期内执行读取，计算和回写，根本就没有\textit {读写}依赖。
-的确，与CPU相比，FPGA的寄存器数量要大得多，如Altera Stratix V的697Kbit，因此可以使用寄存器尽可能减少内存依赖性。
-\name 编译器只要向变量主动分配寄存器即可，对变量的所有访问都引用一个常量地址 - 变量是标量或具有常量偏移的数组条目。
-当然，程序员可以使用``register'' 或 ``local / global'' 关键字来明确地指示编译器放置一个变量（也可以是一个数组）在寄存器，BRAM或板载DDR内存。
+由于寄存器足够快，可以在一个周期内执行读取，计算和写回，只要计算过程可在一个时钟周期内完成，根本就不存在\textit {读写}依赖。
+与CPU相比，FPGA的寄存器数量要大得多，如Altera Stratix V有697Kbit的寄存器，因此可以使用寄存器尽可能减少内存依赖性。
+当变量是标量，或者变量是数组但所有访问的偏移量均为常量且数组大小不超过阈值时，\name 编译器将该变量在寄存器中实现。
+程序员可以使用 ``register'' 或 ``local / global'' 关键字来明确地指示编译器放置一个变量（也可以是一个数组）在寄存器，BRAM或板载DDR内存。
 
 对于较大的数据，它们必须存储在BRAM或DDR内存中。
-幸运的是，仍然可以使用一种名为\textit {延迟写入}的技术
-在图 \ref {clicknp:fig:dependency}（b）中解析\textit {读写操作}之间的内存依赖。
-核心思想是将新数据缓冲在寄存器中并延迟写入操作，直到下一次读操作。
-如果下一个读取访问相同的位置，它将从缓冲寄存器中直接读取值。
-否则，读取和被延迟的写入操作可以并行执行，因为它们将访问不同的内存位置。
-\footnote{FPGA中的大多数BRAM都有两个端口。}
+元件内声明的变量默认存储在 BRAM 中。
+幸运的是，仍然可以使用一种名为\textit {延迟写入}的技术缓解图 \ref {clicknp:fig:dependency}（b）中\textit {读写操作}导致的内存依赖 \footnote{图 \ref {clicknp:fig:dependency}（b）中写操作的结果可能在下一次循环迭代中被读操作使用。展开相邻的两次循环迭代后，读后写和写后读本质上是同种依赖。}。
+延迟写入的核心思想是将待写入的新数据缓冲在寄存器中，直到下一次读操作 \footnote{\textit{延迟写入}得名于变换后的代码模式，在物理上写入到内存的操作并没有被延迟。延迟写入技术生成的硬件逻辑是流水线处理器设计中常用的寄存器转发（register forwarding）模式。}。
+如果下一次读取访问相同的位置，它将从缓冲寄存器中直接读取值。
+这样，读操作和写操作可以并行执行，因为读写操作一定访问不同的内存位置。
+\footnote{FPGA中的大多数BRAM都有两个端口，一个用于读操作，一个用于写操作，即每个时钟周期可以执行一次随机读和一次随机写，读写操作分别有一个时钟周期的延迟。}
 图 \ref {clicknp:fig:dependency}（c）显示了延迟写入的代码片段。
-由于代码中不再存在内存依赖性，因此元件可以在一个周期内处理一个数据。
-默认情况下，\name 编译器会对一个数组自动应用 \textit {延迟写入}，生成类似图 \ref {clicknp:fig:dependency}（b）的代码。
-但目前编译器每个阵列只能生成一个延迟写入。
-对于复杂的内存依赖性，程序员应该将代码重写为访问不相交内存区域的多个元件，并在必要时使用基于消息的协调。
+由于代码中不再存在内存依赖性，元件可以每个周期处理一个数据，实现完全流水线化。
+默认情况下，\name 编译器会对存在读写依赖的数组自动应用 \textit {延迟写入}，生成类似图 \ref {clicknp:fig:dependency}（b）的代码。
+如果存在读写依赖的数组有多处读操作，\name{} 将为每处读操作分别生成图 \ref {clicknp:fig:dependency}（c）中 P1 所示的代码。
+如果数组有多处写操作，且这些写操作位于互斥的分支条件中，\name{} 将生成中间寄存器变量，转化成仅有一处写操作的情形。
+如果数组有多处不互斥的写操作，目前 \name{} 不能自动生成延迟写入 \footnote{理论上可以如下实现：如果有 $N$ 处写操作，可以用 $N$ 个寄存器保存这些写入的值，并在读取时比较所有 $N$ 个寄存器。如果读写操作之间互相穿插，而生成的内存读写指令集中于一处，还需要增加寄存器以保存中间状态。}。
 
 
 \begin{figure}
@@ -112,7 +113,7 @@ S2: buf_addr = r.x;
 }\\
 (c)
 \end{tabular}
-\caption{依赖的例子。 （a）没有依赖性。 S$n$ 表示流水线的一个阶段，D$n$是一个数据。（b）当状态存储在内存中并需要更新时，会发生内存依赖性。 （c）使用延迟写入解决内存依赖性。}
+\caption{内存依赖的例子。 （a）没有依赖性。 S$n$ 表示流水线的一个阶段，D$n$是一个数据。（b）当状态存储在内存中并需要更新时，会发生内存依赖性。 （c）使用延迟写入解决内存依赖性。}
 
 \label{clicknp:fig:dependency}
 \end{figure}
@@ -134,16 +135,16 @@ using registers to increase the parallelism.
 
 
 %\smalltitle{Remove pseudo-dependency.}
-使用\textit {struct}变量数组时会出现一个微妙的问题。
-图\ref {clicknp:fig:memscattering}（a）显示了这样一个例子，其中哈希表用于维护每个流的计数。
-\textbf {S2}将具有与\textbf {S1}的内存依赖关系，尽管它们正在访问\textbf {struct}的不同字段。
-原因是几乎所有当前的高层次综合工具都会将\textbf {struct}数组视为具有较大位宽的单维数组 - 等于\textbf {struct}的大小，并且只使用一个仲裁器控制访问。
-这种类型的内存依赖性称为\textit {伪依赖}，在物理上，两个字段\textit {key}和\textit {cnt}可以位于不同的内存位置。
-为了解决这个问题，\name 采用了一种名为\textit {内存散射}的简单技术，它自动将\textbf {struct}数组转换为几个独立的数组，每个数组都用于\textbf {struct}中的一个字段，并分配它们进入不同的BRAM（图 \ref {clicknp:fig:memscattering}（b））。
-使用\textit {内存散射}，\textbf {S1}不再依赖于\textbf {S2}。
-因此，管道可以由高层次综合工具推断，并且当\textbf{S2}仍然在运行时，新的数据可以由\textbf {S1}处理。
-值得注意的是，内存散射仅适用于FPGA中的元件，如果元件分配在主机CPU上运行则禁用。
-
+使用\textbf {struct}数据结构时会出现一个微妙的问题。
+图 \ref {clicknp:fig:memscattering}（a）显示了这样一个例子，其中哈希表用于维护每个流的计数。
+\textbf {S2}与\textbf {S1}间将具有内存依赖关系，尽管它们正在访问\textbf {struct}的不同字段。
+原因是几乎所有当前的高层次综合工具都会将\textbf {struct}数据结构视为具有较大位宽的单个数据 -- 等于\textbf {struct}的大小，并且只使用一个仲裁器控制访问。
+这种类型的内存依赖性称为\textit {伪依赖}。
+在物理上，两个字段\textit {key}和\textit {cnt}可以位于不同的内存位置。
+为了解决这个问题，\name 采用了一种名为\textit {内存散射}的技术，它自动将\textbf {struct}数组转换为几个独立的数组，每个数组用于存储\textbf {struct}中的一个字段。每个数组分配不同的BRAM，因此可以并行访问（图 \ref {clicknp:fig:memscattering}（b））。
+使用\textit {内存散射}后，\textbf {S1}不再依赖于\textbf {S2}，从而消除了伪依赖。
+一般地，如果一个数组的所有访问可被划分为若干互不相交的等价类，每个等价类中的访问地址范围互不相交，就可以应用\textit{内存散射}，将每个等价类所访问的地址范围转换为一个独立的数组 \footnote{例如图 \ref {clicknp:fig:memscattering} 的例子中，S1 访问除 16 余 0 ～ 7 的地址，S2 访问除 16 余 8 ～ 15 的地址。}。
+值得注意的是，内存散射仅适用于FPGA中的元件，如果元件在主机CPU上运行则禁用。
 
 \begin{figure}
 \lstset{style=numbers}
@@ -179,14 +180,17 @@ S2: A[idx].cnt ++;
 (a) & (b)
 \end{tabular}
 
-\caption{内存散射. }
+\caption{内存散射。}
 \label{clicknp:fig:memscattering}
 \end{figure}
 
 
+当 \textbf{struct} 与 \textbf{union} 共用时，如数据包头有时按字段处理，有时按字节处理，上述内存散射技术不再适用。为了消除数据依赖，\name 采用\textit{数据重排}技术，将 \textbf{union} 中每种类型的数据转换为分立的数组，并根据数据流在数组间同步数据。
+一般地，如果一个数组的访问按照程序语句的顺序可被划分为若干个阶段，其中每个阶段的数组访问均符合应用\textit{内存散射}技术的条件，\name 将尝试在阶段间插入数据重排代码，并权衡数据重排的开销与内存散射的收益，选择最优的阶段划分\footnote{例如图 \ref {clicknp:fig:memscattering} 中，如果 A 数组是从输入管道中读入的，则数据读入阶段和 S1 之间需要插入数据重排代码，将 A 数组的内容分别搬移到内存散射后 S1 和 S2 对应的数组。显然，只有当每次读入数据后 S1 和 S2 执行的次数足够多时，数据重排才有收益。}。
+数据重排仅适用于 FPGA 上的元件。
 
 上述技术可能无法解决所有内存依赖性。
-在许多情况下，它需要程序员重新编写代码，甚至改变算法，以确保它们的实现可以在FPGA中完全流水线化。
+在许多情况下，为了确保在FPGA中完全流水线化，程序员需要将代码重写为访问不相交内存区域的多个元件。
 
 
 \subsubsection{平衡流水级}
@@ -196,22 +200,19 @@ S2: A[idx].cnt ++;
 由于每次迭代需要一个周期（\textbf {S2}），整个循环将需要$N$周期才能完成，从而显着降低了管道吞吐量。
 图 \ref {clicknp:fig:unbalance}（b）显示了另一个示例，它为DDR中的全局表（\textit {gmem}）实现了一个 BRAM 缓存。
 虽然 ``else'' 分支很少被击中，但它会在管道中产生一个胖阶段（需要数百个时钟周期）。
-我们使用的 HLS 编译器为每个阶段预留最坏情况的时钟周期数量，因此，即使胖阶段很少被用到，也会大大影响整个阶段的处理速度。
+我们使用的高层次综合编译器为每个阶段预留最坏情况的时钟周期数量，因此，即使胖阶段很少被用到，也会大大影响整个流水线的处理速度。
 
 \name 使用两种技术来平衡管道内的各个阶段。首先，尽可能地展开（\textit {unroll}）循环。
-展开时，循环操作有效地分解为一系列小操作，每个操作都可以在一个循环中完成。
+循环展开可以将循环分解为一系列可并行或流水线执行的小操作。
 值得注意的是，展开循环将复制循环体中的操作，从而增加面积成本。
-因此，它可能仅适用于具有简单主体和少量迭代的循环。
+因此，它可能仅适用于具有简单循环体和少量迭代的循环。
 在网络功能中，这种小循环是相当常见的，例如计算校验和，移位数据包有效负载并迭代可能的配置。
-ClickNP编译器提供 \textbf {unroll} 指令来展开循环。
-虽然许多高层次综合工具支持循环展开已知次数的迭代，但很多现实应用的迭代次数是不固定的。
-ClickNP 允许程序员指定循环次数的上限，从而编译器可以展开循环。
-
-其次，如果元件同时具有快速和慢速操作，可以尝试将单个元件中的每种类型的操作分开。
-例如，在缓存元件的实现中，如图 \ref {clicknp:fig:unbalance}（b）所示，较慢的 ``else'' 分支被移动到另一个元件中，使得快速路径和慢速路径异步运行。
-如果缓存不命中率很低，则整个元件的处理速度由快速路径决定。
-\name 编译器提供 ``\texttt{async}'' 原语，用户可以在 \texttt{handler} 中插入 \texttt{async \{ \}} 包裹的代码块，其中的代码将被编译成一个新元件，通过管道与原来的元件相连。原来的元件将任务卸载到异步执行的新元件后，将继续执行后续的代码。
-
+\name{} 编译器提供 \textbf {unroll} 指令来展开循环。
+虽然许多高层次综合工具支持循环展开已知次数的迭代，但很多现实应用的循环迭代次数是不固定的。
+然而，在网络功能中，往往可以确定循环迭代次数的上界，如数据包的最大长度。
+由于循环的迭代器常常用来作为数组索引，这种情况下可以根据数组的大小确定迭代器的上下界 \footnote{\name{} 不支持动态内存分配，因此数组的大小都是编译时可以静态确定的。}。
+另有一些循环的迭代器上界和下界是常量或其他循环迭代器组成的简单表达式，这种情况下可以计算下界表达式的最小值和上界表达式的最大值。
+对于编译器不能自动确定循环迭代次数的情况，ClickNP 允许程序员指定循环次数的上限，使编译器可以展开循环。
 
 \begin{figure}
 \lstset{style=numbers}
@@ -265,11 +266,47 @@ S2: } else {
 
 \end{figure}
 
-\iffalse
-\subsection{元件间融合}
 
-每个元件的控制逻辑产生了固定的面积开销，而且元件之间通过管道传输数据也会带来延迟。元件间融合（fusion）可以将多个元件合并成一个元件，以减小面积，降低延迟。
-\fi
+其次，如果元件同时具有快速和慢速操作，可以尝试将单个元件中的每种类型的操作分开。
+例如，在缓存元件的实现中，如图 \ref {clicknp:fig:unbalance}（b）所示，较慢的 ``else'' 分支被移动到另一个元件中，使得快速路径和慢速路径异步运行。
+如果缓存不命中率很低，则整个元件的处理速度由快速路径决定。
+如图 \ref{clicknp:fig:async}，\name 编译器提供 ``\texttt{async}'' 原语，用户可以在 \texttt{handler} 中插入 \texttt{async \{ \}} 包裹的代码块，其中的代码将被编译成一个新元件，通过管道与原来的元件相连。原来的元件将异步元件中所用到的变量序列化并发送给异步元件，然后等待异步元件结束。异步元件执行完毕后，将原来元件仍将用到的写入变量发送回原来元件。
+
+
+
+\begin{figure}[htbp]
+	\small
+	\lstset{ emph={%
+			element, init, state, handler, signal,include,state\_machine, goto_state, async
+		}, emphstyle={\bfseries},
+		morekeywords={get_input_port,read_input_port,from_tor, to_tor, set_output_port, host, begin, VLAN, IPv4, GRE} 
+	}
+	\centering
+	\begin{tabular}{c}
+\begin{lstlisting}
+.handler {
+  r = read_input_port (in);
+  idx = hash (r.x);
+  if (cache[idx].key == r.x) {
+    o = cache[idx].val;
+  } else {
+    k = cache[idx].key;
+    v = cache[idx].val;
+    .async {
+      o = gmem[r.x];
+      gmem[k] = v;
+    }
+    cache[idx].key = r.x;
+    cache[idx].val = o;
+  }
+  set_output_port (out, o);
+}
+\end{lstlisting}
+	\end{tabular}
+	\caption{Async 原语示例。}
+	\label{clicknp:fig:async}
+\end{figure}
+
 
 \iffalse
 \begin{figure}

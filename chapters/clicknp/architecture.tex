@@ -76,10 +76,10 @@ flit的格式如图 \ref {clicknp:fig:element}（b）所示。每个flit包含�
 显然，\name 编程抽象很像Click软件路由器 \cite {kohler2000click}。
 但是，有三个基本差异使得 \name 更适合FPGA实现：
 （1）在Click中，元件之间的边是C ++函数调用，并且需要\textit {queue}元件来存储数据包。
-但是，在 \name 中，边实际上表示可以保存实际数据的FIFO缓冲区。此外，\name  channels打破了元件之间的数据依赖关系，并允许它们并行运行。
-（2）与Click不同，其中每个输入/输出端口可以是\textit {push或pull}，\name 统一了这些操作：一个元件只能\textit {write（push）}到任何输出端口，而 \textit {read（pull）}可以从任何输入端口执行此操作。
+但是，在 \name 中，边实际上表示可以保存实际数据的FIFO缓冲区。此外，\name 管道可以打破元件之间的数据依赖关系，并允许它们并行运行。
+（2）与Click不同，其中每个输入/输出端口可以\textit {写入（推）或读取（拉）}数据，而 \name 统一了这些操作：一个元件只能\textit {写入（推）}到输出端口，而 输入端口只能执行\textit {读取（拉）}操作。
 （3）Click允许元件直接调用另一个元件的方法（通过基于流的路由器上下文），在 \name 中元件之间的协调是\textit {基于消息}，例如，请求者向响应者发送请求消息并通过另一个消息获得响应。
-与通过共享内存进行协调相比，基于消息的协调允许更多的并行性并且在FPGA中更有效，其中访问共享内存位置必须被序列化并且将成为瓶颈。
+与通过共享内存进行协调相比，基于消息的协调允许更多的并行性，并且在FPGA中更高效，因为对共享内存的访问可能成为瓶颈。
 
 \subsubsection{语言}
 
@@ -87,7 +87,7 @@ flit的格式如图 \ref {clicknp:fig:element}（b）所示。每个flit包含�
 \name 元件（element）可以声明为面向对象语言（如 C++）中的一个对象。
 不幸的是，许多现有的高层次综合工具仅支持C语言。
 为了利用商业高层次综合工具，可以编写一个编译器，将面向对象的语言（例如 C++）转换为C，但这种努力并非易事。
-本文采用一种替代路径来扩展C语言以支持元件声明。
+本文提出一个基于C语言子集的领域专用语言（DSL），以支持元件声明。
 
 
 
@@ -164,7 +164,10 @@ element Count (flit in -> flit out) {
 
 
 与Click类似，\name 也使用简单脚本来指定网络功能的配置，如图 \ref{clicknp:fig:logger-config} 所示。配置有两部分：\textit {声明} 和 \textit {连接}，遵循Click语言的类似语法 \cite {kohler2000click}。
-值得注意的是，在 \name 中，可以使用关键字 \textbf {host}来注释元件，这将导致元件被编译为CPU二进制文件并在CPU上执行。
+值得注意的是，在 \name 中，可以使用关键字 \textbf {host}来注释元件，这将导致元件被编译为CPU二进制文件并在CPU上运行。
+
+对于一些高层次综合工具难以生成高效硬件逻辑的元件，\name 支持用硬件描述语言编写的 Verilog 元件。为了把 Verilog 元件集成到系统中，开发者需要编写一个接口相同的空元件作为占位符（或功能相同的高级语言元件用于 CPU 调试与测试），并用 \textbf{verilog} 关键字在 \name 配置文件中声明。编译工具链会将高层次综合工具为占位符元件生成的 Verilog 模块替换为开发者的实现。
+
 
 
 \begin{figure}[htbp]
@@ -188,12 +191,6 @@ tee [2] -> logger
 	\caption{抓包工具元件间互连的 \name 配置文件。使用 \textbf {host}关键字注释的元件在CPU上编译和执行。 用 ``@'' 注释的元件需要从管理器线程接收控制信号。\textbf {``From\_tor''} 和 \textbf {``to\_tor''}是两个内置元件，代表FPGA上以太网端口的输入和输出。}
 	\label{clicknp:fig:logger-config}
 \end{figure}
-
-
-
-\iffalse
-\textbf{Verilog 元件。}
-\fi
 
 
 
@@ -248,8 +245,7 @@ tee [2] -> logger
 \end{lstlisting} \vspace{3pt} \\
 {\normalsize \centering (b)} 
 \end{tabular}
-\caption{用 \name 语言写入元件并指定配置的示例。 使用 \textbf {host}关键字注释的元件在CPU上编译和执行。 用“@”注释的元件需要从管理器线程接收控制信号。
-	}
+\caption{用 \name 语言写入元件并指定配置的示例。 使用 \textbf {host}关键字注释的元件在CPU上编译和执行。 用“@”注释的元件需要从管理器线程接收控制信号。}
 \label{clicknp:fig:lang}
 
 \end{figure}
@@ -264,7 +260,7 @@ tee [2] -> logger
 这三部分源代码被送入 \name 编译器并转换为主程序和FPGA程序的中间源文件。
 主程序可以由普通的C / C++编译器直接编译，而FPGA程序则使用商业高层次综合工具合成。
 现有的商用高层次综合工具可以通过时序分析确定每个元件的最大时钟频率。
-然后，\name 处理图的时钟受到图中最慢元件的约束。
+然后，\name 处理图的时钟受到计算流图中最慢元件的约束。
 另外，高层次综合工具还可以生成优化报告，该报告显示元件中的操作之间的依赖性。如果解析了所有依赖关系并且元件通过在每个时钟周期中处理一个flit来实现最佳吞吐量，则元件是\textit {完全流水线化}的。
 \egg{
 Our ClickNP architecture is built on state-of-the-art data center reconfigurable hardware (Catapult FPGA \cite{putnam2014reconfigurable}) and FPGA programming framework (Altera OpenCL \cite{singh2011implementing}).
