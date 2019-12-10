@@ -198,10 +198,10 @@ LibVMA 的队列层和传输层由 LwIP 轻量级 TCP/IP 协议栈和 Mellnox �
 \end{figure}
 
 
-\section{局限性与讨论}
+\section{局限性}
 \label{sockdirect:sec:limitation}
 
-除了 \S\ref{socksdirect:sec:discussion} 讨论的高并发下的性能局限，本章将讨论 \sys{} 在兼容性和 CPU 开销方面的局限性，以及协议栈的接口抽象。
+除了 \S\ref{socksdirect:sec:discussion} 讨论的高并发下的性能局限，本章将讨论 \sys{} 在兼容性和 CPU 开销方面的局限性。
 
 \subsection{兼容性局限}
 
@@ -231,7 +231,7 @@ LibVMA 的队列层和传输层由 LwIP 轻量级 TCP/IP 协议栈和 Mellnox �
 
 第二种情况是跨机器的通信。此时网卡作为中心分派器，支持的通信模式是任意的，不局限于一个分派进程和若干工作进程。网卡的事件队列（event queue）提供了操作系统内核的调度顺序。管程为每个 CPU 核建立一个事件队列，汇总了该 CPU 核上各进程的所有 RDMA 连接的完成队列事件，由网卡写入，操作系统内核读出。内核按照事件队列的顺序调度进程，从而被调度的进程恰好是有事件可处理的。此外，可编程网卡可以观察到每个 CPU 核上事件队列的长度，从而在一个 RDMA 消息可以分发给多个 CPU 核之任一的情况下，可以将消息分发到事件队列最短的 CPU 核，实现更好的负载均衡。
 
-
+\section{未来工作}
 
 \subsection{应用、协议栈与网卡间的接口抽象}
 \label{future:nic-interface}
@@ -247,6 +247,55 @@ LibVMA 的队列层和传输层由 LwIP 轻量级 TCP/IP 协议栈和 Mellnox �
 目前商用 RDMA 网卡与主机 CPU 之间的传输层功能划分不够灵活。如第 \ref{socksdirect:subsec:cpu-transport} 节讨论的，Mellanox RDMA 网卡中的单边 RDMA 操作只支持可靠连接（RC）而不支持不可靠数据报（UD），这意味着如果希望在主机 CPU 上实现传输层，就必须使用双边 \texttt{send} 和 \texttt{recv} 操作或者网卡提供的其他数据包收发接口，而无法使用远程内存访问原语。此外，传输层中的按序传输、拥塞控制、丢包重传等功能也是紧密耦合的，要么全部使用网卡厂商固定的硬件实现，要么全部在 CPU 上用软件实现。可编程网卡提供了解耦传输层功能的机会。
 
 如果网卡具备处理大量并发连接的能力，在网卡中实现连接建立将可以节约 CPU 创建连接过程中的开销和延迟。
+
+\subsection{模块化网络协议栈}
+
+网络协议栈由接口抽象、拥塞控制、丢包恢复、服务质量（QoS）、访问控制列表（ACL）、数据包格式等组件构成，如表 \ref{socksdirect:tab:network-stack-components} 所示。
+
+
+\begin{table}[htbp]
+	\centering
+	\caption{网络协议栈的组件选择}
+	\small
+	\begin{tabular}{l|l}
+		\hline
+		组件 & 选择 \\
+		\hline
+		接口抽象 & RDMA, BSD socket, StackMap, RPC, 消息队列, \ldots \\
+		拥塞控制 & TCP, DCTCP, DCQCN, TIMELY, MP-RDMA, IRN, \ldots \\
+		丢包恢复 & Go-back-0, Go-back-N, 选择重传, Cut-Payload, \ldots \\
+		QoS & 严格优先级，RR，WFQ，多级反馈队列, \ldots \\
+		ACL & netfilter, OpenFlow, P4, \ldots \\
+		数据包格式 & TCP/IP, RDMA, RoCE, RoCEv2, \ldots \\
+		\hline
+	\end{tabular}
+	\label{socksdirect:tab:network-stack-components}
+\end{table}
+
+目前最具代表性的 RDMA 协议栈和 TCP 协议栈各自实现了一套不同的组件。在数据中心广泛部署的 RoCEv2 协议栈脱胎于 RDMA 协议栈，但替换了数据包格式，以兼容现有数据中心网络基于 IP 地址和端口号的寻址方式。\sys{} 将两种协议栈的组件进行融合，使用 TCP 协议栈的套接字（socket）接口抽象，但其余组件均使用 RDMA 的对应组件。如第 \ref{sockdirect:sec:limitation} 节讨论的，\sys{} 中所使用的 RDMA 拥塞控制、丢包恢复算法与标准 TCP 可能存在公平性问题，也缺少 QoS、ACL 等功能。为此，应当将上述组件模块化，并允许用户灵活地组合。其中，每个组件都可能在 CPU 用户态、CPU 内核态或可编程网卡中实现。一个网络协议栈组合包括用户态、内核态和可编程网卡间的任务划分，以及每种组件的选择。可灵活组合的模块化协议栈可以使用一种模块化的网络功能编程框架实现，如第 \ref{chapter:clicknp} 章的 ClickNP。
+
+如表 \ref{socksdirect:tab:api-components} 所示，网络协议栈的接口抽象可以进一步细分为多个组件。各组件可以组合出不同的接口抽象，适合不同类型的应用程序，也具有不同的性能特性。\sys{} 的很多设计旨在实现 Linux socket 的接口抽象，并为实现其中一些抽象付出了性能代价（如为了保证消息全序，连接需要隐式地被一个线程独享；由于用户管理缓冲区，非按页对齐的缓冲区无法使用零拷贝）。我们期待未来的工作提出可灵活组合的模块化网络协议栈接口抽象。
+
+\begin{table}[htbp]
+	\centering
+	\caption{网络协议栈接口抽象的组件选择}
+	\small
+	\begin{tabular}{l|p{.7\textwidth}}
+		\hline
+		组件 & 选择 \\
+		\hline
+		寻址方式 & IP 地址 + 端口号，Infiniband 地址，内存地址，基于元数据的节点 ID，\ldots \\
+		连接的抽象 & 字节流，消息流，共享内存，无连接，\ldots \\
+		可靠性保证 & 可靠有序，容忍乱序，容忍丢包，容忍错误，\ldots \\
+		连接的共享范围 & 单线程，线程间，fork 父子进程，容器内所有进程，\ldots \\
+		连接共享方式 & 隐式共享，显式共享，独享并显式传递所有权，\ldots \\
+		共享连接消息顺序 & 全序，因果序，无序，同步屏障，\ldots \\
+		缓冲区管理 & 用户管理（RDMA），协议栈管理（socket），用户分配协议栈释放，协议栈分配用户释放，\ldots \\
+		通知方式 & 阻塞，轮询（select），就绪时通知（epoll），完成后通知（aio），完成队列（RDMA CQ），\ldots \\
+		\hline
+	\end{tabular}
+	\label{socksdirect:tab:api-components}
+\end{table}
 
 %Another promising direction to solve the RDMA concurrency issue is to implement the reliable transport in CPU, and the 网卡 remains stateless. However, RDMA UD does not support one-sided write, so the ring buffer in Sec.~\ref{socksdirect:subsec:lockless-queue} will not work. Existing software RDMA~\cite{soft-roce} has low performance. It would be interesting to co-design software and 网卡.
 

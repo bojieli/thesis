@@ -89,12 +89,13 @@ while (true) { // main event loop
 其次，传统的TCP/IP传输层提供I/O复用、拥塞控制、丢包恢复、路由和服务质量保证（QoS）功能。
 第三，网卡层与网卡硬件（或用于主机内套接字的虚拟环回接口）通信以发送和接收数据包。
 众所周知，VFS层贡献了网络协议栈中的很大一部分成本 \cite {clark1989analysis,boyd2010analysis}。
-这可以通过一个简单的实验来验证：主机中两个进程之间的Linux TCP套接字的延迟和吞吐量只比管道（pipe）、FIFO和Unix域套接字（Unix domain socket）差一点（表 \ref {socksdirect:tab:operation-performance} ）。
+这可以通过一个简单的实验来验证：主机中两个进程之间的Linux TCP套接字的延迟和吞吐量只比管道（pipe）、FIFO和Unix域套接字（Unix domain socket）差一点。（表 \ref {socksdirect:tab:operation-performance} 中，Linux TCP 延迟为 11 $\mu$s、吞吐量为 0.9 M op/s，管道、FIFO和Unix域套接字的延迟为 8～9 $\mu$s、吞吐量为 0.9～1.2 M op/s。）
 管道、FIFO和Unix域套接字绕过了传输层和网卡层，但它们的性能仍然不尽如人意。
 
-下文将套接字开销分为四种类型：每个操作，每个数据包，每个字节和每个连接。
+Clark 等的经典工作~\cite{clark1989analysis} 将套接字开销划分为每数据包和每字节开销。在现代协议栈中，由于连接创建也有显著开销~\cite{jeong2014mtcp,lin2016scalable}，我们引入一类新的开销：每连接开销；由于每次套接字操作在 VFS 层有一定的开销，与其处理的数据包数量无关（有些操作，如 \texttt{dup2}，根本不处理数据包），我们引入另一类新的开销：每次操作开销。
+下文将套接字开销分为四种类型：每次操作，每个数据包，每个字节和每个连接。
 
-%Clark et. al~\cite{clark1989analysis} categorized socket overhead into per-packet and per-byte costs.
+% categorized socket overhead into per-packet and per-byte costs.
 %Because connection establishment incurs significant cost~\cite{jeong2014mtcp,lin2016scalable} and some operations do not touch payload (e.g. \texttt{dup2}, \texttt{fnctl} and \texttt{epoll}), we include two additional types of costs: per connection cost and per operation cost, as Table~\ref{socksdirect:tab:overhead} shows.
 
 \begin{table}[t]
@@ -139,7 +140,7 @@ while (true) { // main event loop
 \label{socksdirect:subsec:per-operation-overhead}
 
 \parab {内核穿越（kernel crossing）。}
-传统上，套接字API在内核中实现，因此需要针对每个套接字操作进行内核穿越（即系统调用）。更糟糕的是，为防止 Meltdown \cite {Lipp2018meltdown} 攻击，内核页表隔离（KPTI）补丁 \cite {kpti} 使内核穿越变得4倍昂贵，如表 \ref {socksdirect:tab:operation-performance} 所示。
+传统上，套接字API在内核中实现，因此需要针对每个套接字操作进行内核穿越（即系统调用）。更糟糕的是，为防止 Meltdown \cite {Lipp2018meltdown} 攻击，内核页表隔离（KPTI）补丁 \cite {kpti} 使内核穿越变得4倍昂贵，如表 \ref {socksdirect:tab:operation-performance} 所示（使用 KPTI 补丁前，内核穿越需要 50~ns，而使用 KPTI 后需要 200~ns）。
 本章的目标是绕过内核而不影响安全性（\S\ref{socksdirect:sec:architecture}）。
 
 \parab {套接字文件描述符锁。}

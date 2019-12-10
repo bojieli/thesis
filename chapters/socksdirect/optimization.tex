@@ -185,7 +185,7 @@ LOS~ \cite {huang2017high} 定期用内核文件描述符调用非阻塞\texttt 
 
 \textbf {挑战3：让多个线程分时核心。}
 对于阻塞套接字操作（例如，阻塞recv，connect 和 epoll\_wait），\libipc {}首先轮询环形缓冲区一次。如果操作没有完成，\libipc {}调用\textit {sched\_yield}以放弃 CPU，切换到同一核心上的其他进程。如章节 \ref {socksdirect:subsec:motivation} 中所述，协同多任务处理中的上下文切换仅需要0.4~$\mu$s。但是，一些应用程序可能需要等待很长时间才能收到一个套接字消息，从而导致频繁的唤醒浪费。为此，\libipc{} 对连续的不处理任何消息的唤醒进行计数，并在达到阈值时将进程置于休眠状态。
-如果\libipc {}继续产生一定数量的轮次，它将使自己进入休眠状态。在休眠之前，它会向管程和所有与之直接通信的进程（peers）发送消息，以便稍后通过信号将其唤醒。
+如果\libipc {}空转的次数达到一定阈值，它将使自己进入休眠状态。在休眠之前，它会向管程和所有与之直接通信的进程（peers）发送消息，以便稍后通过信号将其唤醒。
 
 
 %\textbf{Handling events from kernel.}
@@ -241,18 +241,18 @@ LOS~ \cite {huang2017high} 定期用内核文件描述符调用非阻塞\texttt 
 
 
 
-\textbf{绑定。}
+\textbf{绑定地址（bind）。}
 创建套接字后，应用程序调用\texttt {bind}来分配地址和端口。
 由于地址和端口是具有权限保护的全局资源，分配由管程协调。
 如图 \ref {socksdirect:fig:conn-setup} 所示，\libipc {}将请求发送到管程。
 为了隐藏与管程通信的延迟，作为一个优化，如果绑定请求不可能失败（例如没有为客户端套接字指定端口时），\libipc {}会立即返回应用程序。
 
-\textbf{监听。}
+\textbf{监听端口（listen）。}
 当服务器应用程序准备好接受来自客户端的连接时，它会调用\texttt {listen}并通知管程。
 管程维护每个地址和端口上的监听进程列表，以分派新连接。
 
 
-\textbf{连接。}
+\textbf{发起连接（connect）。}
 客户端应用程序调用\texttt {connect}并发送SYN命令以通过共享内存队列进行监听。
 现在，管程需要将新连接分派给监听应用程序。
 在Linux中，新的连接请求在内核的\emph {积压}（backlog）中排队。
@@ -281,7 +281,7 @@ LOS~ \cite {huang2017high} 定期用内核文件描述符调用非阻塞\texttt 
 \subsubsection{与常规 TCP/IP 对端的兼容性}
 
 
-为了与不支持\sys {}和RDMA的对等端兼容，需要检测\sys {}功能并回退到TCP/IP。
+为了与不支持\sys {}和RDMA的对端兼容，\sys{}需要透明地检测\sys{}功能，并在对端不支持时回退到常规TCP/IP。
 但是，Linux普通套接字不支持向TCP SYN和ACK数据包添加特殊选项。
 由于中间盒（middlebox）和网络重新排序，使用另一个端口（例如LibVMA~ \cite {libvma} 的做法）也是不可靠的。
 为此，\libipc{} 首先使用内核原始套接字（raw socket）直接发送带有特殊选项的SYN和ACK数据包，如果不存在特殊选项，则回退到内核TCP/IP套接字。

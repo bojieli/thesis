@@ -215,28 +215,28 @@ KV-Direct的目标是利用数据中心的现有硬件来卸载重要的工作�
 KV-Direct利用广泛部署的可编程网卡和FPGA实现 \cite{putnam2014reconfigurable,caulfield2016cloud}。 FlexNIC \cite {kaufmann2015flexnic,kaufmann2016krishnamurthy} 是另一种具有可重构匹配行动表（RMT） \cite {bosshart2013forwarding} 的可编程网卡的有前途的架构。
 NetCache \cite {netcache-sosp17} 在基于RMT的可编程交换机中实现键值缓存，显示了在基于RMT的网卡中构建KV-Direct的潜力。
 
-\subsection{对现实世界应用的影响}
+\subsection{对现实世界应用的性能影响}
 
 当KV-Direct应用于端到端应用程序时，后台计算显示了潜在的性能提升。 在PageRank \cite {page1999pagerank}中，由于每次边缘遍历都可以通过一次键值操作实现，因此KV-Direct在具有10个可编程网卡的服务器上支持1.22G TEPS。 相比之下，GRAM \cite {wu2015g}支持每台服务器250M TEPS，受交错计算和随机内存访问的约束。
 
 KV-Direct支持用户定义的函数和向量操作（表 \ref {kvdirect:tab:kv-operations}），可以通过将客户端计算卸载到硬件来进一步优化PageRank。 类似的参数适用于参数服务器 \cite {li2014scaling}。本文希望未来的工作可以利用硬件加速的键值存储来提高分布式应用程序的性能。
 
 \subsection{可编程网卡内的有状态处理}
+\label{kvdirect:sec:stateful-nic}
 
 本文第 \ref{chapter:clicknp} 章的 ClickNP 架构比较适合无状态或状态简单的流水线式数据包处理，而对基于连接状态或应用层请求的处理，就显得捉襟见肘。
 例如，四层负载均衡器应用中的调度器和哈希表与应用逻辑耦合紧密，既不容易扩放到大量并发连接，代码的可维护性也不强。事实上在开发过程中花费了大量的时间来解决死锁问题。
-为此，本章提出的有状态处理（stateful processing）和哈希表数据结构设计等基础组件可以作为很多可编程网卡应用的基础，如第 \ref{chapter:clicknp} 章的有状态网络功能（如四层负载均衡器）和第 \ref{chapter:socksdirect} 章的可扩放 RDMA。
 
+KV-Direct 提出了有状态处理（stateful processing）的一种新架构。KV-Direct 相比传统通用处理器架构的根本区别在于控制、计算和访存的分离。在传统处理器中，计算和访存共享同一条指令流，从而对于计算和访存交替的串行程序，计算和访存逻辑之间往往需要相互等待，导致计算和访存的吞吐量都不能被充分利用。KV-Direct 使用分离的控制指令流、计算指令流和访存指令流，且利用乱序执行引擎充分挖掘 KV 操作间的并行性，使得计算和访存可以充分流水线化。开发者需要将请求的处理过程划分为计算和访存交替的若干阶段，将请求处理过程抽象成一个状态机。控制指令流管理请求的状态并将下一阶段任务分发到计算或访存部件。计算或访存部件处理完成一个阶段的任务后，返回控制器。
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=1.0\textwidth]{../figures/kvdirect_arch.pdf}
 	\caption{基于 KV-Direct 的可编程网卡应用层架构。}
-	\label{arch:fig:kvdirect_arch}
+	\label{arch:fig:kvdirect_arch_application}
 \end{figure}
 
-
-为了模块化和可扩放性，使用 KV-Direct 作为基础后，可编程网卡上应用的架构如图 \ref{arch:fig:kvdirect_arch} 所示。
+基于 KV-Direct 的有状态处理架构如图 \ref{arch:fig:kvdirect_arch_application} 所示。
 事务代表着前后依赖关系，例如有状态网络处理中的一个连接，分多个数据包的一个应用层 HTTP 请求，或者键值存储中对同一个键（key）的操作。
 同一个事务中的不同请求需要依次处理，而不同事务中的请求可以并发处理。
 为了隐藏延迟、最大化并发处理能力，请求调度器从基于 KV-Direct 的事务状态键值存储中查找该请求对应的事务编号，并将正在处理事务的请求排入队列。
@@ -244,3 +244,15 @@ KV-Direct支持用户定义的函数和向量操作（表 \ref {kvdirect:tab:kv-
 如果请求处理完成，响应数据进入输出重排模块，重新排列响应的顺序以满足事务处理的一致性要求（例如，不同事务的请求也要按照到达顺序依次响应），最终输出到网络。
 如果请求的处理还需要依赖下一数据包或从主机内存 DMA 来的数据，为了不阻塞数据处理流水线，该请求会返回到调度器，等待依赖操作完成后再进行下一阶段的处理。
 
+KV-Direct 架构可以作为很多可编程网卡应用的基础，如第 \ref{chapter:clicknp} 章的有状态网络功能（如四层负载均衡器）和第 \ref{chapter:socksdirect} 章的可扩放 RDMA。
+
+\subsection{从键值扩展到其他数据结构}
+\label{kvdirect:sec:data-structure}
+
+KV-Direct 实现的是键-值映射的哈希表数据结构。数据中心以 Redis \cite{redis} 为代表的键值存储系统还支持二级索引、有序键值集合、消息队列等数据结构。这些更复杂的数据结构的本质特征都是可编程网卡内的有状态处理（第 \ref{kvdirect:sec:stateful-nic} 节）。
+
+对于消息队列，用 FPGA 处理的优势是快速的中心化协调。在生产者-消费者（producer-consumer）模式中，消息队列需要将生产者的消息分发到各消费者，这是一个中心化 FIFO 的抽象。由于 CPU 单核处理能力有限，并行或分布式消息队列往往需要牺牲一定的一致性 \footnote{一致性即先到先服务的顺序特性} 来提升性能可扩放性。而 FPGA 硬件逻辑的时钟频率足以处理 100 Gbps 线速的请求，无需牺牲一致性。
+
+在基于 KV-Direct 的消息队列中，消息存储在固定大小的缓冲区组成的环形链表中。采用环形链表便于在空间不足时分配新的固定大小缓冲区，也便于回收长时间空闲的缓冲区。对于生产者-消费者模式，为所有生产者维护一个头指针，为所有消费者维护一个尾指针。对于发布者-订阅者（publisher-subscriber）模式，为所有发布者维护一个头指针，为每个订阅者分别维护一个尾指针，使得不同的订阅者可以不同的速度接收消息。
+
+在二级索引中，请求按照一级索引在请求调度器中排队，并按照标准 KV-Direct 的方法获取匹配第一级索引的第二级索引元数据。元数据存储在事务状态存储中作为缓存。然后就第二级索引查询生成一个新的请求，按照一二级合并索引在请求调度器中排队。处理该请求时，从事务状态存储中取出对应的元数据，发起第二次 DMA 查询。此外，二级索引相比单级索引的另一个复杂之处在于第二级索引在增删元素时可能经常需要改变哈希表的大小，从而需要重新哈希，在此期间该第一级索引对应的操作需要挂起等待。用 FPGA 处理二级索引的优势是细粒度的访存延迟隐藏，如某个第二级索引重新哈希期间其他第二级索引可以操作。
