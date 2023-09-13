@@ -1,11 +1,116 @@
-\chapter{Acceleration of SocksDirect Communication Primitives}
+%!TEX root=main.tex
+
+\definecolor{mGreen}{rgb}{0,0.5,0}
+\definecolor{mGray}{rgb}{0.5,0.5,0.5}
+\definecolor{mPurple}{rgb}{0.58,0,0.82}
+\definecolor{backgroundColour}{rgb}{0.97,0.97,0.97}
+
+\lstdefinestyle{myCStyle}{
+	backgroundcolor=\color{backgroundColour},   
+	commentstyle=\color{mGreen},
+	keywordstyle=\color{magenta},
+	numberstyle=\tiny\color{mGray},
+	stringstyle=\color{mPurple},
+	basicstyle=\ttfamily\small,
+	breakatwhitespace=false,
+	breaklines=true,
+	captionpos=b,                    
+	keepspaces=true,                 
+	numbers=left,
+	numbersep=5pt,
+	showspaces=false,
+	showstringspaces=false,
+	showtabs=false,
+	tabsize=2,
+%	language=C
+}
+
+\newcommand{\sys}{{\textsc{SocksDirect}}\xspace}
+\newcommand{\libipc}{{\textsc{libsd}}\xspace}
+\newcommand{\RED}[1]{\textcolor[rgb]{1,0,0}{#1}}
+\newcommand{\paraspace}{\vspace{0.05in}}
+\newcommand{\parab}[1]{\paraspace\noindent{\textbf{#1}}}
+\newcommand{\yes}{\ding{51}}
+
+% Copyright
+%\renewcommand\footnotetextcopyrightpermission[1]{} % removes footnote with conference info
+%\setcopyright{acmcopyright}
+%\setcopyright{acmlicensed}
+%\setcopyright{rightsretained}
+%\setcopyright{usgov}
+%\setcopyright{usgovmixed}
+%\setcopyright{cagov}
+%\setcopyright{cagovmixed}
+
+%Conference
+%\acmConference[Submitted for review to SIGCOMM]{}
+%\acmYear{2018}
+%\copyrightyear{}
+
+%% {} with no args suppresses printing of the price
+
+\newenvironment{icompact}{
+	\begin{list}{$\bullet$}{
+			\parsep 1pt plus 1pt
+			\partopsep 1pt plus 1pt
+			\topsep 1pt plus 2pt minus 1pt
+			\itemsep 1.5pt plus 1pt
+			\parskip 0pt plus 2pt
+			\leftmargin 0.15in}
+	}
+	{\normalsize\end{list}}
+
+\newenvironment{ecompact}{
+	\begin{list}{$\bullet$}{
+			\parsep 1pt plus 1pt
+			\partopsep 1pt plus 1pt
+			\topsep 1pt plus 2pt minus 1pt
+			\itemsep 1.5pt plus 1pt
+			\parskip 0pt plus 2pt
+			\leftmargin 0.15in}
+	}
+	{\normalsize\end{list}}
+
+%
+% import the customized commands
+%
+
+%\begin{document}
+
+%\settopmatter{printfolios=true} % Add page numbers
+%\settopmatter{printacmref=false} % Removes citation information below abstract
+%\renewcommand\footnotetextcopyrightpermission[1]{} % removes footnote with conference information in first column
+%\pagestyle{plain} % removes running headers
+
+%don't want date printed
+%\date{}
+
+%\title{\huge SocksDirect: Datacenter Sockets can be Fast and Compatible}
+
+%\author{{Paper \#110, 14 pages}}%\vspace{-0.5in}}
+
+%\newcommand{\authornote}[1]{\raisebox{0.8ex}{$#1$}}
+%\maketitle
+
+\chapter{SocksDirect 通信原语加速}
 \label{chapter:socksdirect}
 
+%\input{abstract}
 \input{intro}
 \input{background}
+%\input{design_principle}
 \input{design}
 \input{optimization}
+%\input{implementation}
 \input{evaluation}
 \input{application}
+%\input{discussion}
 \input{related}
 \input{conclusion}
+
+%\small 
+%\balance
+%\bibliographystyle{ACM-Reference-Format}
+%\bibliography{reference}
+
+%\end{document}
