@@ -110,8 +110,6 @@ We use batched one-sided RDMA write and amortize polling overhead with shared CQ
 To remove memory copy for large messages, we use \emph{page remapping} to achieve transparent zero copy.
 To share a CPU core efficiently among multiple active threads, \sys uses \emph{cooperative multitasking} to remove thread wakeup overhead.
 
-\fi
-
 %The POSIX socket API was designed for networking and IPC in millisecond scale, leading to two performance challenges. First, connections are shared by processes and threads after \texttt{fork} and thread creation. Linux protects this multi-producer multi-consumer FIFO with locks. To scale a shared socket, we \textit{optimize for the common case and prepare for the worst case}. Senders transmit data via different queues in parallel. To ensure receiver ordering, based on the observation that applications seldom receive concurrently from a shared socket, the sender designates a receiver with exclusive access. We further develop mechanisms to avoid deadlock and starvation, in addition to handling unconsumed buffers during \texttt{fork} and thread creation.
 
 %Second, the send buffer can be modified by application after \texttt{send}, and the receive buffer is not determined until application calls \texttt{recv}. Data copy on \texttt{send} and \texttt{recv} seems mandatory. To avoid memory copy of large buffers, we extend the \textit{page remapping} approach~\cite{thadani1995efficient,chu1996zero}, which enables copy-on-write upon \texttt{send} and remaps send buffer to receiver's virtual address upon \texttt{recv}.

@@ -223,6 +223,4 @@ When an application shuts down one direction of a connection, it sends a \textit
 
 %Generally, each process in our design is treated as an endpoint in the network. Figure \ref{socksdirect:fig:conn-setup-close} shows the process of connection setup and close. When \textit{socket} is called, the process itself allocate per fd resources. When \textit{listen} is called, monitor is notified of port occupation. During the \textit{connect} operation, monitor first chooses one of the processes listen on this port then coordinates the creation of the shared memory between the two processes and notifies each other of the new connection. When \textit{close} happens, both of the endpoint notify each other and monitor is responsible to destroy the shared memory between them.
 
-The LaTeX command "\fi" is not translatable as it is a part of the LaTeX markup structure. It is used to denote the end of an "if" statement in LaTeX. As per your instructions, I am not allowed to change the LaTeX markup structure. Therefore, the translated document remains the same:
-
 \fi

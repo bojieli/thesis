@@ -49,8 +49,6 @@ If each worker thread is assigned to a CPU, each worker thread can handle one or
 
 The output port of an element can be connected to the input port of another element through a \textit {channel}, as depicted in Figure \ref {clicknp:fig:element} (a). In \name, a channel is essentially a FIFO buffer, written at one end and read from the other. The data unit of read/write operations on the channel is known as a \textit {flit}, which has a fixed size of 64 bytes. The format of a flit is shown in Figure \ref {clicknp:fig:element} (b). Each flit contains a header of metadata and a payload of 32 bytes. When moving between \name elements, large amounts of data (e.g., full-size packets) are divided into multiple flits. The first flit is marked with \textbf {sop} (start of packet), and the last flit is marked with \textbf {eop} (end of packet). If the size of the data block is not 32, the \textbf {pad} field of the last flit indicates the number of bytes filled into the payload. The reserved fields in the flit have been optimized by the hardware description language synthesis tool. Dividing large data into flits not only reduces latency but also allows different segments of a packet to be processed simultaneously at different elements, increasing parallelism. Finally, to implement network functions, multiple \name elements can be interconnected to form a directed processing graph, known as a \name \textit {configuration}.
 
-The content you provided is already in English and it is written in an academic style. According to your instructions, I should keep it as-is. Here is the original content:
-
 \begin{figure}[htbp]
 	\centering
 	\begin{tabular}{c}
@@ -176,13 +174,6 @@ tee [2] -> logger
 \end{figure}
 
 \iffalse
-\begin{figure}[htbp]
-\small \lstset{style=numbers}
-
-The content you provided is already in English and it is in an academic style. As per your instructions, I will not make any changes to it.
-
-The LaTeX content you provided is already in English and it is written in an academic style. According to the rules you provided, I should keep it as-is. Therefore, no translation is needed.
-
 \begin{figure}[!t]
 	\centering
 	\includegraphics[width=0.8\columnwidth]{image/ClickNPSoftware}
@@ -206,4 +197,4 @@ When there is a requirement to update the host program, simply terminate the hos
 	\label{clicknp:fig:CatapultFPGAArch}
 	%    
 \end{figure}
-}
+\fi

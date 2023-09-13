@@ -269,8 +269,6 @@ When a process calls a remote procedure call (RPC) and waits for a reply, should
 \parab {Container Networking.}
 Many container deployments use isolated network namespaces, and these containers communicate through a virtual overlay network. In Linux, a virtual switch \cite {pfaff2015design} forwards packets between the host network card and the virtual network card in the container. This architecture incurs overhead from multiple context switches and memory copies on each packet, and the virtual switch becomes a bottleneck \cite {pfefferle2015hybrid}. Slim~ \cite {slim} reduces three kernel round trips to one. Several recent works \cite {martins2014clickos,roghanchi2017ffwd,huang2017high,nsdi19freeflow} delegate all operations to a virtual switch running as a daemon, thus increasing latency and CPU cost on the data path. The solution in this chapter is a centralized control plane and a distributed data plane (\S\ref{socksdirect:subsec:connection-management}).
 
-The content you provided is already in English and in academic style. As per your instructions, I will keep it as-is. Here is the content:
-
 \subsubsection{Per-byte Overhead}
 \label{socksdirect:subsec:per-byte-overhead}
 
@@ -298,7 +296,7 @@ MegaPipe~\cite{han2012megapipe} and StackMap~\cite{yasukata2016stackmap} propose
 \parab {User-space TCP/IP Protocol Stack:}
 The second type of work completely bypasses the kernel TCP/IP protocol stack and implements TCP/IP in user-space. In this category, IX~\cite{belay2017ix} and Arrakis~\cite{peter2016arrakis} are new operating system architectures that use virtualization to ensure security and isolation. IX uses LwIP~\cite{dunkels2001design} to implement TCP/IP in user-space, while using the kernel to forward each packet to achieve performance isolation and QoS. In contrast, Arrakis offloads QoS to the network card, thus bypassing the kernel on the data plane. These works use the network card to forward packets between applications on the same host. As shown in Table \ref{socksdirect:tab:operation-performance}, the round-trip (hairpin) latency from the CPU to the network card is much higher than the cache migration latency between cores. The throughput is also limited by the doorbell latency of memory-mapped I/O (MMIO) and PCIe bandwidth \cite{neugebauer2018understanding,li2017kv}.
 
-In addition to these new operating system architectures, many user-space sockets on Linux use high-performance packet I/O frameworks, such as Netmap~\cite{rizzo2012netmap}, Intel DPDK~\cite{dpdk}, and PF_RING \cite{pf-ring}, to directly access network card queues in user-space. SandStorm~\cite{marinos2014network}, mTCP~\cite{jeong2014mtcp}, Seastar~\cite{seastar}, and F-Stack~\cite{fstack} propose new APIs, thus requiring modifications to the application. Most API changes aim to support zero-copy, while the standard API still copies data. FaSST~\cite{kalia2016fasst} and eRPC~\cite{kalia2018datacenter} provide an RPC API instead of sockets. LibVMA~\cite{libvma}, OpenOnload~\cite{openonload}, DBL~\cite{dbl}, LOS~\cite{huang2017high}, and TAS~\cite{taseurosys19} comply with the standard socket API.
+In addition to these new operating system architectures, many user-space sockets on Linux use high-performance packet I/O frameworks, such as Netmap~\cite{rizzo2012netmap}, Intel DPDK~\cite{dpdk}, and PF\_RING \cite{pf-ring}, to directly access network card queues in user-space. SandStorm~\cite{marinos2014network}, mTCP~\cite{jeong2014mtcp}, Seastar~\cite{seastar}, and F-Stack~\cite{fstack} propose new APIs, thus requiring modifications to the application. Most API changes aim to support zero-copy, while the standard API still copies data. FaSST~\cite{kalia2016fasst} and eRPC~\cite{kalia2018datacenter} provide an RPC API instead of sockets. LibVMA~\cite{libvma}, OpenOnload~\cite{openonload}, DBL~\cite{dbl}, LOS~\cite{huang2017high}, and TAS~\cite{taseurosys19} comply with the standard socket API.
 
 The user-space TCP/IP protocol stack offers superior performance compared to Linux, but it still falls short when compared to RDMA and shared memory. A significant reason for this is that existing works do not support the sharing of sockets between threads and processes, which results in compatibility issues in fork and container hot migration, as well as overhead from multi-threaded locks.
 
@@ -320,6 +318,3 @@ In terms of performance, they cannot eliminate payload copy, socket file descrip
 For example, RSocket allocates buffers and copies payloads at both the sender and receiver. 
 Similar to Arrakis, RSocket uses the network card for intra-host communication, leading to performance bottlenecks.
 
-The content you provided is already in English and it's in LaTeX format, not Markdown. As per your instructions, I will keep it as-is. 
-
-Please provide the content that needs to be translated.

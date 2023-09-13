@@ -22,7 +22,7 @@ Although virtual switches and network functions implemented via software can sup
 The profitability of Infrastructure as a Service (IaaS) cloud service providers is the difference between the price customers pay for virtual machines and the cost of hosting these virtual machines.
 Given that the asset and operating costs of each server are essentially determined at the time of deployment, the most effective way to reduce the cost of hosting virtual machines is to package more customer virtual machines on each computing node server and decrease the number of servers for network and storage nodes.
 Currently, the price of a physical CPU core (2 hyperthreads, i.e., 2 vCPUs) is approximately $0.1 per hour, meaning the maximum potential income is around $900 per year \cite{smartnic}.
-In data centers, servers usually serve for 3 to 5 years, so the highest price of a physical CPU core during the server's life cycle can reach $4500 \cite{smartnic}.
+In data centers, servers usually serve for 3 to 5 years, so the highest price of a physical CPU core during the server's life cycle can reach \$4500 \cite{smartnic}.
 Even considering that some CPU cores are always unsold, and the cloud often offers discounts to large customers, compared with dedicated hardware, even dedicating a physical CPU core to virtual networking is quite costly.
 
 To accelerate virtual networks and network functions, previous work has proposed using GPUs \cite {packetshader}, Network Processors (NP) \cite {cavium,netronome} and hardware network switches \cite {duet}.
@@ -124,7 +124,6 @@ We highlight several design goals for our ClickNP framework to enable software e
 \smalltitle{Host communication.} Network processors require low-latency and high-throughput interactions with the host machine. In Software Defined Networks and Network Function Virtualization applications, FPGA needs to send unknown packets to the controller and request a new forwarding rule to be inserted into FPGA. The round-trip time should be as low as possible to reduce end-to-end flow establish time. In packet replay and capture applications, FPGA needs to receive or send Gigabytes of packets from or to the host machine without using the network adapter.
 
 We design ClickNP to meet the above design goals with Catapult FPGA \cite{putnam2014reconfigurable} and Altera OpenCL \cite{singh2011implementing}. In the next section, we will describe the FPGA and OpenCL components, and how we build a toolchain that abstracts away hardware specific details.
-}
 
 \egg{
 \subsection{FPGA in datacenter}

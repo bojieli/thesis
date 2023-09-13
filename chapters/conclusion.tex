@@ -76,15 +76,12 @@ For instance, offloading stateless computations to accelerators, read-only remot
 
 In addition to mining the internal parallelism of applications from the perspective of compilation, another future research direction is to implement high-performance context switching and scheduling managed by hardware from the perspective of architecture \cite{barroso2017attack}. The network processor hardware scheduler introduced in Section \ref{smartnic-np} can be used as a useful reference.
 
-\iffalse
 \subsubsection{Translation from High-Level Language to Low-Level Language}
 \label{future:high-to-low}
 
 Modern software enjoys the dividends of Moore's Law. For the sake of development efficiency, it generally uses high-level language modular programming, and the compiler's optimization of software is not sufficient. Modern software written in high-level languages, even if it has similar functions to software based on low-level languages (such as C language) many years ago, its performance often differs a lot. The "Andy-Bill Law" \cite{langchaozhidian} vividly depicts this phenomenon, that is, the performance increase brought by high-performance new processors (represented by Intel's CEO Andy) is often consumed by software (represented by Microsoft's founder Bill Gates), and the performance perceived by end users is still similar. There is also a lot of room for optimizing software performance from the perspectives of programming frameworks and compilers. David Patterson pointed out that rewriting Python language as C language can improve the performance of applications by 50 times, and if a series of optimizations are used, achieving a performance improvement of 1000 times compared to Python is not a dream \cite{python-to-c}.
-\fi
 
 The future research direction is the automatic translation from high-level languages to low-level languages. Although many high-level languages are dynamically typed and have high-level language features such as introspection, the type of input for a given high-level language application is often relatively certain.
-\fi
 
 \subsubsection{Automatic Generation of Network Application Data Plane}
 \label{future:p4coder}
@@ -174,8 +171,6 @@ The remaining functions of the operating system include the virtualization of co
 These functions can be implemented in user-space daemons or in programmable network cards.
 After the functions of the traditional operating system are moved to user-space and programmable network cards, a microkernel can be adopted while maintaining compatibility with existing applications.
 
-The content you provided is already in English and it is written in an academic style. According to your instructions, I should keep it as-is. Here is the original text:
-
 An operating system based on a microkernel not only has higher performance but also facilitates the implementation of high availability for general distributed applications, which will be the topic of discussion in the next section.
 
 \subsubsection{High Availability of General Distributed Applications}
@@ -213,8 +208,6 @@ The primary challenge of hot migration lies in creating a consistent snapshot of
 \label{future:distributed-linux}
 
 Smart terminals (such as smartphones and PCs) and clouds (data centers) currently represent the two most significant types of computing and storage devices. The computing and storage capabilities of both the edge and the cloud are rapidly expanding, and with the advancement of 5G technology, the communication cost between the edge and the cloud will significantly decrease, while bandwidth and latency will see substantial improvements. Consequently, edge-cloud convergence will emerge as a crucial trend. On one hand, edge applications will be able to invoke cloud services and access cloud data at a finer granularity; on the other hand, technologies used for high-performance communication and computing on the cloud will gradually be applied to the edge. For instance, by deploying programmable network cards on the edge, power consumption for 5G network communication can be reduced, performance bottlenecks can be eliminated, the performance of accessing Flash storage can be enhanced, and the high-performance user-space socket technology discussed in Chapter \ref{chapter:socksdirect} can also be applied on the edge.
-
-The content you provided is already in English and in an academic style. As per your instructions, I will keep it as-is.
 
 The abstraction level of the distributed operating system is worth discussing. If abstracted at the level of the Linux operating system, compatibility will be the best, and automatic distributed processing of existing parallel programs can be achieved. However, the abstraction level of Linux system calls is relatively low. If developers do not explicitly provide more information, it is difficult to predict the resources that the application will access in the future, and the performance for some types of applications will be poor. One possible way to implement a distributed Linux operating system is remote system calls, i.e., for each process migrated to a remote system, a shadow process is retained locally; system calls on the remote system are captured, sent to the local shadow process and actually called, and the results of the system calls are sent to the remote system. The application process needs to wait for the remote system call to return, i.e., the delay of the system call is greatly increased, so the performance of this implementation scheme may be poor.
 

@@ -384,8 +384,6 @@ Firstly, \name begins from the innermost loop, attempting to unroll as many loop
 
 Next, \name generates controller code. To generate code for concurrent execution with hidden latency, \name compiles the computation components (i.e., unrolled loops) and the code for data movement between on-chip memory and computation components using high-level synthesis tools, to calculate their latency and throughput. The number of tasks executed concurrently is the product of latency and throughput. The controller stores the current execution status and intermediate data of each task in the on-chip memory and schedules the split sub-computation tasks to the computation components.
 
-The content you provided is already in English and it is in an academic style. Therefore, according to your instructions, I will keep it as-is.
-
 A typical inference neural network comprises several sparse and dense layers. Sparse layers primarily read randomly from larger feature arrays, while dense layers mainly perform matrix or vector multiplication. Each sparse and dense layer is represented by a \name component, and the computation flow graph of the neural network is the connection between \name components. If each component is implemented as separate hardware logic, the on-chip resources will be fragmented. For a specific task, only a few computation components are running at the same time, resulting in longer latency for a single task. Therefore, it is necessary to extract common computation components from different components. For network functions, \name has difficulty optimizing this because the types of computations performed by various components of network functions are different and it is difficult to extract common parts.
 
 The method to extract common computation components is to compare the isomorphism of loops in different components, that is, whether the abstract syntax trees of two loops can be made completely the same by replacing the accessed array names and loop variable names. If the loops in several different components are isomorphic, these refactored loops can be extracted into a new \texttt{async} component. For example, access to global memory in each sparse layer can be extracted into one component, matrix and vector multiplication in each dense layer can be extracted into one component, and the relu activation function in each dense layer can be extracted into another component. Next, similar to RSA decryption, \name unrolls the inner loops as much as possible and generates controller code. As shown in Figure \ref{clicknp:tab:neural-network}, the higher the parallelism of loop unrolling, the lower the latency of neural network inference.
@@ -425,12 +423,6 @@ Finally, it should be noted that for compute-intensive tasks, although the high-
 
 \egg{
 	First we test the performance under real-world data center traffic. We adopted the same traffic trace as DUET\cite{}, and picked the first ten minutes as testing data. Figure \ref{clicknp:fig:l4} shows the four experiments we performed on the L4 load balancer. We first use TCP traffic to evaluate the flow completion time (FCT) under different throughputs. Then we use UDP traffic to evaluate the latency. }
-
-The text you provided is already in English and according to the rules you provided, I should keep it as-is. Therefore, no translation is needed.
-
-The content you provided is already in English and it follows an academic style. As per your instructions, I will not make any changes to it.
-
-The content you provided is already in English and in an academic style. According to your instructions, I will keep it as-is.
 
 \egg{
 \textbf{OpenFlow firewall.} We compare our firewall with Click + DPDK \cite{barbette2015fast} on 4 cores, and Linux iptables (for wildcard match) / ipset \cite{ipset} (for exact match) with RSS on 8 cores.

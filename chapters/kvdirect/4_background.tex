@@ -3,7 +3,6 @@
 \label{kvdirect:sec:background}
 
 
-\egg{
 \subsection{The Road to High Performance Key-Value Storage}
 
 Building a high performance key-value storage is a non-trivial exercise of optimizing various software and hardware components in a computer system. The rich literature on key-value storage performance optimizations can give us a glimpse of software and hardware evolution in recent years.
@@ -67,19 +66,15 @@ The results fit the following formulas within 10\% error:
 \end{aligned}
 \end{equation}
 This indicates that when interleaved with computation, the performance of CPU degrades significantly. In the extreme case, even if the instruction window size or memory fetch parallelism goes to infinity, the per-core key-value operation throughput would still be bounded by computation (\approx10M~op/s), 10\approx20x slower than a single DDR channel.
-\end{comment}
 
-\egg{
 \subsection{Domain-Specific Architectures for Key-Value Storage}
 
 Ten years ago, processor frequency scaling was over and people turned to multi-core and concurrency~\cite{sutter2005free}.
 Nowadays, CMOS feature-size reduction is getting more and more difficult, which implies that multi-core scaling is also over. People are turning to domain-specific architectures (DSAs)~\cite{esmaeilzadeh2013power} for better performance. Several such DSAs have been used to improve key-value storage performances. 
 
-\egg{
 For computation, DSAs such as GPU, 
 FPGA~\cite{putnam2014programmable, caulfield2016cloud} and ASIC~\cite{liu2016cambricon, tpu} have been quickly accepted by the market.
 For networking, DSAs are also deployed at scale in datacenters, such as RDMA/RoCE network cards~\cite{mellanoxrdma}, programmable network cards~\cite{greenberg2015sdn, li2016clicknp} and programmable switches~\cite{bosshart2013forwarding}.
-}
 
 \subsubsection{One-sided RDMA}
 
