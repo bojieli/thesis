@@ -37,8 +37,6 @@ The Packet Generator (PktGen) can generate various traffic patterns based on dif
 
 The Packet Capture Tool (PktCap) redirects all received packets to \textit{logger} components, which are typically located in the host. Figure \ref{clicknp:fig:packet-capture} illustrates the component structure of the packet capture tool. Since a single packet capture component cannot fully utilize the capacity of the PCIe I/O channel, PktCap implements a Receive Side Scaling (RSS) component in the FPGA to distribute packets to multiple packet capture components based on the hash value of the flow 5-tuple. Due to the throughput of the PCIe channel being less than the throughput of the 40G network card, an \textit{extractor} component is added, which only extracts important fields of the packet (for example, if there are 5 tuples, DSCP and VLAN tags), and forwards these fields (a total of 16B) and the timestamp (4B) via PCIe. PktCap is an example of demonstrating the importance of joint CPU / FPGA processing. Compared with FPGA, the CPU has more memory for buffering and can easily access other storage, such as the HDD / SSD drives in the literature \cite{lee2015flosis}, so it is more logical to run the logger on the CPU.
 
-The content you provided is already in English and in an academic style. As per your instructions, I will not make any changes to it.
-
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{image/HashTCAM}

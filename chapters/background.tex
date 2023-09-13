@@ -656,7 +656,7 @@ Therefore, although the multicore SoC method has a familiar programming model an
 
 From an architectural perspective, multicore SoCs are most similar to host CPUs, as they both use general-purpose processors. However, as shown in Table \ref{background:tab:host-cpu}, whether in terms of cost or performance power consumption, the general-purpose processors used in programmable network cards have clear advantages. In addition, as discussed in Chapter \ref{chapter:intro}, in cloud computing data centers, host CPUs can be sold, and their potential selling price is much higher than the hardware price of a single CPU component. Therefore, using general-purpose processors embedded in programmable network cards in data centers is still advantageous compared to the traditional method of using host CPUs.
 
-The content you provided is already in English and it is in academic style. As per your instructions, I will not make any changes to it.
+\subsection{Field-Programmable Gate Array (FPGA)}
 
 Intuitively, an FPGA is a large collection of electronic components that can be programmatically reconfigured. These components include logic gates (such as AND, OR, NOT gates), registers, adders, static memory (SRAM), etc., and users can customize their connections to form different circuits. Figure \ref{clicknp:fig:logic-block} illustrates the basic computing unit of an FPGA, which is a logic element composed of programmable logic gates and registers.
 
@@ -806,8 +806,6 @@ In terms of the connection range between custom hardware, the performance of a s
 Using the existing network interconnection in the data center can achieve the maximum scalability, lower cost, and the bandwidth and latency can meet the needs of most applications.
 Historically, Microsoft's FPGA deployment has tried the above three connection methods between custom hardware, which can be roughly divided into three development stages \cite{configurable-cloud-acceleration}:
 
-The content you provided is already in English and in an academic style. As per your instructions, I will not make any changes to it.
-
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/azure_fpga.pdf}
@@ -860,8 +858,6 @@ Due to power consumption constraints, the number of CPU cores and the average co
 Firstly, on bare metal servers, local NVMe storage can achieve a throughput of up to 400 K IOPS (I/O operations per second) per disk. AWS I3 instances have 8 NVMe SSDs, reaching a throughput of 3 M IOPS. For the common storage virtualization protocol stack, each CPU core can only handle a throughput of about 100 K IOPS, which means that 30 CPU cores need to be occupied to allow the virtual machine to fully utilize the throughput of NVMe storage, which is too costly. Even if there is only one NVMe storage, load balancing among 4 CPU cores is still a problem \cite{li2017kv}. As discussed in section \ref{smartnic-architecture}, because hardware allocation and processing tasks are pipeline-style rather than simple parallelism of multiple processing units, hardware can better guarantee Quality of Service (QoS) than multi-core software.
 
 Secondly, in terms of latency, the average latency of NVMe storage on bare metal servers is about 80 microseconds. Virtualization software not only adds an average latency of 20 microseconds, but also due to the impact of factors such as operating system scheduling, interrupts, cache misses, etc., the tail latency under high load can be as high as 1 millisecond (1000 microseconds). Using hardware offloading can reduce the average latency by 20\%, and reduce the tail latency under high load by more than 90\%.
-
-The text you provided is already in English and in an academic style. As per your instructions, I will not make any changes to it.
 
 \textbf{Enhancing the security of bare metal servers.}
 Finally, customer code on bare metal servers can directly access various hardware devices within the server, and may even flash firmware of out-of-band server management (BMC) and other components \cite{bare-metal-security}. If malicious code is embedded in the firmware and activated when the next tenant uses the bare metal server, the consequences are unimaginable. In fact, a large portion of customers choose bare metal servers precisely due to concerns about the isolation of virtual machines. To provide a safe and consistent hardware environment when tenants begin using bare metal servers, the Nitro security chip will overwrite the firmware. Nitro will also perform integrity checks at system startup, which is similar to UEFI trusted boot technology, but the verification scope includes not only the operating system bootloader but also hardware firmware.
