@@ -1,6 +1,5 @@
-\section{系统性能评估}
+\section{System Performance Evaluation}
 \label{socksdirect:sec:evaluation}
-
 
 %\begin{figure}[htpb]
 %	\centering
@@ -9,15 +8,15 @@
 %	\label{socksdirect:fig:eval-fork-tput}
 %\end{figure}
 
-\sys{} 在三个组件中实现：一个用户空间库 \libipc {} 和一个带有17K行C ++代码的监控守护进程，以及一个支持零拷贝的内核模块。
-本节从以下方面评估\sys{}：
+\sys{} is implemented in three components: a user-space library \libipc{} and a monitoring daemon with 17K lines of C++ code, as well as a kernel module that supports zero-copy.
+This section evaluates \sys{} from the following aspects:
 
-\parab {有效地为主机内套接字使用共享内存。}
-对于8字节消息，\sys 实现0.3 $\mu$s RTT和每秒23~M消息的吞吐量。 对于大型消息，\sys 使用零拷贝来实现Linux的1/13延迟和26x吞吐量。
+\parab {Efficiently using shared memory for intra-host sockets.}
+For 8-byte messages, \sys achieves 0.3 $\mu$s RTT and a throughput of 23~M messages per second. For large messages, \sys uses zero-copy to achieve 1/13 of Linux's latency and 26x throughput.
 
-\parab {有效地使用RDMA进行主机间套接字。}
-\sys 达到1.7 $\mu$s RTT，接近原始RDMA性能。
-零拷贝时，一个连接会使100~Gbps链路饱和。
+\parab {Efficiently using RDMA for inter-host sockets.}
+\sys achieves 1.7 $\mu$s RTT, close to raw RDMA performance.
+When zero-copy, a connection can saturate a 100~Gbps link.
 
 %\parab{Robust with number of connections.}
 %The performance above can be maintained with up to 100 million connections.
@@ -25,205 +24,155 @@
 %\parab{Corner-case operations does not affect long-term performance.}
 %After corner-case operations such as \texttt{fork}, the performance recovers quickly.
 
-\parab {可扩展核心数。}
-随着核心数量的增加，吞吐量几乎可以线性扩展。
+\parab {Scalable with the number of cores.}
+As the number of cores increases, the throughput can almost linearly scale.
 
+\parab {Significantly accelerates unmodified end-to-end applications.}
+For example, \sys {} reduces the latency of Nginx HTTP requests by 5.5 to 20 times.
 
-\parab {使用未经修改的端到端应用程序显着加速。}
-例如，\sys  {}将Nginx HTTP请求延迟减少5.5倍到20倍。
-
-
-\subsection{评估方法}
+\subsection{Evaluation Methodology}
 \label{socksdirect:subsec:methodology}
 
-本节使用两个Xeon E5-2698 v3 CPU，256~GiB内存和一个Mellanox ConnectX-4网卡的服务器评估 \sys{}。服务器与Arista 7060CX-32S 交换机通过 100 Gbps 以太网接口互连 \cite {arista-7060cx}。不同于第 \ref{chapter:clicknp}、\ref{chapter:kvdirect} 章，本节仅使用可编程网卡中的商用网卡部分，且商用网卡升级到了 100 Gbps，没有使用 FPGA。服务器使用Ubuntu 16.04和Linux 4.15，将RoCEv2用于RDMA协议，每64条消息轮询一次完成队列。
-每个线程都固定在CPU内核上。在收集数据之前，进行了足够的预热测试。
-对于延迟，本节使用一个乒乓应用程序报告平均往返时间，误差条代表1％和99％百分位数。
-对于吞吐量，一方保持发送数据而另一方不断接收数据。
-本节将比较Linux，原始RDMA写原语（write verb），Rsocket~ \cite {rsockets}和LibVMA~ \cite {libvma}，这是针对Mellanox 网卡优化的用户空间TCP / IP协议栈。
-我们也比较了没有批处理和零拷贝的 \sys{}，用 ``SD (unopt)'' 表示。
-本节没有评估mTCP~ \cite {jeong2014mtcp}，因为底层DPDK库对Mellanox ConnectX-4网卡的支持有限。由于批处理，mTCP具有比RDMA高得多的延迟，报告的吞吐量为每秒1.7~M包~~ \cite {kalia2018datacenter}。
+This section evaluates \sys{} on a server with two Xeon E5-2698 v3 CPUs, 256~GiB memory, and a Mellanox ConnectX-4 network card. The server is interconnected with an Arista 7060CX-32S switch via a 100 Gbps Ethernet interface \cite {arista-7060cx}. Unlike Chapters \ref{chapter:clicknp} and \ref{chapter:kvdirect}, this section only uses the commercial card part of the programmable network card, and the commercial card has been upgraded to 100 Gbps, without using FPGA. The server uses Ubuntu 16.04 and Linux 4.15, uses RoCEv2 for the RDMA protocol, and polls the completion queue every 64 messages.
+Each thread is pinned to a CPU core. Sufficient warm-up tests were conducted before collecting data.
+For latency, this section reports the average round-trip time of a ping-pong application, with error bars representing the 1\% and 99\% percentiles.
+For throughput, one side keeps sending data while the other side keeps receiving data.
+This section compares Linux, raw RDMA write primitives (write verb), Rsocket~ \cite {rsockets}, and LibVMA~ \cite {libvma}, which is a user-space TCP/IP protocol stack optimized for Mellanox network cards.
+We also compared \sys{} without batching and zero-copy, denoted as ``SD (unopt)''.
+This section did not evaluate mTCP~ \cite {jeong2014mtcp}, because the underlying DPDK library has limited support for Mellanox ConnectX-4 network cards. Due to batching, mTCP has much higher latency than RDMA, and the reported throughput is 1.7~M packets per second~~ \cite {kalia2018datacenter}.
 
-\subsection{性能微基准测试}
+\subsection{Performance Microbenchmark}
 \label{socksdirect:subsec:microbenchmark}
 
-\subsubsection{延迟和吞吐量}
+\subsubsection{Latency and Throughput}
 
+Figure \ref {socksdirect:fig:eval-msgsize-intra} shows the intra-host socket performance between a pair of sender and receiver threads.
+For 8-byte messages, \sys achieves 0.3 $ \mu $ s round-trip latency (1/35 of Linux) and 23~M messages per second throughput (20 times of Linux).
+In comparison, a simple shared memory queue has 0.25 $ \mu $ s round-trip latency and 27~M throughput, indicating that \sys adds very little overhead.
+RSocket has 6x latency and 1/4 throughput of \sys  {}, because it uses the network card to forward intra-host packets, which leads to PCIe latency.
+LibVMA simply uses kernel TCP sockets for intra-host.
+The one-way latency of \sys  {} is 0.15 $ \mu $ s, even lower than kernel crossing (0.2 $ \mu $ s). Kernel-based sockets need to cross the kernel on both the sender and receiver.
 
-
-图 \ref {socksdirect:fig:eval-msgsize-intra}显示了一对发送方和接收方线程之间的主机内套接字性能。
-对于8字节消息，\sys 实现0.3 $ \mu $ s往返延迟（Linux的1/35）和每秒23~M消息吞吐量（Linux的20倍）。
-相比之下，一个简单的共享内存队列具有0.25 $ \mu $ s往返延迟和27~M吞吐量，表明\sys 增加了很少的开销。
-RSocket具有6x延迟和1/4吞吐量的\sys  {}，因为它使用网卡转发主机内数据包，这会导致PCIe延迟。
-LibVMA只是将内核TCP套接字用于主机内部。
-\sys  {}的单向延迟为0.15 $ \mu $ s，甚至低于内核穿越（0.2 $ \mu $ s）。基于内核的套接字需要在发送方和接收方都进行内核交叉。
-
-
-由于内存复制，对于8~KiB消息，\sys 的吞吐量仅比Linux高60％，延迟低4倍。对于大小至少为16~KiB的消息，\sys 使用页面重映射来实现零拷贝。
-对于1~MiB消息，\sys 比Linux具有1/13延迟和26x吞吐量。
-由于事件通知延迟，RSocket的延迟不稳定，在某些情况下甚至可能比Linux大。
-
-
+Due to memory copying, for 8~KiB messages, the throughput of \sys is only 60% higher than Linux, and the latency is 4 times lower. For messages of at least 16~KiB in size, \sys uses page remapping to achieve zero-copy. For 1~MiB messages, \sys has 1/13 of the latency and 26x the throughput of Linux. Due to event notification latency, the latency of RSocket is unstable and may even be larger than Linux in some cases.
 
 \begin{figure*}[htbp]
 	\centering
-	\subfloat[单机内吞吐量。]{                    
-		%\begin{minipage}{0.4\textwidth}
+	\subfloat[Single-machine throughput.]{                    
 		\centering
 		\includegraphics[width=0.5\textwidth]{eval/microbenchmark/msgsize-ipc-tput.pdf}
 		\label{socksdirect:fig:eval-msgsize-ipc-tput}
-		%\end{minipage}
 	}
-	\subfloat[单机内延迟。]{
-		%\begin{minipage}{0.4\textwidth}
+	\subfloat[Single-machine latency.]{
 		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/msgsize-ipc-lat.pdf}
 		\label{socksdirect:fig:eval-msgsize-ipc-lat}
-		%\end{minipage}
 	}
 	
-	\caption{不同消息大小下的单机内通信单核消息性能。}
+	\caption{Single-core message performance of intra-machine communication under different message sizes.}
 	\label{socksdirect:fig:eval-msgsize-intra}
 \end{figure*}
 
-
-图 \ref {socksdirect:fig:eval-msgsize-inter} 显示了一对线程之间的主机间套接字性能。
-对于8字节消息，\sys{} 实现每秒18M消息吞吐量（Linux的15倍）和1.7微秒的延迟（Linux的1/17）。
-吞吐量和延迟接近原始RDMA写操作（如虚线所示），它没有套接字语义。
-批处理不影响我们评测的延迟，由于仅当发送队列满时，RDMA 写操作才会被延迟处理，而我们评测延迟仅使用一条消息。
-由于批处理，\sys  {}对于8字节消息的吞吐量甚至高于RDMA。
-非批处理的 \sys{} 消息吞吐量介于 RSocket 和 RDMA 之间。
-LibVMA 也使用批处理达到了较好的性能，但延迟是\sys  {}的7倍。
-对于小于8~KiB的消息大小，主机间RDMA的吞吐量略低于主机内共享内存，因为环形缓冲区结构是共享的。
-对于512B到8KiB消息，以及更大的没有启用零拷贝的消息，\sys  {}受数据包复制的限制，但由于缓冲管理开销减少，仍然比RSocket和LibVMA更快。
-对于零拷贝消息（$\ge$ 16 KiB），\sys  {}使网络带宽饱和，其具有所有比较工作的3.5倍吞吐量和RSocket的72％延迟。
-
+Figure \ref {socksdirect:fig:eval-msgsize-inter} shows the inter-host socket performance between a pair of threads. For 8-byte messages, \sys{} achieves a throughput of 18M messages per second (15 times that of Linux) and a latency of 1.7 microseconds (1/17 of Linux). The throughput and latency are close to the original RDMA write operation (as shown by the dashed line), which does not have socket semantics. Batching does not affect the latency we evaluate, as RDMA write operations are only delayed when the send queue is full, and we only use one message to evaluate latency. Due to batching, the throughput of \sys  {} for 8-byte messages is even higher than RDMA. The message throughput of non-batching \sys{} is between RSocket and RDMA. LibVMA also uses batching to achieve good performance, but the latency is 7 times that of \sys  {}. For messages smaller than 8~KiB, the throughput of inter-host RDMA is slightly lower than intra-host shared memory because the ring buffer structure is shared. For messages from 512B to 8KiB, and larger messages that do not enable zero-copy, \sys  {} is limited by packet copying, but it is still faster than RSocket and LibVMA due to reduced buffer management overhead. For zero-copy messages ($\ge$ 16 KiB), \sys  {} saturates the network bandwidth, with 3.5 times the throughput of all comparison work and 72% of the latency of RSocket.
 
 \begin{figure*}[htbp]
 	\centering
-	\subfloat[跨主机吞吐量。]{
-		%\begin{minipage}{0.4\textwidth}
+	\subfloat[Cross-host throughput.]{
 		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/msgsize-network-tput.pdf}
 		\label{socksdirect:fig:eval-msgsize-network-tput}
-		%\end{minipage}
 	}
-	\subfloat[跨主机延迟。]{
-		%\begin{minipage}{0.4\textwidth}
+	\subfloat[Cross-host latency.]{
 		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/msgsize-network-lat.pdf}
 		\label{socksdirect:fig:eval-msgsize-network-lat}
-		%\end{minipage}
 	}
 	
-	\caption{不同消息大小下的跨主机通信单核消息性能。}
+	\caption{Single-core message performance of cross-host communication under different message sizes.}
 	\label{socksdirect:fig:eval-msgsize-inter}
 \end{figure*}
 
-\subsubsection{延迟分解}
+\subsubsection{Latency Decomposition}
 
-表 \ref{tab:microbenchmark} 说明了为什么 \sys{} 的性能超越了其他系统。
-每次套接字操作，Linux 都需要内核穿越，除 \sys{} 以外的系统在线程安全模式下都需要加锁。
-每个数据包，\sys{} 节约了缓冲区管理开销，并将传输层和数据包处理卸载到网卡。
-为了传输一个数据包，\sys{} 利用单边 RDMA 写操作，仅需要在发送端和接收端分别进行一次 DMA 操作。
-RSocket 使用双边 RDMA，LibVMA 使用一个类似的数据包接口，因此接收端需要增加一次 DMA 操作。
-LibVMA 和 RSocket 使用网卡来转发单机内的数据包，而 \sys{} 使用共享内存。
-Linux 的高延迟主要是由于中断处理和进程唤醒。
-对于较大的消息，\sys{} 消除了数据拷贝，页面重映射的开销明显更低。
-RSocket 比 LibVMA 和 Linux 的性能更好，由于它把发送端的数据拷贝、RDMA 发送操作和接收端的数据拷贝操作流水线化了。
-\sys{} 的连接建立延迟主要来源于通过 Linux 裸套接字的初始握手以及通过 \texttt{libibverbs} 创建 RDMA QP。
+Table \ref{tab:microbenchmark} explains why the performance of \sys{} surpasses other systems. Each socket operation in Linux requires a kernel traversal, and all systems except \sys{} require locking in thread-safe mode. For each packet, \sys{} saves buffer management overhead and offloads the transport layer and packet processing to the network card. To transmit a packet, \sys{} uses a one-sided RDMA write operation, requiring only one DMA operation at the sender and receiver respectively. RSocket uses two-sided RDMA, and LibVMA uses a similar packet interface, so the receiver needs to add one DMA operation. LibVMA and RSocket use the network card to forward intra-machine packets, while \sys{} uses shared memory. The high latency of Linux is mainly due to interrupt handling and process awakening. For larger messages, \sys{} eliminates data copying, and the overhead of page remapping is significantly lower. RSocket performs better than LibVMA and Linux because it pipelines the data copy operation at the sender, the RDMA send operation, and the data copy operation at the receiver. The connection establishment latency of \sys{} mainly comes from the initial handshake through the Linux raw socket and the creation of RDMA QP through \texttt{libibverbs}.
 
 \begin{table}[htbp]
 	\centering
 	\small
 		\begin{tabular}{l|l|r|r|r|r}
 			\hline
-			类型 & 开销 & \sys & LibVMA & RSocket & Linux \\
+			Type & Overhead & \sys & LibVMA & RSocket & Linux \\
 			\hline
 			\hline
-			每操作 & 总共（线程不安全） & 53 & 56 & 71 & 413 \\
+			Per operation & Total (thread-unsafe) & 53 & 56 & 71 & 413 \\
 			\hline
-			每操作 & 总共（线程安全） & 53 & 177 & 209 & 413 \\
+			Per operation & Total (thread-safe) & 53 & 177 & 209 & 413 \\
 			\hline
-			每操作 & C 库封装 & 15 & 10 & 10 & 12 \\
+			Per operation & C library wrapper & 15 & 10 & 10 & 12 \\
 			\hline
-			每操作 & 内核穿越（系统调用） & N/A & N/A & N/A & 205 \\
+			Per operation & Kernel crossing (system call) & N/A & N/A & N/A & 205 \\
 			\hline
-			每操作 & 套接字文件描述符锁 & N/A & 121 & 138 & 160 \\
-			\hline
-			\hline
-			每数据包 & 总共（主机间） & 850 & 2200 & 1700 & 15000 \\
-			\hline
-			每数据包 & 总共（主机内） & 150 & 1300 & 1000 & 5800 \\
-			\hline
-			每数据包 & 缓冲区管理 & 50 & 320 & 370 & 430 \\
-			\hline
-			每数据包 & 传输层协议 & N/A & 260 & N/A & 360 \\
-			\hline
-			每数据包 & 数据包处理 & N/A & 200 & N/A & 500 \\
-			\hline
-			每数据包 & 网卡门铃和 DMA & 600 & 900 & 900 & 2100 \\
-			\hline
-			每数据包 & 网卡处理 \& wire & \multicolumn{4}{c}{200} \\
-			\hline
-			每数据包 & 处理网卡中断 & N/A & N/A & N/A & 4000 \\
-			\hline
-			每数据包 & 进程唤醒 & N/A & N/A & N/A & 5000 \\
+			Per operation & Socket file descriptor lock & N/A & 121 & 138 & 160 \\
 			\hline
 			\hline
-			每千字节 & 总共（主机间）& 173 & 540 & 239 & 365 \\
+			Per packet & Total (inter-host) & 850 & 2200 & 1700 & 15000 \\
 			\hline
-			每千字节 & 总共（主机内） & 13 & 381 & 212 & 160 \\
+			Per packet & Total (intra-host) & 150 & 1300 & 1000 & 5800 \\
 			\hline
-			每千字节 & 线上传输 & \multicolumn{4}{c}{160} \\
+			Per packet & Buffer management & 50 & 320 & 370 & 430 \\
+			\hline
+			Per packet & Transport layer protocol & N/A & 260 & N/A & 360 \\
+			\hline
+			Per packet & Packet handling & N/A & 200 & N/A & 500 \\
+			\hline
+			Per packet & NIC doorbell and DMA & 600 & 900 & 900 & 2100 \\
+			\hline
+			Per packet & NIC handling \& wire & \multicolumn{4}{c}{200} \\
+			\hline
+			Per packet & Handling NIC interrupt & N/A & N/A & N/A & 4000 \\
+			\hline
+			Per packet & Process wakeup & N/A & N/A & N/A & 5000 \\
 			\hline
 			\hline
-			每连接 & 总共（主机间）& 47000 & 18000 & 77000 & 47000 \\
+			Per kilobyte & Total (inter-host)& 173 & 540 & 239 & 365 \\
 			\hline
-			每连接 & 总共（主机内） & 700 & 3800 & 33000 & 14700 \\
+			Per kilobyte & Total (intra-host) & 13 & 381 & 212 & 160 \\
 			\hline
-			每连接 & 初始 TCP 握手 & 16000 & 16000 & 47000 & N/A \\
+			Per kilobyte & Line transmission & \multicolumn{4}{c}{160} \\
 			\hline
-			每连接 & 管程处理 & 180 & N/A & N/A & N/A \\
 			\hline
-			每连接 & RDMA QP 创建 & 30000 & N/A & 30000 & N/A \\
+			Per connection & Total (inter-host)& 47000 & 18000 & 77000 & 47000 \\
+			\hline
+			Per connection & Total (intra-host) & 700 & 3800 & 33000 & 14700 \\
+			\hline
+			Per connection & Initial TCP handshake & 16000 & 16000 & 47000 & N/A \\
+			\hline
+			Per connection & Monitor handling & 180 & N/A & N/A & N/A \\
+			\hline
+			Per connection & RDMA QP creation & 30000 & N/A & 30000 & N/A \\
 			\hline
 		\end{tabular}
-	\caption{\sys{} 和其他系统的延迟分解。每操作延迟使用 \texttt{fcntl()} 测量，每数据包和每千字节延迟是从 \texttt{send()} 到 \texttt{recv()} 的时间，每连接延迟是连接创建的延迟。表中数字单位为纳秒，仅代表粗略估计。}
+	\caption{Latency breakdown of \sys{} and other systems. The per-operation latency is measured using \texttt{fcntl()}, the per-packet and per-kilobyte latency is the time from \texttt{send()} to \texttt{recv()}, and the per-connection latency is the delay of connection creation. The numbers in the table are in nanoseconds and represent rough estimates.}
 	\label{tab:microbenchmark}
 \end{table}
 
 
-\subsubsection{多核可扩放性}
+\subsubsection{Multi-core Scalability}
 
-
-
-
-
-
-\sys 实现了主机内和主机间套接字的几乎线性可扩展性。
-对于主机内套接字，\sys 在16对发送器和接收器核心之间提供每秒306~M消息的吞吐量，这是Linux的40倍和RSocket的30倍。
-LibVMA回退到Linux用于主机内套接字。
-使用RDMA作为主机间套接字，\sys 使用批处理以16个内核实现每秒276~M个消息的吞吐量，这是本章使用的RDMA网卡的消息吞吐量的2.5倍，也是 RSocket 吞吐量的 8 倍。
-不启用批处理时，\sys{} 只能达到 62~M 的吞吐量，是裸 RDMA 的 60\%。
-由于缓冲区管理的可扩展性有限，RSocket的主机内部吞吐量为24~M，主机间为33~M。
-由于共享网卡队列上的锁争用，与单线程相比，LibVMA的吞吐量减少到两个线程的1/4，而三个和更多线程的1/10。
-Linux吞吐量从1到7个核心线性扩展，并在环回或具有更多核心的网卡队列上出现瓶颈。
-尽管本文没有测试，mTCP 预计将在多核情况下有更好的可扩放性。
+\sys has achieved nearly linear scalability for intra-host and inter-host sockets. For intra-host sockets, \sys provides a throughput of 306 M messages per second across 16 pairs of sender and receiver cores, which is 40 times that of Linux and 30 times that of RSocket. LibVMA falls back to Linux for intra-host sockets. Using RDMA as inter-host sockets, \sys achieves a throughput of 276 M messages per second across 16 cores with batching, which is 2.5 times the message throughput of the RDMA network card used in this chapter, and 8 times the throughput of RSocket. Without enabling batching, \sys can only achieve a throughput of 62 M, which is 60% of bare RDMA. Due to the limited scalability of buffer management, the intra-host throughput of RSocket is 24 M, and inter-host is 33 M. Due to lock contention on the shared network card queue, the throughput of LibVMA decreases to 1/4 with two threads compared to single-threaded, and 1/10 with three or more threads. Linux throughput scales linearly from 1 to 7 cores and bottlenecks on loopback or network card queues with more cores. Although not tested in this paper, mTCP is expected to have better scalability in multi-core scenarios.
 
 \begin{figure*}[htbp]
-	\subfloat[单机内吞吐量。]{                    
+	\subfloat[Single machine throughput.]{                    
 		%\begin{minipage}{0.4\textwidth}
 		\centering
 		\includegraphics[width=0.5\textwidth]{eval/microbenchmark/corenum-IPC-tput.pdf}
 		\label{socksdirect:fig:eval-cornum-ipc}
 		%\end{minipage}
 	}
-	\subfloat[跨主机吞吐量。]{
+	\subfloat[Cross-host throughput.]{
 		%\begin{minipage}{0.4\textwidth}
 		\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/corenum-network-tput.pdf}
 		\label{socksdirect:fig:eval-cornum-network}
 		%\end{minipage}
 	}
 	
-	\caption{不同 CPU 核数下的 8 字节消息吞吐量。}
+	\caption{Throughput of 8-byte messages under different CPU core numbers.}
 	\label{socksdirect:fig:eval-corenum-tput}
 \end{figure*}
 
@@ -233,8 +182,8 @@ Linux吞吐量从1到7个核心线性扩展，并在环回或具有更多核心�
 
 %Figure~\ref{socksdirect:fig:eval-conn-setup-tput} shows the throughput of connection creation with different number of cores. Each core can create 1.4~M new connections per second, which is 20x of Linux and 2x of mTCP~\cite{jeong2014mtcp}. The upper bound is 5.3~M connections per second, where the monitor becomes a bottleneck.
 
-最后评估共享核心的多个线程的性能。 每个线程都需要等待轮到它来处理消息。
-如图 \ref {socksdirect:fig:eval-context-switch}所示，尽管消息处理延迟几乎与活动进程的数量呈线性增长，但它仍然是Linux的1/20到1/30。
+Finally, we evaluate the performance of multiple threads sharing a core. Each thread has to wait for its turn to process messages.
+As shown in Figure \ref {socksdirect:fig:eval-context-switch}, although the message processing latency almost linearly increases with the number of active processes, it is still 1/20 to 1/30 of that of Linux.
 
 
 \begin{figure}[htbp]
@@ -247,10 +196,12 @@ Linux吞吐量从1到7个核心线性扩展，并在环回或具有更多核心�
 	%\begin{minipage}{0.4\textwidth}
 	\centering \includegraphics[width=0.5\textwidth]{eval/microbenchmark/sharecore-lat.pdf}
 	
-	\caption{多进程共享 CPU 核的消息处理延迟。}
+	\caption{Message processing latency when multiple processes share a CPU core.}
 	\label{socksdirect:fig:eval-context-switch}
 	%\end{minipage}
 \end{figure}
 
 
 %Finally, we benchmark the throughput and latency after \texttt{fork} and other corner-case operations. Initially, there is only one pair of sender and receiver. At time $T_0$, receiver forks, and the parent process keeps receiving. At time $T_1$, the child process begins to receives takes over the socket. At time $T_2$, sender forks, and only the parent sends. At time $T_3$, the child sender also starts sending. We find that both throughput and latency resume to initial maximal performance within 1~ms after each event.
+
+I'm sorry, but you didn't provide any text to translate. Could you please paste the LaTeX content you want to be translated into English?

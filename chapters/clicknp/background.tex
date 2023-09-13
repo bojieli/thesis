@@ -1,143 +1,108 @@
-%!TEX root=main.tex
-\section{背景}
+\section{Background}
 \label{clicknp:sec:background}
 
-\subsection{软件虚拟网络与网络功能的性能挑战}
+\subsection{Performance Challenges of Software Virtual Networks and Network Functions}
 
+Virtual networks are typically implemented with virtual switch software, such as Open vSwitch \cite{pfaff2015design}.
+To enhance the performance of virtual networks and meet programmability requirements, cloud service providers have redesigned software virtual switches.
+By leveraging high-speed network packet processing technologies such as DPDK \cite{dpdk}, and running CPU cores in polling mode, the cost of packet processing can be significantly reduced by bypassing the OS network protocol stack.
+%SoftNIC \cite{han2015softnic} proposes to implement the solidified functions in the network card with software to improve flexibility.
+However, even for simple network packet forwarding that does not do any processing, each CPU core can only handle 10 M to 20 M packets per second \cite{martins2014clickos,netbricks}, which still requires 3 to 6 CPU cores for a 40 Gbps line speed of 60 M packets per second.
 
-虚拟网络通常用虚拟交换机软件实现，如 Open vSwitch \cite{pfaff2015design}。
-为了提高虚拟网络的性能，并满足可编程性要求，云服务商重新设计了软件虚拟交换机。
-通过利用 DPDK \cite{dpdk} 等高速网络处理包技术，并使用轮询模式运行 CPU 核，可以绕过 OS 网络协议栈来显著降低数据包处理成本。
-%SoftNIC \cite{han2015softnic} 提出用软件实现网卡中固化的功能以提高灵活性。
-但是，即使是不做任何处理的简单网络数据包转发，每个 CPU 核每秒也只能处理 10 M 至 20 M 个数据包 \cite{martins2014clickos,netbricks}，对于 60 M 个数据包每秒的 40 Gbps 线速，仍然需要 3 至 6 个 CPU 核。
+Traditional network functions are implemented by dedicated devices deployed at specific locations in the data center, such as F5 load balancers \cite{f5-load-balancer}. These dedicated network function devices are not only expensive, but also not flexible enough to support multi-tenancy in cloud services.
+To support flexible network functions, cloud service providers also deploy software-implemented virtual network functions. For instance, Ananta \cite {ananta} is a software load balancer deployed in Microsoft data centers, used to provide cloud-scale load balancing services.
+To support multiple network functions on a single server, RouteBricks \cite {routebricks}, xOMB \cite{anderson2012xomb} and COMB \cite{comb} adopt the programming model of the Click modular router \cite{kohler2000click}, implementing each network function as a C++ class, allowing each packet to be processed by various network functions in sequence on a CPU core, the so-called "run-to-completion" model.
+These works show that under actual network functions, the speed of packet forwarding per server based on multi-core x86 CPUs can reach 10 Gbps, and capacity can be expanded through multi-core and building more network node clusters.
+To achieve isolation between network functions, NetVM \cite{hwang2015netvm}, ClickOS \cite{martins2014clickos}, HyperSwitch \cite{ram2013hyper}, mSwitch \cite{eisenbud2016maglev} and other works put each network function in a (lightweight) virtual machine, and let the virtual switch distribute packets to these virtual machines for processing in sequence, the so-called "pipeline" model.
+In the pipeline model, packets are repeatedly passed between cores, which is costly.
+NetBricks \cite{netbricks} returned to the "run-to-completion" model, but implemented network functions in high-level languages, and ensured isolation between network functions at the compiler and runtime framework level.
+NFP \cite{sun2017nfp} improves packet processing performance by using multiple parallel network function pipelines.
 
-传统的网络功能由部署在数据中心特定位置的专用设备实现，如 F5 负载均衡器 \cite{f5-load-balancer}。这些专用网络功能设备不仅价格高昂，也不够灵活，不足以支持云服务中的多租户。
-为了支持灵活的网络功能，云服务商还部署了软件实现的虚拟网络功能。例如，Ananta \cite {ananta} 是一个部署在微软数据中心的软件负载均衡器，用于提供云规模的负载均衡服务。
-为了在一台服务器上支持多种网络功能，RouteBricks \cite {routebricks}、xOMB \cite{anderson2012xomb} 和 COMB \cite{comb} 采用 Click 模块化路由器 \cite{kohler2000click} 的编程模型，把每个网络功能实现成一个 C++ 的类，让每个数据包在一个 CPU 核上依次被各个网络功能处理，即所谓 ``运行到结束（run-to-completion）'' 模型。
-这些工作表明，在实际网络功能下，基于多核 x86 CPU 的每台服务器转发数据包的速度可达 10 Gbps，并且可以通过多核和搭建更多网络节点的集群来扩展容量。
-为了实现网络功能之间的隔离，NetVM \cite{hwang2015netvm}、ClickOS \cite{martins2014clickos}、HyperSwitch \cite{ram2013hyper}、mSwitch \cite{eisenbud2016maglev} 等工作把每个网络功能放在一个（轻量级）虚拟机里，并让虚拟交换机把数据包依次分发给这些虚拟机处理，即所谓 ``流水线'' 模型。
-流水线模型中，数据包在多核之间反复传递，开销较高。
-NetBricks \cite{netbricks} 回到了 ``运行到结束'' 模型，但用高级语言实现网络功能，并在编译器和运行框架的层面上保证网络功能之间的隔离性。
-NFP \cite{sun2017nfp} 利用多个并行的网络功能流水线提高数据包处理的性能。
+Although virtual switches and network functions implemented via software can support higher performance with more CPU cores and larger network node clusters, this will significantly increase asset and operating costs \cite {ananta,duet}.
+The profitability of Infrastructure as a Service (IaaS) cloud service providers is the difference between the price customers pay for virtual machines and the cost of hosting these virtual machines.
+Given that the asset and operating costs of each server are essentially determined at the time of deployment, the most effective way to reduce the cost of hosting virtual machines is to package more customer virtual machines on each computing node server and decrease the number of servers for network and storage nodes.
+Currently, the price of a physical CPU core (2 hyperthreads, i.e., 2 vCPUs) is approximately $0.1 per hour, meaning the maximum potential income is around $900 per year \cite{smartnic}.
+In data centers, servers usually serve for 3 to 5 years, so the highest price of a physical CPU core during the server's life cycle can reach $4500 \cite{smartnic}.
+Even considering that some CPU cores are always unsold, and the cloud often offers discounts to large customers, compared with dedicated hardware, even dedicating a physical CPU core to virtual networking is quite costly.
 
-虽然软件实现的虚拟交换机和网络功能可以使用更多数量的 CPU 核和更大的网络节点集群来支持更高的性能，但这样做会增加相当大的资产和运营成本 \cite {ananta,duet}。
-云服务商在 IaaS 业务中的盈利能力是客户为虚拟机支付的价格与托管虚拟机的成本之间的差异。
-由于每台服务器的资产和运营成本在上架部署时就已基本确定，因此降低托管虚拟机成本的最佳方法是在每台计算节点服务器上打包更多的客户虚拟机，并减少网络和存储节点的服务器数量。
-目前，物理 CPU 核（2 个超线程，即 2 个 vCPU）的售价为 0.1 美元/小时左右，亦即最大潜在收入约为 900 美元/年 \cite{smartnic}。
-在数据中心，服务器通常服役 3 到 5 年，因此一个物理 CPU 核在服务器生命周期内的售价最高可达 4500 美元 \cite{smartnic}。
-即使考虑到总有一部分 CPU 核没有被售出，并且云经常为大客户提供折扣，与专用硬件相比，即使专门分配一个物理 CPU 核用于虚拟网络也是相当昂贵的。
+To accelerate virtual networks and network functions, previous work has proposed using GPUs \cite {packetshader}, Network Processors (NP) \cite {cavium,netronome} and hardware network switches \cite {duet}.
+GPUs were initially used primarily for graphics processing, but in recent years have expanded to other applications with massive data parallelism.
+PacketShader \cite {packetshader} demonstrates that using GPUs can achieve a packet switching speed of 40Gbps.
+GPUs are suitable for batch operations, but batch operations can lead to high latency.
+For instance, the forwarding latency reported by PacketShader \cite {packetshader} is about $200 \mu{}s$, which is two orders of magnitude higher than \name{}.
+As discussed in section \ref{smartnic-fpga}, compared with GPUs, FPGAs can fully utilize pipeline parallelism, data parallelism and request parallelism to achieve low-latency, high-throughput packet processing.
+Network processors are specifically used for processing network traffic and have many hard-wired network accelerators.
+NP-Click \cite{shah2004np} implemented the Click programming framework on network processors.
+The year after the Click modular router \cite{kohler2000click} was proposed, NP-Click \cite{shah2004np} implemented the Click programming framework on network processors.
+As discussed in section \ref{smartnic-np}, the main problem with network processors is that single-flow throughput is limited by single-core performance.
+As discussed in section \ref{background:sec:network-function}, the main problem with hardware network switches is insufficient flexibility and lookup table capacity \cite {duet}.
 
-为了加速虚拟网络和网络功能，以前的工作已经提出使用 GPU \cite {packetshader}，网络处理器（Network Processor，NP） \cite {cavium,netronome} 和硬件网络交换机 \cite {duet}。
-GPU 早期主要用于图形处理，近年来扩展到具有海量数据并行性的其他应用程序。
-PacketShader \cite {packetshader} 表明使用 GPU 可以实现 40Gbps 的分组交换速度。
-GPU 适合批量操作，但是，批量操作会导致高延迟。
-例如，PacketShader \cite {packetshader} 报告的转发延迟约为 $200 \mu{}s$，比 \name{} 高两个数量级。
-如第 \ref{smartnic-fpga} 节讨论的，与GPU相比，FPGA可以充分利用流水线并行、数据并行和请求并行，实现低延迟、高吞吐量的数据包处理。
-网络处理器专门用于处理网络流量并且具有许多硬连线（hard-wired）的网络加速器。
-NP-Click \cite{shah2004np} 在网络处理器上实现了 Click 编程框架。
-Click 模块化路由器 \cite{kohler2000click} 提出的第二年，NP-Click \cite{shah2004np} 就在网络处理器上实现了 Click 编程框架。
-如第 \ref{smartnic-np} 节讨论的，网络处理器的主要问题是单流（single flow）吞吐量受单核性能局限。
-如第 \ref{background:sec:network-function} 节讨论的，硬件网络交换机的主要问题是灵活性和查找表容量不足 \cite {duet}。
+As discussed in Section \ref{smartnic-fpga}, utilizing FPGA for network function processing poses a series of challenges. This paper concentrates on harnessing massive parallelism and programming toolchains. Compared to CPUs or GPUs, FPGAs typically have lower clock frequencies and smaller memory bandwidth. For instance, the typical clock frequency of an FPGA is about 200MHz, an order of magnitude slower than a CPU (2 to 3~GHz). Similarly, the bandwidth of a single block of memory or external DRAM on an FPGA is usually 2 to 10~GBps, while the DRAM bandwidth of an Intel Xeon CPU is about 60~GBps, and the GDDR5 or HBM bandwidth of a GPU can reach hundreds of GBps. However, CPUs or GPUs only have a limited number of cores, which restricts parallelism. FPGAs have a large amount of built-in parallelism. Modern FPGAs may have millions of LEs, hundreds of K-bit registers, tens of M-bit BRAMs, and thousands of DSP modules. Theoretically, each of them can work in parallel. Therefore, thousands of parallel "\textit{cores}" may be running simultaneously inside an FPGA chip. Although the bandwidth of a single BRAM may be limited, if thousands of BRAMs are accessed in parallel, the total memory bandwidth can reach several TBps! Therefore, to achieve high performance, programmers must fully utilize this massive parallelism.
 
-如第 \ref{smartnic-fpga} 节讨论的，使用 FPGA 来做网络功能处理存在一系列挑战，本文关注利用大规模并行性和编程工具链两个方面。
-与CPU或GPU相比，FPGA通常具有更低的时钟频率和更小的存储器带宽。
-例如，FPGA的典型时钟频率约为200MHz，比CPU慢一个数量级（2至3~GHz）。
-同样，FPGA的单块存储器或外部DRAM的带宽通常为2至10~GBps，而Intel Xeon CPU的DRAM带宽约为60~GBps，GPU的GDDR5或HBM带宽可高达数百 GBps。
-但是，CPU或GPU只有有限的内核，这限制了并行性。 FPGA内置了大量的并行性。
-现代FPGA可能拥有数百万个LE，数百个K位寄存器，数十个M位BRAM和数千个DSP模块。从理论上讲，它们中的每一个都可以并行工作。
-因此，FPGA芯片内部可能会同时运行数千个并行的``\textit {核}''。
-虽然单个BRAM的带宽可能有限，但如果并行访问数千个BRAM，则总内存带宽可达数TBps！
-因此，为了实现高性能，程序员必须充分利用这种大规模的并行性。
+Traditionally, FPGAs are programmed using hardware description languages such as Verilog and VHDL. These languages are too low-level, difficult to learn, and complex to program. Therefore, the large software programmer community has been far from FPGAs for many years~\cite{bacon2013fpga}. To simplify FPGA programming, the industry and academia have developed many high-level synthesis tools and systems, aiming to convert programs in high-level languages (mainly C) into hardware description languages. However, as the next subsection will discuss, they are not suitable for network function processing, which is the focus of this work.
 
-传统上，FPGA使用诸如Verilog和VHDL之类的硬件描述语言进行编程。
-这些语言水平太低，难以学习，编程也很复杂。
-因此，大型软件程序员社区已经远离FPGA多年了~\cite {bacon2013fpga}。
-为了简化 FPGA 编程，工业界和学术界开发了许多高级综合工具和系统，旨在将高级语言（主要是C）的程序转换为硬件描述语言。
-但是，正如下一小节将讨论的，它们都不适合网络功能处理，这是本工作的重点。
+\subsection{FPGA-based Network Function Programming}
 
-\subsection{基于 FPGA 的网络功能编程}
+The aim of this chapter is to leverage FPGAs to construct a multi-functional, high-performance network function platform. Such a platform should meet the following requirements.
 
-本章的目标是利用FPGA加速构建一个多功能，高性能的网络功能平台。这样的平台应满足以下要求。
+\textbf{Flexibility.} The platform should be \textit{fully programmed in high-level languages.} Developers should be able to program using high-level abstractions and familiar tools, just like programming on multi-core processors. This is a prerequisite for most software programmers to use FPGAs.
 
-\textbf {灵活性。} 平台应该\textit {完全使用高级语言编程。}
-开发人员应当能使用高级抽象和熟悉的工具编程，就像在多核处理器上编程一样。
-这是使大多数软件程序员可以使用FPGA的必要条件。
+\textbf{Modularity.} The network function platform should support a \textit{modular architecture} for packet processing. Previous experiences with virtualized network functions have shown that the correct modular architecture can capture many common functions in packet processing~\cite{kohler2000click,martins2014clickos}, making them easy to reuse in various network functions.
 
-\textbf {模块化。} 网络功能平台应该支持\textit {模块化架构}进行数据包处理。以前关于虚拟化网络功能的经验表明，正确的模块化架构可以很好地捕获数据包处理中的许多常见功能~\cite {kohler2000click,martins2014clickos}，使它们易于在各种网络功能中重用。
+\textbf{High performance, low latency.} Network functions in data centers should process a large number of packets at line rates of 40 / 100~Gbps, with ultra-low latency. Previous work has shown~\cite{rollback-mb} that even a few hundred microseconds of latency added by network functions can negatively impact the service experience.
 
-\textbf {高性能、低延迟。} 数据中心的网络功能应该以40 / 100~Gbps的线路速率处理大量数据包，具有超低延迟。以前的工作已经显示~\cite {rollback-mb}，即使网络功能添加的几百微秒的延迟也会对服务体验产生负面影响。
+\textbf{Support for CPU/FPGA joint packet processing.} FPGA is not a panacea. As discussed in Section \ref{smartnic-fpga}, not all tasks are suitable for FPGAs. Larger logic cannot be accommodated in FPGAs. Therefore, fine-grained processing separation between the CPU and FPGA should be supported. This requires high-performance communication between the CPU and FPGA.
 
-\textbf {支持 CPU/FPGA 联合数据包处理。} FPGA 不是万能药。
-正如第 \ref{smartnic-fpga} 节所讨论的，并非所有任务都适用于FPGA。
-FPGA 中也无法容纳较大的逻辑。
-因此，应该支持CPU和FPGA之间的细粒度处理分离。这需要CPU和FPGA之间的高性能通信。
+FPGAs have long been used to implement network routers and switches. NetFPGA \cite{lockwood2007netfpga} proposed an open hardware platform for implementing routers on FPGAs. In recent years, FPGAs have also been used to accelerate network functions \cite{rubow2010chimpp,lavasani2012compiling}. As early as the second year after the Click modular router \cite{kohler2000click} programming framework was proposed, Xilinx proposed Cliff \cite{kulkarni2004mapping} for implementing Click with FPGA, requiring hardware developers to implement a Click element as a hardware module using hardware description languages. Subsequently, CUSP \cite{schelle2005cusp} and Chimpp \cite{rubow2010chimpp} proposed a series of improvements, simplifying the interconnection of hardware modules and enhancing the capabilities of software-hardware co-processing and software simulation. However, the above work programs FPGAs using Verilog, VHDL, and other hardware description languages. It is well known that hardware description languages are difficult to debug, write, and modify, posing significant challenges for software personnel to use FPGAs.
 
+To enhance the development efficiency of Field-Programmable Gate Arrays (FPGAs), manufacturers of these devices offer high-level synthesis (HLS) tools~\cite{vivado,intel-hls} capable of compiling restricted C code into hardware modules. However, these tools merely supplement the hardware development toolchain, and programmers are still required to manually insert the hardware modules generated from C language into the hardware description language project. Manual handling is also necessary for the communication between the FPGA and the host CPU. Efficient hardware development languages such as Bluespec \cite{bluespec}, Lime \cite{auerbach2010lime}, and Chisel \cite{bachrach2012chisel} \cite{bacon2013fpga,singh2011implementing,wester2015transformation} have been proposed by the academic and industrial communities, but their use requires developers to possess substantial hardware design knowledge. Gorilla \cite{lavasani2012compiling} proposed a domain-specific high-level language for packet switching on FPGAs. While high-level synthesis tools and efficient hardware development languages can enhance the work efficiency of hardware developers, they are still insufficient for software developers to utilize FPGAs.
 
-FPGA 长期被用于实现网络路由器和交换机。
-NetFPGA \cite{lockwood2007netfpga} 提出了一个在 FPGA 上实现路由器的开放硬件平台。
-近年来，FPGA 也被用于加速网络功能 \cite {rubow2010chimpp,lavasani2012compiling}。
-早在 Click 模块化路由器 \cite{kohler2000click} 编程框架被提出的第二年，Xilinx 就提出了用 FPGA 实现 Click 的 Cliff \cite{kulkarni2004mapping}，需要硬件开发人员使用硬件描述语言把一个 Click 元件实现为一个硬件模块。
-此后，CUSP \cite{schelle2005cusp} 和 Chimpp \cite {rubow2010chimpp} 提出了一系列改进，简化了硬件模块的互连，提高了软硬件协同处理、软件仿真的能力。
-然而，上述工作使用 Verilog、VHDL 等硬件描述语言编程 FPGA。众所周知，硬件描述语言难以调试、编写和修改，给软件人员使用 FPGA 带来了很大挑战。
+Click2NetFPGA~\cite {Click2NetFPGA} employs high-level synthesis tools to directly compile the C++ code of Click modular routers \cite {kohler2000click} to FPGA, thereby providing a modular architecture. However, several bottlenecks exist in the system design of Click2NetFPGA's performance (such as memory and packet I/O), and the code has not been optimized to ensure fully pipelined processing, resulting in a performance that is two orders of magnitude lower than that of this paper. Moreover, Click2NetFPGA does not support FPGA/CPU joint processing, thus it cannot update configurations or read states during data plane runtime.
 
-为了提高 FPGA 的开发效率，FPGA厂商提供了高层次综合（HLS）工具~\cite{vivado,intel-hls}，可以把受限的 C 代码编译成硬件模块。但这些工具只是硬件开发工具链的补充，程序员仍然需要手动将从C语言生成的硬件模块插入到硬件描述语言的项目中，且 FPGA 与主机 CPU 之间的通信也需要自行处理。学术界和工业界提出了 Bluespec \cite{bluespec}、Lime \cite{auerbach2010lime} 和 Chisel \cite{bachrach2012chisel} 等高效硬件开发语言 \cite{bacon2013fpga,singh2011implementing,wester2015transformation}，但它们需要开发者具有足够的硬件设计知识。Gorilla \cite {lavasani2012compiling} 为 FPGA 上的数据包交换提出了一种领域特定的高级语言。高层次综合工具和高效硬件开发语言可以提高硬件开发人员的工作效率，但仍然不足以让软件开发人员使用 FPGA。
-
-Click2NetFPGA~\cite {Click2NetFPGA} 利用高层次综合工具，直接将 Click 模块化路由器 \cite {kohler2000click} 的 C++ 代码编译到 FPGA 来提供模块化架构。
-然而，Click2NetFPGA 的性能的系统设计存在若干瓶颈（例如，内存和数据包 I/O），它们也没有优化代码以确保完全流水线处理，因此比本文达到的性能低两个数量级。
-此外，Click2NetFPGA 不支持 FPGA / CPU 联合处理，因此无法在数据平面运行时更新配置或读取状态。
-
-近年来，为了让软件开发人员使用FPGA，FPGA厂商提出了基于OpenCL的编程工具链~\cite{aoc,sdaccel}，提供了类似GPU的编程模型，如图 \ref{intro:fig:opencl} 所示。软件开发人员可以把用OpenCL语言编写的核（kernel）卸载到FPGA上。
-
+In recent years, to enable software developers to use FPGA, manufacturers of these devices have proposed OpenCL-based programming toolchains~\cite{aoc,sdaccel}, offering a GPU-like programming model, as depicted in Figure \ref{intro:fig:opencl}. Software developers can offload kernels written in OpenCL language to FPGA.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.7\textwidth]{../figures/opencl.pdf}
-	\caption{OpenCL 核之间以及核与网络、主机的通信方式：共享内存。}
+	\caption{Communication method between OpenCL kernels and between kernels and network, host: shared memory.}
 	\label{intro:fig:opencl}
 \end{figure}
 
+Nonetheless, this method has its limitations. Multiple parallel executing kernels need to communicate through on-board shared memory, and the DRAM throughput and latency on the FPGA are not ideal, making shared memory a communication bottleneck. Furthermore, the communication model between FPGA and CPU resembles a GPU-like batch processing model. The communication between the host program and the FPGA kernel must always go through the on-board DDR memory. This results in higher processing latency (about 1 millisecond), which is not suitable for network packet processing that requires microsecond-level latency. Thirdly, OpenCL kernel functions require explicit calls from software programs on the host machine. Before the kernel terminates, the host program cannot control the kernel behavior, such as setting new parameters, nor can it read any kernel state. However, network functions face a continuous stream of data packets and should always be running. Lastly, OpenCL does not support joint packet processing between CPU and FPGA, and packet processing on the CPU can only be performed outside the OpenCL framework.
 
-但是，这种方法中多个并行执行的核间需要通过板上共享内存进行通信，而FPGA上的DRAM吞吐量和延迟都不理想，共享内存还会成为通信瓶颈。
-其次，FPGA与CPU之间的通信模型是类似GPU的批处理模型，主机程序和FPGA内核之间的通信必须始终通过板载DDR内存。这使得处理延迟较高（约1毫秒），不适用于需要微秒级延迟的网络数据包处理。
-第三，OpenCL内核函数需要宿主机上的软件程序显式调用。
-在内核终止之前，主机程序无法控制内核行为，例如设置新参数，也不能读取任何内核状态。
-但是网络功能面临着连续的数据包流，应该始终在运行。
-第四，OpenCL不支持CPU和FPGA之间的联合数据包处理，CPU上的数据包处理只能在 OpenCL 框架以外进行。
+The following will introduce \name{}, a novel FPGA-accelerated network function platform that meets the requirements of flexibility, modularity, high performance, low latency, and CPU/FPGA joint processing.
 
-下文将介绍 \name{}，一种新颖的FPGA加速网络功能平台，满足灵活性、模块化、高性能、低延迟和 CPU/FPGA 联合处理的要求。
-
-网络数据包处理属于流式处理。ST-Accel \cite{ruan2018st} 指出，在 FPGA 中通过 FIFO 进行流式处理的效率比共享内存更高，可以达到更低的延迟和更高的吞吐量。为此，在 \name	框架内，FPGA 的处理逻辑模块以及网络和主机之间也应当通过 FIFO 管道来通信，如图 \ref{intro:fig:element_conn} 所示。
+Network packet processing belongs to stream processing. ST-Accel \cite{ruan2018st} pointed out that the efficiency of stream processing through FIFO in FPGA is higher than that of shared memory, which can achieve lower latency and higher throughput. For this reason, within the \name framework, the processing logic modules of FPGA and the communication between the network and the host should also be through the FIFO pipeline, as shown in Figure \ref{intro:fig:element_conn}.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=1.0\textwidth]{image/element_conn.pdf}
-	\caption{ClickNP 核之间以及核与网络、主机的通信方式：管道（FIFO）。}
+	\caption{Communication method between ClickNP kernels and between kernels and network, host: pipeline (FIFO).}
 	\label{intro:fig:element_conn}
 \end{figure}
 
-
 \egg{
-Today's data centers rely on a wide range of network functions to implement network virtualization, ensure security (e.g. firewalls and intrusion detection/prevention systems), perform measurements and improve performance (e.g. traffic scheduling). As data centers are moving towards 40 Gbps bandwidth at end hosts, where the line-rate is 60 M packets per second for minimum-sized packets, higher throughput requirement is imposed upon network processors. Furthermore, as data center services are evolving rapidly, programmability becomes indispensable for network processors. However, existing network processors has a large mismatch to the performance and programmability requirements.
+Today's data centers depend on a broad array of network functions to implement network virtualization, ensure security (e.g., firewalls and intrusion detection/prevention systems), carry out measurements, and enhance performance (e.g., traffic scheduling). As data centers are transitioning towards 40 Gbps bandwidth at end hosts, where the line-rate is 60 M packets per second for minimum-sized packets, a higher throughput requirement is imposed on network processors. Moreover, as data center services are rapidly evolving, programmability becomes essential for network processors. However, existing network processors have a significant mismatch to the performance and programmability requirements.}
 
 \subsection{Architectures for Network Processors}
 
-Network processors based on general-purpose CPUs such as ClickOS \cite{martins2014clickos} enjoy good programmablity, modularity and composabilty, but the packet forwarding performance of a single core could not keep up with 10 Gbps line rate for minimum-sized packets, even before any network function is plugged in. Because CPU instructions are executed one-by-one and have low parallelism, packet processing performance would drop further as more network functions are added. If a CPU-based network processor is added bump-in-the-wire, there will be 10s of microseconds additional end-to-end latency \cite{martins2014clickos} which is one magnitude higher than the switching fabric. In network virtualization scenario, if packet encapsulation and decapsulation is done at end hosts, as in the case of virtual switch, 网卡 offloading mechanisms including Large Send Offload (LSO) and Large Receive Offload (LRO) have to be disabled, which has a huge impact on TCP performance \cite{yoshino2008performance}.
+Network processors based on general-purpose CPUs such as ClickOS \cite{martins2014clickos} offer excellent programmability, modularity, and composability, but the packet forwarding performance of a single core cannot keep up with a 10 Gbps line rate for minimum-sized packets, even before any network function is plugged in. Because CPU instructions are executed sequentially and have low parallelism, packet processing performance would drop further as more network functions are added. If a CPU-based network processor is added bump-in-the-wire, there will be tens of microseconds additional end-to-end latency \cite{martins2014clickos}, which is one magnitude higher than the switching fabric. In a network virtualization scenario, if packet encapsulation and decapsulation are done at end hosts, as in the case of a virtual switch, network card offloading mechanisms including Large Send Offload (LSO) and Large Receive Offload (LRO) have to be disabled, which has a significant impact on TCP performance \cite{yoshino2008performance}.
 
-ASICs are known to be high-performance, but the network functions are fixed. Commodity switching ASICs typically have a pipeline of network functions \cite{broadcomethernet}, where each function can be configured via registers and a match table based on TCAM or memory. Some ASICs provide flexible OpenFlow-like match-action tables \cite{broadcomopenflow}, but the packet parser is fixed (we could not support new packet header and shim layer formats), actions are not extensible and the order of network functions in the pipeline is not reconfigurable.
+ASICs are known to be high-performance, but the network functions are fixed. Commodity switching ASICs typically have a pipeline of network functions \cite{broadcomethernet}, where each function can be configured via registers and a match table based on TCAM or memory. Some ASICs provide flexible OpenFlow-like match-action tables \cite{broadcomopenflow}, but the packet parser is fixed (we could not support new packet header and shim layer formats), actions are not extensible, and the order of network functions in the pipeline is not reconfigurable.
 
-GPUs are widely used as co-processors for computing-intensive tasks, but its SIMD (Single-Instruction Multiple-Data) programming model does not fit network processing, where different types of packets may take various execution flows. The high power consumption, high latency of batch processing and inability to receive and send network packets without CPU intervention are also factors that render GPU-based network processor infeasible in data centers.
+GPUs are extensively utilized as co-processors for tasks that require intensive computing, but their SIMD (Single-Instruction Multiple-Data) programming model is not suitable for network processing, where different packet types may follow various execution flows. The high power consumption, the high latency of batch processing, and the inability to send and receive network packets without CPU intervention also make GPU-based network processors impractical in data centers.
 
-Fortunately, reconfigurable hardware is an architecture that provides both programmability, high performance and power efficiency for certain workloads. FPGA (field programmable gate arrays) is the most prominent example of reconfigurable hardware. FPGAs can implement arbitrary logic function and utilize distributed on-chip registers and SRAM to exploit bit-level and task-level parallelism, therefore stream processing pipelines would not ``hit the memory wall'' as in Von Neumann architecture \cite{bacon2013fpga}. FPGA has shown potential in accelerating many workloads in cloud \cite{putnam2014reconfigurable}. Moreover, Moore's law is still working in FPGA industry, because the fabrication technology of FPGA is currently several generations behind the CPU industry [citation required].
+Fortunately, reconfigurable hardware is an architecture that offers both programmability and high performance, as well as power efficiency for certain workloads. The most notable example of reconfigurable hardware is FPGA (field programmable gate arrays). FPGAs can implement any logic function and use distributed on-chip registers and SRAM to exploit bit-level and task-level parallelism, so stream processing pipelines do not "hit the memory wall" as in Von Neumann architecture \cite{bacon2013fpga}. FPGAs have shown potential in accelerating many workloads in the cloud \cite{putnam2014reconfigurable}. Moreover, Moore's law is still applicable in the FPGA industry, as the fabrication technology of FPGA is currently several generations behind the CPU industry [citation required].
 
 \subsection{FPGA Programming Challenge}
 
-Despite FPGA's potential in network processing, the programmablity of FPGA is traditionally provided by hardware description languages (硬件描述语言) such as Verilog, which requires hardware knowledge and are much harder to program and debug than higher-level languages such as C/C++. Thus, existing FPGA-based network processors such as NetFPGA \cite{lockwood2007netfpga} are hard to program for software engineers.
+Despite the potential of FPGA in network processing, FPGA's programmability is traditionally provided by hardware description languages (Hardware Description Languages) such as Verilog, which require hardware knowledge and are much more difficult to program and debug than higher-level languages like C/C++. Therefore, existing FPGA-based network processors such as NetFPGA \cite{lockwood2007netfpga} are challenging to program for software engineers.
 
-Many works, e.g. OpenFlow \cite{mckeown2008openflow}, P4 \cite{bosshart2014p4} and 软件定义网络et \cite{xilinxsdnet}, provides the programmability by abstracting a set of primitives in network processing and defining a high-level programming language to compose the primitives. This direction has proved effective, but the programmability is limited to a set of pre-defined actions, which could not keep pace with rapid development of data center network functions. Our work strive to make the primitives extensible for software engineers.
+Many works, for example, OpenFlow \cite{mckeown2008openflow}, P4 \cite{bosshart2014p4}, and Software Defined Network et \cite{xilinxsdnet}, provide programmability by abstracting a set of primitives in network processing and defining a high-level programming language to compose the primitives. This approach has proven effective, but the programmability is limited to a set of predefined actions, which cannot keep up with the rapid development of data center network functions. Our work aims to make the primitives extensible for software engineers.
 
-Fortunately, several frameworks have been proposed to provide abstractions for generic FPGA programming. Examples of such works include Xilinx Vivado 高层次综合 (High Level Synthesis) \cite{feist2012vivado} based on C/C++, Altera SDK for OpenCL \cite{czajkowski2012opencl} based on C-like OpenCL and IBM Lime \cite{auerbach2010lime} based on Java.
+Fortunately, several frameworks have been proposed to provide abstractions for generic FPGA programming. Examples of such works include Xilinx Vivado High Level Synthesis \cite{feist2012vivado} based on C/C++, Altera SDK for OpenCL \cite{czajkowski2012opencl} based on C-like OpenCL and IBM Lime \cite{auerbach2010lime} based on Java.
 
-However, FPGA has a completely different architecture than general-purpose CPUs. For software programmers that bear Von Neumann model in mind, the compilers may generate surprisingly poor hardware logic for reasonable code in high-level language. For example, Click2NetFPGA \cite{Click2NetFPGA} uses LLVM and 高层次综合 tools to compile optimized Click C++ code into 硬件描述语言, but the resulting FPGA-based router can only process 178 K pps (packets per second) for 98B packets, and 215 Mbps for large packets, which is 30 -- 50x slower than a CPU core in ClickOS \cite{martins2014clickos}. The bottleneck for small packets is the IP header checking stage \cite{Click2NetFPGA} because this stage is not fully pipelined; the bottleneck for large packets is the byte-wide shared memory \cite{Click2NetFPGA}, indicating a shared-memory design suitable for Von Neumann model would yield poor performance on FPGA.
+However, FPGA has a completely different architecture than general-purpose CPUs. For software programmers that bear Von Neumann model in mind, the compilers may generate surprisingly poor hardware logic for reasonable code in high-level language. For example, Click2NetFPGA \cite{Click2NetFPGA} uses LLVM and high-level synthesis tools to compile optimized Click C++ code into hardware description language, but the resulting FPGA-based router can only process 178 K pps (packets per second) for 98B packets, and 215 Mbps for large packets, which is 30 -- 50x slower than a CPU core in ClickOS \cite{martins2014clickos}. The bottleneck for small packets is the IP header checking stage \cite{Click2NetFPGA} because this stage is not fully pipelined; the bottleneck for large packets is the byte-wide shared memory \cite{Click2NetFPGA}, indicating a shared-memory design suitable for Von Neumann model would yield poor performance on FPGA.
 
 FPGA has millions of logic gates with 10x slower clock rate than CPU, thousands of distributed fast SRAMs each with only KB capacity, and a large DRAM with 10x lower throughput than DRAMs in CPU architecture. Consequently, exploiting both spatial and temporal parallelism is crucial to unleashing the performance of FPGA. In network stream processing, most operations are independent of each other and therefore can be either parallelized (spatial) or pipelined (temporal), so that each stage of the pipeline can process different packets in parallel.
 
@@ -152,11 +117,11 @@ We highlight several design goals for our ClickNP framework to enable software e
 
 \smalltitle{Code reuse.} Many network applications share a common set of elements, for example packet parser, lookup tables and packet modifications. Code of these elements should be reusable and elements should be composable. Software engineers should be able to write many network applications simply by connecting elements in the library.
 
-\smalltitle{Debugging support.} First, as 硬件描述语言 (e.g. Verilog) simulation and debugging is both time consuming and requires extensive hardware knowledge, the framework should be able to compile OpenCL-based ClickNP programs to native x86 code for emulation, and provide traffic generators and receivers to test functionality. Second, as CPU is neither capable of sending or receiving packets at 60 Mpps, we need a FPGA-based network benchmark suite to perform stress testing on the network processor.
+\smalltitle{Debugging support.} First, as hardware description language (e.g. Verilog) simulation and debugging is both time consuming and requires extensive hardware knowledge, the framework should be able to compile OpenCL-based ClickNP programs to native x86 code for emulation, and provide traffic generators and receivers to test functionality. Second, as CPU is neither capable of sending or receiving packets at 60 Mpps, we need a FPGA-based network benchmark suite to perform stress testing on the network processor.
 
-\smalltitle{Separation of control plane and data plane.} On one hand, our throughput requirement requires most network packets to be processed through the reconfigurable hardware without any CPU intervention. On the other hand, 软件定义网络 and 网络功能虚拟化 applications are usually complicated and have external dependencies. Therefore a clear interface between the control plane and the data plane is mandatory, where data plane programs are written within ClickNP framework and target massive parallelism, and control plane programs need only slight modifications to call our host library and perform on-the-fly reconfigurations.
+\smalltitle{Separation of control plane and data plane.} On one hand, our throughput requirement requires most network packets to be processed through the reconfigurable hardware without any CPU intervention. On the other hand, software-defined networking and network function virtualization applications are usually complicated and have external dependencies. Therefore a clear interface between the control plane and the data plane is mandatory, where data plane programs are written within ClickNP framework and target massive parallelism, and control plane programs need only slight modifications to call our host library and perform on-the-fly reconfigurations.
 
-\smalltitle{Host communication.} Network processors require low-latency and high-throughput interactions with the host machine. In 软件定义网络 and 网络功能虚拟化 applications, FPGA needs to send unknown packets to the controller and request a new forwarding rule to be inserted into FPGA. The round-trip time should be as low as possible to reduce end-to-end flow establish time. In packet replay and capture applications, FPGA needs to receive or send Gigabytes of packets from or to the host machine without using the network adapter.
+\smalltitle{Host communication.} Network processors require low-latency and high-throughput interactions with the host machine. In Software Defined Networks and Network Function Virtualization applications, FPGA needs to send unknown packets to the controller and request a new forwarding rule to be inserted into FPGA. The round-trip time should be as low as possible to reduce end-to-end flow establish time. In packet replay and capture applications, FPGA needs to receive or send Gigabytes of packets from or to the host machine without using the network adapter.
 
 We design ClickNP to meet the above design goals with Catapult FPGA \cite{putnam2014reconfigurable} and Altera OpenCL \cite{singh2011implementing}. In the next section, we will describe the FPGA and OpenCL components, and how we build a toolchain that abstracts away hardware specific details.
 }
@@ -188,7 +153,7 @@ implement different processing.
 % I/O
 Finally, FPGA supports various I/O interface. Normally, GPU can only communicate with PC memory through PCIE bus. 
 But FPGA can input or output data from many interfaces like network ports, and is more suitable for processing these 
-I/O streams. 
+I/O streams.
 
 FPGA is a mature technology and becomes inexpensive. A large scale deployment of FPGA in Microsoft datacenter shows 
 that a high-end FPGA board increases the total cost of ownership (TCO) of a server by less than 30\%, but can double 

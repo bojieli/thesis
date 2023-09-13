@@ -1,198 +1,148 @@
 % !TeX root = ../main.tex
-\chapter{绪论}
+\chapter{Introduction}
 \label{chapter:intro}
 
-\section{研究的背景和意义}
+\section{Research Background and Significance}
 \label{intro:sec:background}
 
+Data centers serve as the "brains" of the Internet, providing the infrastructure necessary for storing vast amounts of data, performing large-scale computations, and offering Internet services. In the first decade of the 21st century, data centers primarily processed tasks that were easily parallelizable, such as websites and search engines. The rapid improvement in the performance of general-purpose processors also made the advantages of dedicated hardware less apparent. Consequently, Internet data centers often employed a large number of low-cost standard servers for construction \cite{barroso2009datacenter}.
 
-数据中心是互联网的 ``大脑''，也是人类存储海量数据、进行大规模计算和提供互联网服务的基础设施。21 世纪第一个十年，数据中心主要处理 Web 网站、搜索引擎等容易并行的任务；通用处理器的高速性能提升也使得专用硬件的优势不甚明显。因此，互联网数据中心多使用大量低成本的标准服务器搭建 \cite{barroso2009datacenter}。
+In the past decade, the emergence of big data and artificial intelligence has altered the application load characteristics of data centers. On one hand, big data processing and machine learning workloads demand high computational power. However, due to the slowdown of Moore's Law and the end of Dennard's scaling law, the increase in frequency and number of multi-cores of general-purpose processors has been limited by the power wall in the past decade \cite{borkar2011future}. Therefore, the "free lunch" of general-purpose processor performance improvement has ended, ushering in the era of architectural innovation. Customized hardware such as GPUs, FPGAs, and TPUs \cite{jouppi2018motivation} are now widely deployed in data centers. On the other hand, big data processing and machine learning workloads require multiple nodes to work closely together, necessitating high inter-node communication bandwidth and low latency. To efficiently provide message passing and shared memory inter-process communication paradigms for distributed systems, efficient message passing needs to be implemented in the network, and high-performance shared data structure storage needs to be implemented at the storage level. Therefore, in the past decade, data center networks have evolved from 1 Gbps to 40 Gbps, and there is a trend to evolve to 100 Gbps. Dedicated interconnects between customized hardware are also becoming a trend. %As NVIDIA CEO Jensen Huang said, future data centers will be like supercomputers \cite{nvidia-datacenter}.
 
-近十年来，大数据与人工智能的兴起改变了数据中心的应用负载特性。一方面，大数据处理、机器学习等负载对算力要求很高。然而，由于摩尔定律的放缓和 Dennard 缩放定律的终结，近十年来，通用处理器的频率提升和多核核数增加都受到功耗墙的限制 \cite{borkar2011future}。因此，通用处理器性能提升 ``免费的午餐'' 已经结束，体系结构的创新迎来了春天，GPU、FPGA、TPU \cite{jouppi2018motivation} 等定制化硬件在数据中心内大量部署。另一方面，大数据处理、机器学习等负载需要多个节点紧密协同处理，对节点间的通信带宽和延迟要求较高。为了给分布式系统高效地提供消息传递和共享内存两种进程间通信范式，在网络方面需要实现高效的消息传递，在存储层面需要实现高性能的共享数据结构存储。因此，近十年来，数据中心网络从 1 Gbps 发展到 40 Gbps，并有向 100 Gbps 演进的趋势。定制化硬件之间的专用互连也成为趋势。%如英伟达 CEO 黄仁勋所说，未来的数据中心会像超级计算机一样 \cite{nvidia-datacenter}。
+At the same time, the operational mode of data centers is also undergoing a transformation towards cloudification. A handful of cloud manufacturers are gradually centralizing the computing power of data centers, each possessing millions of servers. Due to the large scale of cloud data centers, cloud service providers can, on one hand, amortize the design and tape-out costs of servers, boards, and even chips, and on the other hand, improve performance indicators and reduce costs through software optimization, thereby achieving significant economic benefits. 
 
-%与此同时，数据中心的运营模式也在经历一场云化的变革。数据中心的算力逐渐集中到少数几家云厂商，每家拥有数以百万计的服务器。由于云数据中心的规模大，云服务商一方面有足够的规模来平摊服务器、板卡甚至芯片的设计和流片成本，另一方面通过软件优化也可以提高性能指标、降低成本，获得可观的经济效益。由于上述应用负载特性的转变和数据中心的云化，工程师获得了从硬件、系统软件到应用程序的全栈优化机会。
+The cloudification of data centers means that a few cloud manufacturers maintain the basic infrastructure of data centers, and IT companies only need to rent computing, network, storage, and other resources from these cloud manufacturers as needed. In cloud data centers, different tenants share a vast pool of computing, storage, and network resources. To achieve resource sharing and performance isolation, data centers require virtualized computing, storage, and networks. 
 
-与此同时，数据中心的运营模式也在逐步云化，即少数几家云厂商维护数据中心的基础架构，IT 企业只需按需从云厂商租用计算、网络、存储等资源。在云数据中心中，不同的租户（tenant）共享一个巨大的计算、存储和网络资源池。为了实现资源共享和性能隔离，数据中心需要虚拟化的计算、存储和网络。如图 \ref{intro:fig:virt-architecture} 所示，在基础设施作为服务（IaaS）的云服务模式下，计算节点上需要提供虚拟网络、虚拟云存储、虚拟本地存储等服务，实际的网络和云存储资源则位于独立的网络节点和存储节点上。计算节点上的虚拟网络和存储服务把数据中心内物理上分散的网络和存储资源虚拟化成逻辑上统一调配的资源（``多虚一''），如同一台规模巨大的计算机 \cite{barroso2018datacenter}。网络和存储节点则不仅需要把物理资源共享给多个计算节点上不同租户的虚拟机使用（``一虚多''），还需要提供数据处理功能和高层抽象。例如，网络节点需要提供防火墙、负载均衡、加密隧道网关、网络地址转换（NAT）等\textit{网络功能}（Network Function）\footnote{本文中\textit{网络功能}是一个专有名词，并不是指交换机和路由器等网络设备，而是指防火墙等网络基础架构中的功能。}；存储节点需要进行数据结构处理以提供对象存储、文件系统存储等高层抽象，还需要进行复制（replication）以实现容灾；除了持久化存储，数据中心还需要提供内存数据结构存储，以支持分布式系统的通信 \footnote{分布式系统的通信有消息传递和共享内存两种范式。消息传递可以直接映射到网络通信。共享内存范式对开发者更友好，可以支持高可用性和可扩放性，在网络互连的分布式系统中需要通过消息传递来实现。然而，共享内存的抽象层次较低，因此大多数分布式系统使用共享数据结构存储来取代共享内存。}。
-%第 \ref{chapter:background} 章将详细介绍数据中心虚拟化的背景知识。
+As shown in Figure \ref{intro:fig:virt-architecture}, under the Infrastructure as a Service (IaaS) cloud service model, computing nodes need to provide services such as virtual networks, virtual cloud storage, and virtual local storage, while the actual network and cloud storage resources are located on independent network nodes and storage nodes. The virtual network and storage services on the computing nodes virtualize the physically dispersed network and storage resources in the data center into logically unified resources ("multi-virtual one"), akin to a large-scale computer \cite{barroso2018datacenter}. 
 
+Network and storage nodes not only need to share physical resources with virtual machines of different tenants on multiple computing nodes ("one virtual multi"), but also need to provide data processing functions and high-level abstractions. For instance, network nodes need to provide \textit{network functions} such as firewalls, load balancing, encrypted tunnel gateways, and Network Address Translation (NAT)\footnote{In this article, \textit{network function} is a proper noun, not referring to network devices such as switches and routers, but referring to functions in network infrastructure such as firewalls.}; storage nodes need to perform data structure processing to provide high-level abstractions such as object storage and file system storage, and need to perform replication for disaster recovery.
+
+In addition to persistent storage, data centers also need to provide memory data structure storage to support communication in distributed systems\footnote{Communication in distributed systems has two paradigms: message passing and shared memory. Message passing can be directly mapped to network communication. The shared memory paradigm is more developer-friendly, can support high availability and scalability, and needs to be implemented through message passing in distributed systems with network interconnection. However, the abstraction level of shared memory is relatively low, so most distributed systems use shared data structure storage to replace shared memory.}.
+%Chapter \ref{chapter:background} will introduce the background knowledge of data center virtualization in detail.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/virt_arch.pdf}
-	\caption{虚拟化的数据中心架构。}
+	\caption{Virtualized data center architecture.}
 	\label{intro:fig:virt-architecture}
 \end{figure}
 
+Due to the rapid evolution of cloud services, these virtualized network and storage functions also require flexibility, programmability, and debuggability, which are traditionally often implemented by software running on general-purpose processors. Besides virtualization overhead, the overhead of traditional operating systems cannot be overlooked. The software overhead depicted in the shadowed boxes in Figure \ref{intro:fig:virt-architecture} is referred to as the "data center tax" \cite{barroso2009datacenter,barroso2013datacenter,barroso2018datacenter}.
+In the era of 1 Gbps networks and mechanical hard drives, the CPU overhead and latency introduced by network and storage virtualization as well as the operating system's network and storage protocol stack were acceptable.
+With the trend of increasingly faster networks, storage, and customized computing hardware, the data center tax not only squanders significant CPU resources but also hinders applications from fully exploiting the low latency and high throughput of hardware \cite{barroso2017attack}.
+For instance, as will be elucidated in Chapter \ref{chapter:clicknp}, computing nodes need to allocate a portion of the CPU cores specifically for implementing network and storage virtualization, and these cores will not be available for sale to customers.
+Additionally, virtual networks and network functions will add tens to thousands of microseconds of latency. For comparison, the latency of the data center network itself is only a few to tens of microseconds, and the latency added by virtualization is higher than the latency of the network itself.
+Chapter \ref{chapter:kvdirect} will explain that the throughput of software-implemented shared memory data structure storage is far from that of memory hardware.
+%If you consider that the storage data needs to be compressed and encrypted, each CPU core can only process throughput on the order of 100 MB/s, which is only about 1/50 of the maximum throughput of a data center-level NVMe SSD.
+Chapter \ref{chapter:socksdirect} will explain that applications generally use the socket primitives in the operating system for communication. For communication-intensive applications such as web servers, the operating system occupies a large part of the CPU time; moreover, the socket primitives implemented by the operating system have an order of magnitude higher latency than the Remote Direct Memory Access (RDMA) primitives provided by the hardware.
 
-由于云服务的快速迭代，这些虚拟化的网络、存储功能还需要灵活性、可编程性和可调试性，传统上往往用运行在通用处理器上的软件实现。除了虚拟化开销，传统操作系统的开销也不容忽视。这些图 \ref{intro:fig:virt-architecture} 中阴影背景的方框所示的软件开销被称为 ``数据中心税''（data center tax） \cite{barroso2009datacenter,barroso2013datacenter,barroso2018datacenter}。
-在 1 Gbps 网络和机械硬盘的时代，网络、存储虚拟化以及操作系统网络、存储协议栈引入的 CPU 开销和延迟是可以接受的。
-在网络、存储、定制化计算硬件越来越快的趋势下，数据中心税不仅浪费了可观的 CPU 资源，还导致应用程序无法充分利用硬件的低延迟和高吞吐量 \cite{barroso2017attack}。
-例如，本文第 \ref{chapter:clicknp} 章将说明，计算节点需要分配一部分 CPU 核专门用来实现网络和存储虚拟化，这部分核将无法出售给客户。
-此外，虚拟网络和网络功能都会增加数十乃至上千微秒的延迟。作为比较，数据中心网络本身的延迟只有数微秒至数十微秒，虚拟化增加的延迟比网络本身的延迟还高。
-第 \ref{chapter:kvdirect} 章将说明，软件实现的内存共享数据结构存储与内存硬件的吞吐量相去甚远。
-%如果考虑到存储的数据需要压缩和加密，每个 CPU 核只能处理 100 MB/s 量级的吞吐量，只是一块数据中心级 NVMe SSD 最高吞吐量的约 1/50。
-第 \ref{chapter:socksdirect} 章将说明，应用程序普遍使用操作系统中的套接字（socket）原语来进行通信，对于 Web 服务器等通信密集型的应用程序，操作系统占用了很大部分的 CPU 时间；而且，操作系统实现的套接字原语比硬件提供的远程直接内存访问（RDMA）原语延迟高一个数量级。
+In summary, it is of great importance to reduce the "data center tax" through full-stack optimization combining hardware and software for the performance and cost of modern data centers, which is also the subject of this paper.
 
-综上，通过软硬件结合的全栈优化降低 ``数据中心税'' 对现代数据中心的性能和成本有重要意义，这也是本文研究的课题。
+\section{Research Status at Home and Abroad}
 
+In order to reduce the overhead of the "data center tax", the academic and industrial communities have proposed many solutions, which can be roughly divided into three categories: optimizing software, utilizing new commercial hardware, and designing new hardware.
 
-
-
-
-\section{国内外研究现状}
-
-为了降低 ``数据中心税'' 的开销，学术界和工业界提出了很多方案，大致可以分为优化软件、利用新型商用硬件和设计新硬件三类。
-
-\subsection{优化软件}
+\subsection{Optimizing Software}
 \label{background:sec:software}
 
-传统的网络功能由部署在数据中心特定位置的专用设备实现。这些专用网络功能设备不仅价格高昂，也不够灵活，不足以支持云服务中的多租户。
-为此，云服务商部署了软件实现的虚拟网络功能。例如，Ananta \cite {ananta} 是一个部署在微软数据中心的软件负载均衡器，用于提供云规模的负载均衡服务。
-RouteBricks \cite {routebricks} 等工作表明，基于多核 x86 CPU 的每台服务器转发数据包的速度可达 10 Gbps，并且可以通过多核和搭建更多网络节点的集群来扩展容量。
-虽然软件实现的虚拟交换机和网络功能可以使用更多数量的 CPU 核和更大的网络节点集群来支持更高的性能，但这样做会增加相当大的资产和运营成本 \cite {ananta,duet}。
-云服务商在 IaaS 业务中的盈利能力是客户为虚拟机支付的价格与托管虚拟机的成本之间的差异。
-由于每台服务器的资产和运营成本在上架部署时就已基本确定，因此降低托管虚拟机成本的最佳方法是在每台计算节点服务器上打包更多的客户虚拟机，并减少网络和存储节点的服务器数量。
-目前，物理 CPU 核（2 个超线程，即 2 个 vCPU）的售价为 0.1 美元/小时左右，亦即最大潜在收入约为 900 美元/年 \cite{smartnic}。
-在数据中心，服务器通常服役 3 到 5 年，因此一个物理 CPU 核在服务器生命周期内的售价最高可达 4500 美元 \cite{smartnic}。
-即使考虑到总有一部分 CPU 核没有被售出，并且云经常为大客户提供折扣，与专用硬件相比，即使专门分配一个物理 CPU 核用于虚拟网络也是相当昂贵的。
+Traditional network functions are implemented by dedicated devices deployed in specific locations in the data center. These dedicated network function devices are not only expensive, but also not flexible enough to support multi-tenancy in cloud services. 
+Therefore, cloud service providers have deployed software-implemented virtual network functions. For instance, Ananta \cite {ananta} is a software load balancer deployed in Microsoft data centers, used to provide cloud-scale load balancing services.
+Works such as RouteBricks \cite {routebricks} demonstrate that the speed of each server forwarding packets based on multi-core x86 CPUs can reach 10 Gbps, and capacity can be expanded by multi-core and building more network node clusters.
+Although software-implemented virtual switches and network functions can use a larger number of CPU cores and larger network node clusters to support higher performance, doing so will increase considerable asset and operating costs \cite {ananta,duet}.
+The profitability of cloud service providers in IaaS business is the difference between the price paid by customers for virtual machines and the cost of hosting virtual machines.
+Since the asset and operating costs of each server are basically determined at the time of deployment, the best way to reduce the cost of hosting virtual machines is to package more customer virtual machines on each computing node server and reduce the number of servers for network and storage nodes.
+Currently, the price of a physical CPU core (2 hyperthreads, i.e., 2 vCPUs) is about $0.1 per hour, i.e., the maximum potential income is about $900 per year \cite{smartnic}.
+In data centers, servers usually serve for 3 to 5 years, so the highest price of a physical CPU core during the server's life cycle can reach $4500 \cite{smartnic}.
+Even considering that some CPU cores are not sold out, and the cloud often offers discounts to large customers, compared with dedicated hardware, it is quite expensive to allocate a physical CPU core specifically for virtual networks.
 
-绝大多数应用程序通过操作系统提供的套接字（socket）接口访问网络。Linux 等现有操作系统的套接字是为几十年前的低速网络设计的，在当今高吞吐量、低延迟的数据中心网络中有很高的开销。
-近年来，大量工作致力于提供高性能套接字。
-第一类工作是优化操作系统内核的 TCP/IP 网络协议栈。
-但是，大量的内核开销仍然存在，这将在第 \ref {chapter:socksdirect} 章详细讨论。
-第二类工作完全绕过内核 TCP/IP 协议栈并在用户空间中实现 TCP/IP，称为用户态协议栈。
-在这个类别中，一些工作 \cite {belay2017ix,peter2016arrakis} 提出了新的操作系统架构，使用虚拟化来确保安全性和隔离性。
-除了这些新的操作系统体系结构，许多用户态协议栈利用 Linux 上已经存在的高性能数据包 I/O 框架 \cite {rizzo2012netmap,dpdk,pf-ring}。
-其中，一些用户态协议栈 \cite {marinos2014network,jeong2014mtcp,seastar,fstack} 认为 Linux 套接字 API 是性能开销的根源，进而提出了新的 API，因此需要修改应用程序。
-大多数 API 更改旨在支持零拷贝（zero copy）。
-另一些系统  \cite {kalia2016fasst,kalia2018datacenter} 更进一步，认为套接字的抽象层次太低，应用程序应当使用更高层次的远程过程调用（RPC）接口。
-由于套接字的应用非常广泛，要求应用程序修改接口在很多情况下并不现实。
-因此，工业界 \cite{libvma,openonload,dbl} 和学术界 \cite{huang2017high} 的一些系统提出了符合标准套接字 API 的用户态 TCP/IP 协议栈。
-这些用户态协议栈提供了比 Linux 更好的性能，但它仍然不接近硬件的性能极限。
-目前，数据中心网络内主机间通信的性能标杆是远程直接内存访问（RDMA），而主机内进程间通信最高效的方法是共享内存（shared memory）。
-这些用户态协议栈的主机间通信延迟比 RDMA 高一个数量级，主机内通信延迟比共享内存高一到两个数量级。
+Most applications access the network through the socket interface provided by the operating system. The sockets of existing operating systems such as Linux were designed for low-speed networks decades ago and have high overhead in today's high-throughput, low-latency data center networks.
+In recent years, a lot of work has been devoted to providing high-performance sockets.
+The first type of work is to optimize the TCP/IP network protocol stack of the operating system kernel.
+However, a lot of kernel overhead still exists, which will be discussed in detail in Chapter \ref {chapter:socksdirect}.
+The second type of work completely bypasses the kernel TCP/IP protocol stack and implements TCP/IP in user space, known as user-mode protocol stacks.
+In this category, some works \cite {belay2017ix,peter2016arrakis} propose new operating system architectures, using virtualization to ensure security and isolation.
+In addition to these new operating system architectures, many user-mode protocol stacks utilize high-performance packet I/O frameworks that already exist on Linux \cite {rizzo2012netmap,dpdk,pf-ring}.
+Among them, some user-mode protocol stacks \cite {marinos2014network,jeong2014mtcp,seastar,fstack} believe that the Linux socket API is the root of performance overhead, and thus propose new APIs, which require modifying applications.
+Most API changes aim to support zero copy.
+Some other systems \cite {kalia2016fasst,kalia2018datacenter} go further, believing that the abstraction level of sockets is too low, and applications should use a higher-level remote procedure call (RPC) interface.
+Since sockets are widely used, it is not realistic to require applications to modify the interface in many cases.
+Therefore, some systems in the industry \cite{libvma,openonload,dbl} and academia \cite{huang2017high} propose user-mode TCP/IP protocol stacks that comply with the standard socket API.
+These user-mode protocol stacks provide better performance than Linux, but they are still not close to the performance limit of hardware.
+Currently, the performance benchmark for host-to-host communication in data center networks is Remote Direct Memory Access (RDMA), and the most efficient method for inter-process communication within a host is shared memory.
+The host-to-host communication latency of these user-mode protocol stacks is an order of magnitude higher than RDMA, and the intra-host communication latency is one to two orders of magnitude higher than shared memory.
 
-作为分布式系统通信和存储的重要基础设施，键值存储（Key-Value Storage）系统的研究和开发一直是系统学术界和工业界的热点。
-早期的内存键值存储系统 \cite{memcached} 性能不令人满意。
-由于分布式系统是通过网络互连的，键值存储系统的用户客户端和存储服务器之间也需要通过网络通信，引入了前面讨论的套接字网络协议栈和网络虚拟化等开销。
-为了摆脱操作系统内核的开销，近期的键值存储系统  \cite {kapoor2012chronos,ousterhout2010case,ousterhout2015ramcloud,lim2014mica,li2016full} 利用高性能网络数据包处理框架，轮询来自网卡的网络数据包，并且使用上文所述的用户态轻量级网络协议栈处理它们。
-然而，即使不考虑网络的开销，键值存储系统进行数据结构处理的成本也很高。
-为了降低计算成本，一系列工作 \cite{mao2012cache,fan2013memc3,li2014algorithmic} 优化锁、缓存、哈希和内存分配算法。为了降低多个 CPU 核共同处理同一个键的核间同步开销，较高效的办法是由固定的 CPU 核处理每个键的写操作 \cite{lim2014mica}。
-然而，由于 CPU 并行性的限制，第 \ref{chapter:kvdirect} 章将讨论，即使优化到极致，每个 CPU 核每秒也只能处理约 500 万次键值操作请求，远低于内存随机访存所能提供的硬件性能。
-此外，现实世界工作负载的键往往服从长尾分布，即少量键访问非常频繁，大多数键访问不频繁。在长尾分布负载下，由于同一个键总是映射到同一个 CPU 核，将导致 CPU 核之间的负载不平衡 \cite{lim2014mica}。
+As a fundamental infrastructure for communication and storage in distributed systems, the exploration and advancement of Key-Value Storage systems have persistently been a primary concern in the academic and industrial systems community. The performance of early memory key-value storage systems \cite{memcached} was not satisfactory. Given that distributed systems are interconnected through networks, the user clients and storage servers of key-value storage systems also need to communicate through networks, introducing the overhead of socket network protocol stacks and network virtualization discussed earlier. 
 
+To eliminate the overhead of the operating system kernel, recent key-value storage systems \cite {kapoor2012chronos,ousterhout2010case,ousterhout2015ramcloud,lim2014mica,li2016full} employ high-performance network packet processing frameworks, poll network packets from network cards, and utilize the aforementioned user-mode lightweight network protocol stacks to process them. However, even without considering the overhead of the network, the cost of key-value storage systems for data structure processing is also high. 
 
+To reduce computing costs, a series of works \cite{mao2012cache,fan2013memc3,li2014algorithmic} optimize locks, caches, hashes, and memory allocation algorithms. To reduce the inter-core synchronization overhead of multiple CPU cores processing the same key, a more efficient method is for a fixed CPU core to handle each key's write operations \cite{lim2014mica}. 
 
+However, due to the limitations of CPU parallelism, as will be discussed in Chapter \ref{chapter:kvdirect}, even if optimized to the extreme, each CPU core can only handle about 5 million key-value operation requests per second, far lower than the hardware performance that memory random access can provide. 
 
+In addition, the keys in real-world workloads often follow a long-tail distribution, that is, a small number of keys are accessed very frequently, and most keys are not frequently accessed. Under long-tail distribution loads, because the same key is always mapped to the same CPU core, it will lead to load imbalance among CPU cores \cite{lim2014mica}.
 
-\subsection{利用新型商用硬件}
+\subsection{Utilizing New Commercial Hardware}
 
+Due to the pressing performance demands of large-scale web services, big data processing, machine learning, and other computing and networking applications, computing acceleration devices such as Graphics Processing Units (GPUs) and network acceleration technologies such as Remote Direct Memory Access (RDMA) \cite{infiniband2000infiniband} are increasingly being deployed in data centers.
 
-由于大规模 Web 服务、大数据处理、机器学习等应用对计算和网络的性能需求非常迫切，图形处理器（GPU）等计算加速设备和远程直接内存访问（RDMA） \cite{infiniband2000infiniband} 等网络加速技术在越来越多的数据中心广泛部署。
+To speed up virtual networks and network functions, previous research has suggested the use of GPUs \cite{packetshader}, Network Processors (NPs) \cite{cavium,netronome}, and hardware network switches \footnote{In this paper, the term \textit{switch} is used interchangeably with router, and the term \textit{switch} is commonly used in data center-related literature to refer to network interconnection devices.} \cite{duet}. GPUs were initially used primarily for graphics processing, but in recent years have been extended to other applications with massive data parallelism. GPUs are suitable for batch operations, but batch operations can lead to high latency. The history of network processors can be traced back to network switches of the 1990s. Network processors consist of a large number of embedded processor cores, each with limited processing power, and stateful connections are usually handled by fixed processor cores, thus limiting the throughput of a single connection. The main problem with hardware network switches is their lack of flexibility and insufficient lookup table capacity \cite{duet}.
 
-为了加速虚拟网络和网络功能，以前的工作已经提出使用 GPU \cite {packetshader}，网络处理器（Network Processor，NP） \cite {cavium,netronome} 和硬件网络交换机 \footnote{本文中，\textit{交换机}（switch）与路由器不加区分，数据中心的相关文献中通常使用\textit{交换机}一词指代网络互连设备。} \cite {duet}。
-GPU 早期主要用于图形处理，近年来扩展到具有海量数据并行性的其他应用程序。
-GPU 适合批量操作，但是，批量操作会导致高延迟。
-网络处理器的历史则可以追溯到 20 世纪 90 年代的网络交换机。
-网络处理器由大量的嵌入式处理器核心构成，每个处理器核心的处理能力有限，而有状态连接通常由固定的处理器核心处理，从而单条连接的吞吐量有一定的局限性。
-硬件网络交换机的主要问题是灵活性和查找表容量不足 \cite{duet}。
+To reduce the overhead of operating system communication primitives, a series of work has offloaded \footnote{In this paper, \textit{offload} is a term that refers to implementing functions that are implemented in software on the host CPU using hardware other than the host CPU.} part of the operating system network protocol stack to network card hardware. The TCP Offload Engine (TOE) \cite{tcp-chimney-offload} offloads part or all of the TCP/IP protocol stack to the network card. However, due to the rapid growth of general-purpose processor performance according to Moore's Law, the performance advantages of these dedicated hardware are limited and have only been successful in dedicated fields. The commercially successful TCP offload functions are mostly stateless offloads \footnote{\textit{Stateless} means that the internal storage of the network card is read-only during packet processing.}, such as offloading of TCP checksums. Infiniband \cite{infiniband2000infiniband} technology designed a new set of communication primitives, transport layer protocols, network layer protocols, and physical transmission media. The communication primitives and transport layer protocols are known as Remote Direct Memory Access (RDMA). Infiniband implements the entire network protocol stack in hardware, achieving high throughput and low latency, and is widely used in the field of high-performance computing. Since the transport layer needs to maintain the state of each connection to implement congestion control, packet retransmission, out-of-order rearrangement, etc., Infiniband is a stateful offload. In recent years, due to the hardware trends and application requirements of data centers, the story of stateful offload has begun to revive \cite{chuanxiong-rdma-keynote}. RDMA based on Infiniband technology is widely deployed in data centers \cite{guo2016rdma}. In order to be compatible with the existing Ethernet in data centers, data centers do not use Infiniband physical layer networks, but strip the RDMA primitives and transport layer protocols from the Infiniband technology stack, encapsulate RDMA transport layer packets in UDP/IP packets, and transmit them through Ethernet, which is called RoCEv2 \cite{rocev2}. Compared with the software-based TCP/IP network protocol stack, RDMA uses hardware offloading to provide ultra-low latency and near-zero CPU overhead.
 
-为了降低操作系统通信原语的开销，一系列工作将操作系统网络协议栈的一部分卸载 \footnote{在本文中，\textit{卸载}（offload）是一个术语，表示把主机 CPU 上软件实现的功能用主机 CPU 以外的硬件实现。} 到网卡硬件上。
-TCP 卸载引擎（TCP Offload Engine，TOE） \cite {tcp-chimney-offload} 将部分或全部的 TCP/IP 协议栈卸载到网卡。
-但由于通用处理器的性能按摩尔定律迅速增长，这些专用硬件的性能优势有限，仅在专用领域中获得成功。
-取得商业成功的 TCP 卸载功能大多是无状态卸载（stateless offload） \footnote{\textit{无状态}（stateless）意味着网卡的内部存储在数据包处理过程是只读的。}，例如 TCP 校验和（checksum）的卸载。
-Infiniband \cite{infiniband2000infiniband} 技术设计了一套全新的通信原语、传输层协议、网络层协议和物理传输介质。其中通信原语和传输层协议称为远程直接内存访问（RDMA）。Infiniband 在硬件中实现了整个网络协议栈，达到了很高的吞吐量和很低的延迟，在高性能计算领域广泛使用。
-由于传输层需要维护每个连接的状态以实现拥塞控制、丢包重传、乱序重排等，Infiniband 属于有状态卸载。
-近年来，由于数据中心的硬件趋势和应用需求，有状态卸载的故事开始复兴 \cite {chuanxiong-rdma-keynote}。
-基于 Infiniband 技术的远程直接内存访问（RDMA） \cite {infiniband2000infiniband} 在数据中心广泛部署 \cite {guo2016rdma}。
-为了与数据中心现有的以太网兼容，数据中心不使用 Infiniband 物理层网络，而是将 RDMA 原语和传输层协议从 Infiniband 技术栈中剥离出来，把 RDMA 传输层数据包封装在 UDP/IP 数据包中，通过以太网传输，这称为 RoCEv2 \cite{rocev2}。
-与基于软件的 TCP/IP 网络协议栈相比，RDMA 使用硬件卸载来提供超低延迟和接近零的 CPU 开销。
+RDMA communication primitives significantly differ from the socket communication primitives typically used by applications. RDMA is message-based, whereas sockets are stream-based. RDMA necessitates applications to explicitly register and manage send and receive buffers. It also requires applications to manage send, receive, and event queues, and to timely send flow control notifications to the network card. RDMA offers two types of communication primitives. The first type is two-sided operations, similar to sockets, where the sender calls send and the receiver calls recv. Unlike sockets, the RDMA receiver application needs to predeclare the messages to be received and prepare the receive buffer for the network card. The other type is one-sided operations, which provide shared memory primitives, i.e., direct read and write of remote memory, or atomic operations on remote memory. Consequently, RDMA programming is considerably more complex than socket programming. An example program that sends and receives with sockets requires only a few dozen lines of code, while the same functionality with RDMA requires hundreds of lines of code. To enable socket applications to use RDMA, works like RSocket \cite{rsockets,socketsdirect,russell2008extended} convert socket operations into RDMA primitives. They have similar designs, with RSocket being the most actively developed and the de facto standard for converting sockets to RDMA. However, the performance and compatibility of RSocket are not satisfactory. Chapter \ref{chapter:socksdirect} will propose a socket system that is compatible with existing applications and can fully utilize the performance of RDMA network cards.
 
-RDMA 通信原语与应用程序通常使用的套接字通信原语有很多不同。
-RDMA 是基于消息的，而套接字是基于字节流的。
-RDMA 需要应用程序显式注册并管理发送和接收缓冲区。
-RDMA 还需要应用程序管理发送、接收和事件队列，并适时向网卡发送流控（flow control）通知。
-RDMA 提供了两类通信原语，第一类是双边（two-sided）操作，与套接字类似，发送端调用 send，接收端调用 recv。与套接字不同的是，RDMA 的接收端应用程序需要事先声明所要接收的消息，为网卡准备好接收缓冲区。
-另一类是单边（one-sided）操作，提供了共享内存的原语，即直接读写远程内存，或在远程内存上执行原子操作。
-因此，RDMA 编程比套接字复杂很多，一个用套接字收发的示例程序仅需数十行代码，而同样功能的 RDMA 程序需要数百行代码。
-为了使套接字应用程序能够使用 RDMA，RSocket 等工作 \cite {rsockets,socketsdirect,russell2008extended} 将套接字操作转换为 RDMA 原语。
-它们具有相似的设计，其中 RSocket 的开发最活跃，是套接字转换 RDMA 的事实标准。
-但是，RSocket 的性能和兼容性都不令人满意。
-第 \ref{chapter:socksdirect} 章将提出一个与现有应用兼容，并能充分利用 RDMA 网卡性能的套接字系统。
+In addition to network communication between hosts, inter-process communication within a host is also crucial. Some work \cite {belay2017ix,peter2016arrakis,rsockets} allows inter-process communication within a host to bypass the RDMA network card. However, due to the limitations of the PCIe bus, the latency and throughput of the RDMA network card are much worse than the shared memory within the host. Therefore, Chapter \ref{chapter:socksdirect} uses shared memory to implement inter-process communication within the host.
 
-除了主机之间的网络通信，主机内的进程间通信也很重要。一些工作 \cite {belay2017ix,peter2016arrakis,rsockets} 让主机内的进程间通信绕行 RDMA 网卡。但由于 PCIe 总线的限制，RDMA 网卡的延迟和吞吐量都比主机内的共享内存差很多。因此，第 \ref{chapter:socksdirect} 章使用共享内存实现主机内的进程间通信。
-
-
-为了加速键值存储系统，近年来的工作 \cite {kalia2014using,kalia2016design,kalia2014using,kalia2016design} 利用 RDMA 网卡基于硬件的网络协议栈，使用双边RDMA作为键值存储客户端和服务器之间的远程过程调用机制，进一步提高每核吞吐量并减少延迟，如图 \ref{intro:fig:memaccess-a} 所示。尽管这些工作进一步降低了网络通信的开销，但如第 \ref{background:sec:software} 节所讨论的，这些系统仍然使用服务器端的 CPU 进行数据结构处理，性能受限。
-
+To enhance the performance of key-value storage systems, recent research \cite {kalia2014using,kalia2016design,kalia2014using,kalia2016design} has utilized the hardware-based network protocol stack of the RDMA network card. This approach uses bilateral RDMA as the remote procedure call mechanism between the key-value storage client and server, thereby significantly increasing per-core throughput and reducing latency, as illustrated in Figure \ref{intro:fig:memaccess-a}. Although these studies have further reduced the overhead of network communication, as discussed in Section \ref{background:sec:software}, these systems still rely on the server-side CPU for data structure processing, which hampers performance.
 
 \begin{figure*}[t]
 	\centering
-	\subfloat[软件 / 双边 RDMA。\label{intro:fig:memaccess-a}]
+	\subfloat[Software / Bilateral RDMA.\label{intro:fig:memaccess-a}]
 	{\includegraphics[width=.4\textwidth,page=1]{cropped_access.pdf}}
-	\subfloat[单边 RDMA。\label{intro:fig:kvdirect-b}]
+	\subfloat[Unilateral RDMA.\label{intro:fig:kvdirect-b}]
 	{\includegraphics[width=.4\textwidth,page=2]{cropped_access.pdf}}
-	\caption{键值存储系统的架构。线表示数据路径。一个键值操作（细线）可能需要多个基于地址的存储器访问（粗线）。黑色背景的方框表示键值数据结构处理发生的位置。}
+	\caption{Architecture of key-value storage systems. Lines represent data paths. A key-value operation (thin line) may require multiple address-based memory accesses (thick line). The box with a black background indicates where key-value data structure processing occurs.}
 	\label{intro:fig:kvdirect}
 \end{figure*}
 
-另一种不同的方法是利用单边 RDMA，把服务器端 CPU 的数据结构处理转移到客户端，如图 \ref{intro:fig:kvdirect-b} 所示。客户端通过单边 RDMA 发起对服务器端共享内存的读写请求，服务器端的网卡直接访问内存而无需经过 CPU。
-但是，使用共享内存模式访问数据结构往往需要多个网络往返（例如先查询索引后访问数据），增加了访问延迟，浪费了网络带宽。
-此外，这种模式对写入密集型的工作负载不友好。当多个客户端试图操作同一个数据结构（例如分配内存或修改同一个键值对）时，必须加锁或在客户端间进行同步，带来额外的延迟和带宽开销。
+An alternative strategy is to employ unilateral RDMA, which shifts the data structure processing of the server-side CPU to the client, as shown in Figure \ref{intro:fig:kvdirect-b}. The client initiates read and write requests to the server-side shared memory via unilateral RDMA, and the server-side network card directly accesses the memory without involving the CPU. However, using shared memory mode to access data structures often necessitates multiple network round trips (for instance, querying the index first and then accessing the data), which increases access latency and consumes network bandwidth. Moreover, this mode is not suitable for write-intensive workloads. When multiple clients attempt to manipulate the same data structure (for example, allocating memory or modifying the same key-value pair), they must lock or synchronize between clients, which introduces additional latency and bandwidth overhead.
 
-\subsection{设计新硬件}
+\subsection{Designing New Hardware}
 
-随着通用处理器的性能提升遇到了瓶颈，各大云服务商开始探索使用定制化硬件来降低 ``数据中心税''，也就是把数据中心的虚拟化、操作系统和高层抽象的开销从通用处理器转移到定制化硬件上。
-使用定制化硬件并不是在硬件中原样实现已有的软件，而是对已有软件进行重构，划分出数据面和控制面，数据面优化后在硬件中实现，控制面则留在软件上。
-采用新硬件的方案尽管性能较高，但不仅需要新硬件的资产和运营成本，还需要软硬件协同设计的开发成本，往往比单纯优化软件的一次性研发（Non-Recurring Engineering，NRE）成本更高。
-此外，相比开发和测试软件，设计、验证和量产新硬件需要较长的研发周期。可编程硬件尽管具有一定的灵活性，但相对通用处理器是受限的，因此需要对未来的数据中心应用负载和基础架构有一定的预见性。
-因此，不是所有软件都适合用硬件来加速，需要权衡成本、收益、研发周期、灵活性等多方面的因素。
-由于云服务的规模巨大，``数据中心税'' 的开销也很广泛和显著，因此值得设计可编程硬件来加速。
+As the performance improvement of general-purpose processors has hit a wall, major cloud service providers have started to explore the use of custom hardware to reduce the "data center tax". This means shifting the overhead of data center virtualization, operating systems, and high-level abstractions from general-purpose processors to custom hardware. The use of custom hardware is not about implementing existing software in hardware as it is, but rather refactoring existing software, dividing it into a data plane and a control plane, optimizing the data plane and implementing it in hardware, and leaving the control plane in software. Although the solution using new hardware has higher performance, it requires not only the assets and operating costs of new hardware, but also the development costs of software and hardware co-design, which are often higher than the one-time research and development (Non-Recurring Engineering, NRE) cost of simply optimizing software. In addition, compared to developing and testing software, designing, verifying, and mass-producing new hardware requires a longer R&D cycle. Programmable hardware has a certain degree of flexibility, but it is limited compared to general-purpose processors, so it requires a certain foresight of future data center application loads and infrastructure. Therefore, not all software is suitable for hardware acceleration, and it is necessary to weigh multiple factors such as cost, benefit, R&D cycle, and flexibility. Due to the massive scale of cloud services, the overhead of the "data center tax" is also widespread and significant, so it is worth designing programmable hardware for acceleration.
 
-为了尽可能减少计算节点上用于虚拟网络的 CPU 核，以微软 Azure 云为代表的云服务商在数据中心的每台服务器上部署了一块可编程网卡，用以加速虚拟网络 \cite{smartnic}。
-为了在提供高性能的同时保持一定的可编程性和灵活性，业界提出了专用芯片（ASIC）、网络处理器（Network Processor）、多核通用处理器片上系统（SoC）、现场可编程门阵列（FPGA）等可编程网卡架构，将在 \ref{smartnic-architecture} 节中详细讨论。
-FPGA 在性能和灵活性间达到了折中，因此微软采用了基于 FPGA 的可编程网卡 \cite{putnam2014reconfigurable}。
+To minimize the CPU cores used for virtual networks on computing nodes, cloud service providers, represented by Microsoft Azure, have deployed a programmable network card on each server in the data center to accelerate virtual networks \cite{smartnic}. To provide high performance while maintaining a certain degree of programmability and flexibility, the industry has proposed programmable network card architectures such as dedicated chips (ASIC), network processors (Network Processor), multi-core general-purpose processor system-on-chip (SoC), and field-programmable gate arrays (FPGA), which will be discussed in detail in Section \ref{smartnic-architecture}. FPGA achieves a balance between performance and flexibility, so Microsoft uses an FPGA-based programmable network card \cite{putnam2014reconfigurable}.
 
-FPGA 长期被用于实现网络路由器和交换机。
-然而，FPGA 通常使用 Verilog、VHDL 等硬件描述语言编程。众所周知，硬件描述语言难以调试、编写和修改，给软件人员使用 FPGA 带来了很大挑战。
-为了提高 FPGA 的开发效率，FPGA厂商提供了高层次综合（HLS）工具~\cite{vivado,intel-hls}，可以把受限的 C 代码编译成硬件模块。但这些工具只是硬件开发工具链的补充，程序员仍然需要手动将从C语言生成的硬件模块插入到硬件描述语言的项目中，且 FPGA 与主机 CPU 之间的通信也需要自行处理。学术界和工业界提出了 Bluespec \cite{bluespec}、Lime \cite{auerbach2010lime} 和 Chisel \cite{bachrach2012chisel} 等高效硬件开发语言 \cite{bacon2013fpga,singh2011implementing,wester2015transformation}，但它们需要开发者具有足够的硬件设计知识。高层次综合工具和高效硬件开发语言可以提高硬件开发人员的工作效率，但仍然不足以让软件开发人员使用 FPGA。
+FPGAs have been extensively utilized in the implementation of network routers and switches. However, FPGAs are typically programmed in hardware description languages such as Verilog and VHDL. As is widely recognized, hardware description languages are challenging to debug, write, and modify, which presents a significant obstacle for software personnel to utilize FPGAs. To enhance the development efficiency of FPGAs, FPGA manufacturers offer high-level synthesis (HLS) tools~\cite{vivado,intel-hls} capable of compiling restricted C code into hardware modules. However, these tools merely supplement the hardware development toolchain. Programmers still need to manually insert the hardware modules generated from C language into the hardware description language project, and they must handle the communication between the FPGA and the host CPU themselves. The academic and industrial communities have proposed efficient hardware development languages such as Bluespec \cite{bluespec}, Lime \cite{auerbach2010lime}, and Chisel \cite{bachrach2012chisel} \cite{bacon2013fpga,singh2011implementing,wester2015transformation}, but these require developers to possess substantial hardware design knowledge. High-level synthesis tools and efficient hardware development languages can enhance the work efficiency of hardware developers, but they are still insufficient for software developers to utilize FPGAs.
 
-近年来，为了让软件开发人员使用FPGA，FPGA厂商提出了基于OpenCL的编程工具链~\cite{aoc,sdaccel}，提供了类似GPU的编程模型。软件开发人员可以把用OpenCL语言编写的核（kernel）卸载到FPGA上。但是，这种方法中多个并行执行的核间需要通过板上共享内存进行通信，而FPGA上的DRAM共享内存吞吐量和延迟都不理想，共享内存还会成为通信瓶颈。其次，FPGA与CPU之间的通信模型是类似GPU的批处理模型，这使得处理延迟较高（约1毫秒），不适用于需要微秒级延迟的网络数据包处理。
-本文第 \ref{chapter:clicknp} 章将提出一个让软件开发人员可用，且网络数据包处理性能高的模块化 FPGA 编程框架。
-在此基础上，第 \ref{chapter:kvdirect} 章将利用可编程网卡，将 RDMA 的共享内存读写原语扩展到键值操作原语，用可编程网卡实现高吞吐量、低延迟的内存键值存储。
+In recent years, to enable software developers to use FPGA, FPGA manufacturers have proposed OpenCL-based programming toolchains~\cite{aoc,sdaccel}, providing a GPU-like programming model. Software developers can offload kernels written in OpenCL language to FPGA. However, in this method, multiple parallelly executing kernels need to communicate through shared memory on the board, and the throughput and latency of DRAM shared memory on FPGA are not ideal, and shared memory can become a communication bottleneck. Secondly, the communication model between FPGA and CPU is similar to the GPU's batch processing model, which results in higher processing latency (about 1 millisecond), which is not suitable for network packet processing that requires microsecond-level latency.
+Chapter \ref{chapter:clicknp} of this paper will propose a modular FPGA programming framework that is available to software developers and has high performance for network packet processing.
+Based on this, Chapter \ref{chapter:kvdirect} will use programmable network cards to extend the shared memory read and write primitives of RDMA to key-value operation primitives, and use programmable network cards to implement high-throughput, low-latency memory key-value storage.
 
+\section{Research Content and Contributions of This Paper}
 
-
-
-
-
-\section{本文的研究内容和贡献}
-
-
-本文旨在探索基于可编程网卡的高性能数据中心系统。本文提出一个基于 FPGA 可编程网卡，对云计算数据中心计算、网络、存储节点实现全栈加速的系统。如图 \ref{intro:fig:accel-arch} 所示，通过把计算、网络、存储节点上的普通网卡替换为可编程网卡，本文在计算节点上实现了虚拟网卡和虚拟网络，虚拟本地存储和云存储，以及轻量级用户态运行库和硬件传输协议相结合的通信原语，替代了图 \ref{intro:fig:virt-architecture} 中的软件虚拟化服务和操作系统网络协议栈。本文还基于数据面与控制面分离的思想，实现了网络节点的虚拟网络功能和存储节点的内存数据结构处理，用可编程网卡提高数据面性能，并保留原有软件控制面的灵活性。
-
+This paper aims to explore high-performance data center systems that are constructed on programmable network cards. It presents a system that enhances the full stack of computing, networking, and storage nodes in cloud computing data centers, utilizing FPGA programmable network cards. As illustrated in Figure \ref{intro:fig:accel-arch}, by replacing the standard network cards on the computing, networking, and storage nodes with programmable network cards, this paper implements virtual network cards and virtual networks, virtual local storage and cloud storage, and lightweight user-state runtime libraries on the computing nodes. Furthermore, the integration of hardware transport protocol communication primitives supplants the software virtualization services and operating system network protocol stack in Figure \ref{intro:fig:virt-architecture}. This paper also implements the virtual network functions of network nodes and the memory data structure processing of storage nodes based on the concept of separating the data plane and the control plane, enhances the data plane performance with programmable network cards, and retains the flexibility of the original software control plane.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/accel_arch.pdf}
-	\caption{基于可编程网卡的数据中心系统总体架构。}
+	\caption{Overall architecture of the data center system based on programmable network cards.}
 	\label{intro:fig:accel-arch}
 \end{figure}
 
-首先，本文提出用可编程网卡加速云计算中的虚拟网络功能。提出了首个在商用服务器中用 FPGA 加速的高灵活性、高性能网络功能处理平台 ClickNP。众所周知，FPGA 编程对软件工程师很不友好。为了简化 FPGA 编程，设计了类 C 的 ClickNP 语言和模块化的编程模型，并开发了一系列优化技术，以充分利用 FPGA 的海量并行性。实现了 ClickNP 开发工具链，可以与多种商用高层次综合工具集成。基于 ClickNP 设计和实现了 200 多个网络元件，并用这些元件组建起多种网络功能。相比基于 CPU 的软件网络功能，ClickNP 的吞吐量提高了 10 倍，延迟降低到 1/10；且具有可忽略的 CPU 开销，可以为云计算中的每个计算节点节约 20\% 的 CPU 核。
+Firstly, this paper proposes to accelerate the virtual network functions in cloud computing with programmable network cards. It introduces the first high-flexibility, high-performance network function processing platform ClickNP, accelerated by FPGA in commercial servers. It is well known that FPGA programming is not user-friendly for software engineers. To simplify FPGA programming, a C-like ClickNP language and a modular programming model are designed, and a series of optimization techniques are developed to fully exploit the massive parallelism of FPGA. The ClickNP development toolchain is implemented, which can be integrated with various commercial high-level synthesis tools. More than 200 network elements are designed and implemented based on ClickNP, and these elements are used to construct various network functions. Compared with CPU-based software network functions, ClickNP's throughput is increased by 10 times, and the latency is reduced to 1/10; and it has negligible CPU overhead, which can save 20\% of CPU cores for each computing node in cloud computing.
 
-其次，本文提出用可编程网卡加速远程数据结构访问。键值存储是最常用的基本数据结构之一，也是很多数据中心内的关键分布式系统组件。基于 ClickNP 编程框架，设计实现了一个高性能内存键值存储系统 KV-Direct，在服务器端绕过 CPU，用可编程网卡通过 PCIe 直接访问主机内存。把单边 RDMA 的内存操作语义扩展到键值操作语义，解决了单边 RDMA 操作数据结构时通信和同步开销高的问题。还利用 FPGA 可重配置的特性，允许用户实现更复杂的数据结构。面对网卡与主机内存之间 PCIe 带宽较低、延迟较高的性能挑战，通过哈希表、内存分配器、乱序执行引擎、负载均衡和缓存、向量操作等一系列性能优化，实现了 10 倍于 CPU 的能耗效率和微秒级的延迟，实现了首个单机性能达到 10 亿次每秒的通用键值存储系统。
+Secondly, this paper presents a method to accelerate access to remote data structures using programmable network cards. Key-value storage, a fundamental data structure often used, plays a crucial role in numerous distributed systems within data centers. A high-performance memory key-value storage system, KV-Direct, is developed based on the ClickNP programming framework. This system bypasses the server-side CPU and utilizes programmable network cards to directly access the host memory via PCIe. The memory operation semantics of one-sided RDMA are extended to key-value operation semantics, addressing the high communication and synchronization overhead when one-sided RDMA operates data structures. The reconfigurable feature of FPGA is also utilized, allowing users to implement more complex data structures. To address the performance challenges of lower PCIe bandwidth and higher latency between the network card and the host memory, a series of performance optimizations are employed, such as hash tables, memory allocators, out-of-order execution engines, load balancing and caching, vector operations, etc. These optimizations enable 10 times the energy efficiency of the CPU and microsecond-level latency, and for the first time, single-machine performance reaches 1 billion operations per second in a general key-value storage system.
 
-最后，本文提出用可编程网卡和用户态运行库相结合的方法为应用程序提供系统原语，从而绕过操作系统内核。套接字是操作系统提供的最常用的通信原语。设计实现了一个用户态套接字系统 SocksDirect，与现有应用程序完全兼容，能实现接近硬件极限的吞吐量和延迟，多核性能具有可扩放性，并在高并发负载下保持高性能。主机内和主机间的通信分别使用共享内存和 RDMA 实现。为了支持高并发连接数，本文基于 KV-Direct 实现了一个 RDMA 可编程网卡。通过消除线程间同步、缓冲区管理、大数据拷贝、进程唤醒等一系列开销，SocksDirect 相比 Linux 提升了 7 至 20 倍吞吐量，降低延迟到 1/17 至 1/35，并将 Web 服务器的 HTTP 延迟降低到 1/5.5。
+Lastly, this paper presents a method that integrates programmable network cards and user-state runtime libraries to provide system primitives for applications, thereby bypassing the operating system kernel. The socket, the most commonly used communication primitive provided by the operating system, is redesigned and implemented in a user-state socket system, SocksDirect. This system is fully compatible with existing applications, can achieve throughput and latency close to hardware limits, has scalable multi-core performance, and maintains high performance under high concurrent loads. Intra-host and inter-host communications are implemented using shared memory and RDMA respectively. To support a high number of concurrent connections, an RDMA programmable network card is implemented based on KV-Direct. By eliminating a series of overheads such as inter-thread synchronization, buffer management, large data copying, process awakening, etc., SocksDirect increases the throughput by 7 to 20 times compared to Linux, reduces the latency to 1/17 to 1/35, and reduces the HTTP latency of the web server to 1/5.5.
 
+\section{Arrangement of Thesis Structure}
 
-\section{论文结构安排}
-
-本论文的内容结构安排如下：
-第 1 章为绪论。
-第 2 章介绍数据中心的发展趋势，指出数据中心软硬件结合优化的需求与机遇，讨论可编程网卡的架构，并调研可编程网卡在数据中心的应用。
-第 3 章提出基于可编程网卡的数据中心系统架构。
-第 4 章是网络功能加速部分，提出用可编程网卡加速云计算中的虚拟网络功能。为了简化 FPGA 编程，提出首个适用于高速网络数据包处理、基于高级语言的模块化 FPGA 编程框架 ClickNP。
-第 5 章是数据结构加速部分，提出用可编程网卡加速远程数据结构访问，并设计实现一个高性能内存键值存储系统 KV-Direct。
-第 6 章是操作系统加速部分，提出用可编程网卡和用户态运行库相结合的方法为应用程序提供操作系统原语，并设计实现一个用户态套接字系统 SocksDirect。
-第 7 章总结全文并展望未来研究方向。
+The structure of this thesis is organized as follows:
+Chapter 1 serves as the introduction.
+Chapter 2 presents the development trends of data centers, emphasizes the needs and opportunities for software and hardware co-optimization in data centers, discusses the architecture of programmable network cards, and reviews the application of programmable network cards in data centers.
+Chapter 3 proposes a data center system architecture that is based on programmable network cards.
+Chapter 4 is the network function acceleration section, suggesting the acceleration of virtual network functions in cloud computing using programmable network cards. To simplify FPGA programming, the first modular FPGA programming framework ClickNP, which is suitable for high-speed network packet processing and based on high-level languages, is proposed.
+Chapter 5 is the data structure acceleration section, suggesting the acceleration of remote data structure access using programmable network cards, and designing and implementing a high-performance memory key-value storage system KV-Direct.
+Chapter 6 is the operating system acceleration section, suggesting a method of integrating programmable network cards and user-state runtime libraries to provide system primitives for applications, and designing and implementing a user-state socket system SocksDirect.
+Chapter 7 summarizes the entire text and anticipates future research directions.

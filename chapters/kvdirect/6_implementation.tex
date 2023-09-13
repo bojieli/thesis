@@ -1,4 +1,4 @@
-\section{实现}
+\section{Implementation}
 \label{kvdirect:sec:implementation}
 
 
@@ -6,7 +6,7 @@
 %
 %\begin{table}[htbp]
 %	\centering
-%	\caption{Line of code and resource utilization of the 键值 processor.}
+%	\caption{Line of code and resource utilization of the key-value processor.}
 %	\label{kvdirect:tab:resource-util}
 %	\scalebox{0.8}{
 %		\begin{tabular}{l|r|r|r}
@@ -31,20 +31,19 @@
 %	}
 %\end{table}
 
-下面讨论几个实现中的细节。
+The following discusses several details in the implementation.
 
 
 
-\subsection{Slab 内存分配器}
+\subsection{Slab Memory Allocator}
 
 
 
-\subsection{DRAM 负载均衡器}
+\subsection{DRAM Load Balancer}
 
-%\textbf{键值 Operation Decoder.}
-%The 键值 operation decoder saves receive timestamp and UDP flow tuple as execution context in reservation station.
-%When the 键值 operation completes, the flow control component measures the processing delay from the receive timestamp in execution context.
+%\textbf{Key-Value Operation Decoder.}
+%The key-value operation decoder saves receive timestamp and UDP flow tuple as execution context in reservation station.
+%When the key-value operation completes, the flow control component measures the processing delay from the receive timestamp in execution context.
 %The network encoder needs the flow tuple to generate completion packets and send to the client.
-%To avoid head-of-line blocking, 键值 operations are processed out-of-order, so the client may receive 键值 completions in a different order from requests.
+%To avoid head-of-line blocking, key-value operations are processed out-of-order, so the client may receive key-value completions in a different order from requests.
 %The client could match the completions with requests by the key, because completions with a same key are guaranteed to be in request order.
-

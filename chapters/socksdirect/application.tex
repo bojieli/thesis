@@ -1,74 +1,53 @@
-\subsection{实际应用性能}
+\subsection{Practical Application Performance}
 \label{socksdirect:subsec:application}
 
+This section demonstrates that \sys {} can significantly improve the performance of actual applications without modifying the code.
+Rsocket~ \cite {rsockets} is not compatible with any of the following applications.
 
-本节演示了\sys {}可以在不修改代码的情况下显着提高实际应用程序的性能。
-Rsocket~ \cite {rsockets}与以下任何应用程序都不兼容。
+\subsubsection{Nginx HTTP Server}
 
-\subsubsection{Nginx HTTP 服务器}
-
-
-
-为了测试客户端来自网络并在主机内提供服务的典型Web服务方案，本节使用Nginx~ \cite {nginx} v1.10作为HTTP请求生成器和HTTP响应生成器之间的反向代理。
-Nginx和响应生成器位于同一主机中，而请求生成器位于不同的主机中。
-生成器使用保持活动的TCP连接与Nginx进行通信。
-由于fork，LibVMA~ \cite {libvma}不能与未修改的Nginx一起使用。
-在图 \ref {socksdirect:fig:eval-nginx}中，请求生成器测量从发送HTTP请求到接收整个响应的时间。
-对于较小的HTTP响应大小，与Linux相比，\sys {}可将延迟减少5.5倍。
-对于大型响应，由于零拷贝，\sys {}可将延迟降低多达20倍。
+To test the typical web service scenario where the client comes from the network and provides services within the host, this section uses Nginx~ \cite {nginx} v1.10 as a reverse proxy between the HTTP request generator and the HTTP response generator.
+Nginx and the response generator are located in the same host, while the request generator is located in a different host.
+The generator communicates with Nginx using keep-alive TCP connections.
+Due to fork, LibVMA~ \cite {libvma} cannot be used with unmodified Nginx.
+In Figure \ref {socksdirect:fig:eval-nginx}, the request generator measures the time from sending the HTTP request to receiving the entire response.
+For smaller HTTP response sizes, compared with Linux, \sys {} can reduce latency by 5.5 times.
+For large responses, due to zero-copy, \sys {} can reduce latency by up to 20 times.
 
 \begin{figure}[htbp]
 	\centering \includegraphics[width=0.5\textwidth]{eval/web/msgsize-clocal-lat.pdf}
 	
-	\caption{Nginx HTTP 请求端到端延迟。}
+	\caption{Nginx HTTP request end-to-end latency.}
 	\label{socksdirect:fig:eval-nginx}
 \end{figure}
 
+\subsubsection{Redis Key-Value Store}
 
-%In Figure B, to test the how Nginx throughput scales with multiple cores, we run Nginx with a fixed number of worker threads and response size 1KB.
-%The request generator sends multiple HTTP requests in parallel, and we use a sufficient number of generator threads to saturate Nginx throughput.
-%Figure B: throughput scalability with number of cores.
+This section uses the redis-benchmark client and 8-byte GET requests to measure the latency of the Redis~ \cite {redis} in-memory key-value store server.
+When using Linux, the average latency is 38.9 $ \mu s $, and the 1% and 99% percentile latencies are 31.6 and 56.1 $ \mu s $ respectively.
+After using \sys {}, the average latency is 14.1 $ \mu s $ (64% lower than Linux), and the 1% and 99% percentiles are 8.4 and 19.1 $ \mu s$.
 
-\subsubsection{Redis 键值存储}
+\subsubsection{Remote Procedure Call (RPC) Library}
 
-本节使用redis-benchmark客户端和8字节GET请求来测量Redis~ \cite {redis} 内存键值存储服务器的延迟。
-使用Linux时，平均延迟为38.9 $ \mu s $，1％和99％百分位延迟分别为31.6和56.1 $ \mu s $。
-使用\sys {} 后，平均延迟为14.1 $ \mu s $（比Linux低64％），1 ％和99 ％百分位数8.4和19.1 $ \mu s$。
+This section uses RPClib~ \cite {rpclib} to measure RPC latency.
+Running example 1~KiB RPC in two processes within the host with RPClib takes 45 $ \mu $s. On two hosts, RPC takes 79 $ \mu$s.
+Using \sys {}, the intra-host latency becomes 21 $ \mu s $ (a reduction of 53%), and the inter-host latency is 46 $ \mu$s (a reduction of 42%).
 
-%Figure: line chart, y axis: throughput, lines: (intra-, inter-) x (\sys{}, libvma, Linux). x axis: number of concurrent clients.
+However, \sys{} is not a panacea. Even with \libipc{}, the performance of RPClib is still far below that of the most advanced RPC libraries, such as eRPC \cite{kalia2018datacenter}, due to the overhead of RPClib becoming a performance bottleneck.
 
-%Utility: redis-benchmark.
-%Key point: concurrency low: test latency, concurrency high: test throughput.
+\subsubsection{Network Function Pipeline}
 
-%\subsection{Real-time Stream Processing}
-
-%Apache Flink~\cite{carbone2015apache} (need to turn off durability on disk)
-
-%Scenario: Word Count (distributed system with one source, two mappers and one reducer)
-
-%Metrics: Latency, throughput
-
-\subsubsection{远程过程调用（RPC）库}
-
-本节使用RPClib~ \cite {rpclib}来测量RPC延迟。
-在主机内的两个进程中运行RPClib中的示例1~KiB RPC，需要45 $ \mu $s。 在两个主机上，RPC需要79 $ \mu$s。
-使用\sys {}，主机内延迟变为21 $ \mu s $（减少53％），主机间为46 $ \mu$s （减少42％）。
-
-然而，\sys{} 不是万能药。即使使用了 \libipc{}, RPClib 的性能仍然远远低于最先进的 RPC 库，如 eRPC \cite{kalia2018datacenter}，由于 RPClib 的开销成为性能瓶颈。
-
-\subsubsection{网络功能流水线}
-
-\emph {pcap}格式的64字节数据包来自外部数据包生成器，通过网络功能（NF）管道，并发送回数据包生成器。
-本节将每个NF实现为一个进程，它从\emph {stdin}输入数据包，更新本地计数器，并输出到\emph {stdout}。
-对于Linux，使用\emph {pipe}和\emph {TCP socket}来连接主机内的NF进程。
-图 \ref {socksdirect:fig:eval-tun-tput}表明\sys {}的吞吐量分别是Linux管道和TCP套接字的15倍和20倍。
-它甚至接近最先进的NF框架，NetBricks~ \cite {panda2016netbricks}。
+64-byte data packets in \emph{pcap} format come from an external packet generator, pass through the Network Function (NF) pipeline, and are sent back to the packet generator.
+This section implements each NF as a process, which inputs packets from \emph{stdin}, updates local counters, and outputs to \emph{stdout}.
+For Linux, \emph{pipe} and \emph{TCP socket} are used to connect NF processes within the host.
+Figure \ref{socksdirect:fig:eval-tun-tput} shows that the throughput of \sys{} is 15 times and 20 times that of Linux pipe and TCP socket, respectively.
+It even approaches the most advanced NF framework, NetBricks~\cite{panda2016netbricks}.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.5\textwidth]{eval/microbenchmark/nfv-tun-tput.pdf}
 	
-	\caption{网络功能流水线的吞吐量。}
+	\caption{Throughput of network function pipeline.}
 	\label{socksdirect:fig:eval-tun-tput}
 	%\includegraphics[width=\textwidth]{eval/microbenchmark/nginx-short-tput.pdf}
 	%

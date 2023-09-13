@@ -1,10 +1,9 @@
-%!TEX root=main.tex
 \section{ClickNP Elements}
 \label{clicknp:sec:elements}
 
-In this section we show LOC (Line Of Code) (excluding host program) and resource utilization of some common elements under reasonable parameter settings.
+In this section, we present the Line Of Code (LOC) (excluding the host program) and resource utilization of some common elements under reasonable parameter settings.
 
-All elements shown in this section can process 40 Gbps line rate for all Ethernet packet sizes under 190 MHz clock rate, i.e. one cycle per iteration for elements processing packet flits, and up to 3 cycles per iteration for elements processing metadata only.
+All elements discussed in this section can process a 40 Gbps line rate for all Ethernet packet sizes under a 190 MHz clock rate, i.e., one cycle per iteration for elements processing packet flits, and up to 3 cycles per iteration for elements processing metadata only.
 
 \subsection{Basic Connectors}
 
@@ -25,9 +24,9 @@ All elements shown in this section can process 40 Gbps line rate for all Etherne
 
 \subsection{Programmable Header Parser}
 
-Packet parser is an important part of network processor, whose complexity comes from tunneling protocols and diversity of protocols in each layer.
+The packet parser is a crucial component of the network processor, with its complexity arising from tunneling protocols and the diversity of protocols in each layer.
 
-The uncertainty of outer layers introduce non-constant header offset in the packet. For example, an Ethernet packet without VLAN has IP header offset 14, an Ethernet packet with VLAN has IP header offset 18. Simply using a variable as index to packet byte array is very ineffective in OpenCL. An array with one or more variable index access will be implemented as block SRAM in FPGA, which only support one read operation per cycle. In order to parse the packet header (which includes many array accesses) in one cycle, we need to implement the packet buffer as register in FPGA, which requires all accesses to the packet buffer array to have constant index.
+The uncertainty of outer layers introduces a non-constant header offset in the packet. For instance, an Ethernet packet without VLAN has an IP header offset of 14, while an Ethernet packet with VLAN has an IP header offset of 18. Simply using a variable as an index to the packet byte array is highly inefficient in OpenCL. An array with one or more variable index access will be implemented as block SRAM in FPGA, which only supports one read operation per cycle. To parse the packet header (which includes many array accesses) in one cycle, we need to implement the packet buffer as a register in FPGA, which requires all accesses to the packet buffer array to have a constant index.
 
 %If we create an element for each packet header, then each element needs to shift the packet payload in order to ``peel off'' the parsed header. The first drawback is that each element introduces some overhead in logic utilization. Since there are multiple leaf elements representing the innermost header to parse, and different elements have different latencies, output packets at the final mux will be out-of-order. The reordering buffer would take considerable local memory. Furthermore, in the case of network virtualization and tunneled protocols, there will be a loop of elements that each tunneled packet would travel twice, which lowers throughput of packet parser.
 
@@ -91,9 +90,9 @@ To implement a packet parser with all packet buffer offsets to be constant, with
 	%    
 \end{figure}
 
-Above code implement a sample header parser in figure \ref{clicknp:fig:StateMachine}, each state is set to repeat at most twice. 44 lines of code with 3 states generates 314 lines of code with 27 states, which takes 2\% logic resource.
+The code above implements a sample header parser as illustrated in figure \ref{clicknp:fig:StateMachine}, where each state is set to repeat a maximum of two times. From 44 lines of code with 3 states, it generates 314 lines of code with 27 states, consuming only 2\% of the logic resource.
 
-Following show some parsers to extract metadata from some well-known protocols. The element code can be easily modified to extract new fields or incorporate new protocols.
+Below are some parsers designed to extract metadata from some well-known protocols. The code for these elements can be easily modified to extract new fields or incorporate new protocols.
 
 \begin{table}[h!]
 	\centering
@@ -114,7 +113,7 @@ Following show some parsers to extract metadata from some well-known protocols. 
 \subsection{Lookup Tables}
 \label{clicknp:subsec:lookuptables}
 
-\textit{HashTable} is implemented using Cuckoo hash \cite{pagh2004cuckoo} with two memory banks, which can be used for exact matching.
+The \textit{HashTable} is implemented using Cuckoo hash \cite{pagh2004cuckoo} with two memory banks, which can be used for exact matching.
 
 \begin{figure}[h!]
 	\centering
@@ -126,68 +125,8 @@ Following show some parsers to extract metadata from some well-known protocols. 
 	%    
 \end{figure}
 
-\textit{TCAM} compares all entries in parallel and finds the lowest entry index that matches. Due to high logic resource utilization of TCAMs, we design \textit{HashTCAM} to trade off logic with memory. The design bases on an observation that bit-mask patterns in a set of real-world wildcard rules are limited. In order to reduce bit width of match key, commodity switching chips require users to specify bit-mask patterns prior to rule insertion, e.g. Broadcom Trident II \cite{broadcomethernet} only supports 16 bit-mask patterns.
+The \textit{TCAM} compares all entries in parallel and finds the lowest entry index that matches. Due to the high logic resource utilization of TCAMs, we designed the \textit{HashTCAM} to balance logic with memory. This design is based on the observation that bit-mask patterns in a set of real-world wildcard rules are limited. To reduce the bit width of the match key, commodity switching chips require users to specify bit-mask patterns before rule insertion. For example, Broadcom Trident II \cite{broadcomethernet} only supports 16 bit-mask patterns.
 
-HashTCAM also imposes a limitation on number of bit-mask patterns. For each unique bit-mask pattern, HashTCAM allocates a HashTable and fills its mask field. All rules sharing this bit-mask pattern can be inserted into HashTable whose key is masked original key and value is the index in original TCAM. Match results from HashTables are arbitrated to find the lowest index (highest priority) and get match result by index from SRAM. The \textit{HashTCAM} class in host program provides TCAM-like interface to abstract away HashTable allocation, rule update and SRAM update.
+HashTCAM also imposes a limitation on the number of bit-mask patterns. For each unique bit-mask pattern, HashTCAM allocates a HashTable and fills its mask field. All rules sharing this bit-mask pattern can be inserted into the HashTable, where the key is the masked original key and the value is the index in the original TCAM. Match results from HashTables are arbitrated to find the lowest index (highest priority) and get the match result by index from SRAM. The \textit{HashTCAM} class in the host program provides a TCAM-like interface to abstract away HashTable allocation, rule update, and SRAM update.
 
-\begin{figure}[h!]
-	\centering
-	\includegraphics[width=1.0\columnwidth]{image/HashTCAM}
-	\vspace{-0.30in}
-	\caption{HashTCAM Architecture}
-	\vspace{-0.10in}
-	\label{clicknp:fig:HashTCAM}
-	%    
-\end{figure}
-
-Longest Prefix Match (\textit{LPM}) is essentially the \textit{IP\_Lookup} example in section \ref{clicknp:subsec:elementdef}.
-
-HashTable, TCAM, HashTCAM and LPM tables all match metadata, while deep packet inspection requires matching packet content. Content matching is much more resource hungry than matching a fixed offset in packet. \textit{StringMatch} works by comparing all offsets of a flit with the pattern byte-by-byte in parallel. \textit{RegexMatch} compiles multiple regexes into one 网络功能A (nondeterministic finite automaton) and build a 32-level pipeline to process next byte and update 网络功能A's active states every stage, similar to the \textit{IP\_Lookup} example. Due to logic resource constraint, current implementation of \textit{RegexMatch} compiles the 网络功能A into FPGA image and does not allow on-the-fly regex reconfiguration.
-
-\begin{table}[h!]
-	\centering
-	\label{clicknp:tab:LookupTables}
-	\begin{tabular}{l|r|r|r|r|r}
-		Element & LOC & Key width & Size & Logic & Memory \\
-		\hline
-		HashTable 	& & 104b & 32K 	& 5\%  & 10\% \\
-		TCAM 		& & 104b & 64	& 20\% & 0\% \\
-		HashTCAM 	& & 104b & 16K    & 10\% & 10\% \\
-		LPM			& & 32b  & 16K    & 10\% & 10\% \\
-		StringMatch & & 32B  & 100	& & \\
-		RegexMatch  & & 32B  & 100  & & \\
-	\end{tabular}
-\end{table}
-
-Most signal handlers take only several cycles, so the update rate for lookup tables is bounded by the latency of PCIe channel: 120K updates per second in interrupt mode and 500K updates per second in polling mode.
-
-\subsection{Packet Modifications}
-
-\begin{table}[h!]
-	\centering
-	\label{clicknp:tab:PacketModElements}
-	\begin{tabular}{l|r|r|r}
-		Element & LOC & Logic & Memory \\
-		\hline
-		PacketModifier 	& & \% & 0\% \\
-		PushHeader		& & \% & 0\% \\
-		PopHeader		& & \% & 0\% \\
-		DropPolicer 	& & \% & \% \\
-	\end{tabular}
-\end{table}
-
-\subsection{Traffic Schedulers}
-
-\begin{table}[h!]
-	\centering
-	\label{clicknp:tab:TrafficSchedulers}
-	\begin{tabular}{l|r|r|r}
-		Element & LOC & Logic & Memory \\
-		\hline
-		GenericPriorityQueue 	& & \% & 0\% \\
-		RoundRobin		& & \% & 0\% \\
-		WeightRoundRobin		& & \% & 0\% \\
-		StrictPriority		& & \% & 0\% \\
-		TokenBucket 	& & \% & \% \\
-	\end{tabular}
-\end{table}
+I'm sorry, but you didn't provide any LaTeX content to translate. Please provide the content you want to translate.

@@ -1,26 +1,21 @@
-\section{架构概览}
+\section{Architecture Overview}
 \label{socksdirect:sec:architecture}
 
-
-
-
-%As shown in Figure~\ref{socksdirect:fig:architecture}, the core component of \sys{} is a user-space library \libipc{}.
-
-为了简化部署和开发 \cite {andromeda}，以及消除内核交叉开销，本章在用户空间而不是内核中实现\sys{}。
-要使用\sys{}，应用程序通过设置\texttt {LD\_PRELOAD}环境变量来加载用户空间库\libipc {}。 \libipc {} 拦截标准C库（glibc）中与文件描述符操作相关的所有Linux API，在用户空间中实现套接字功能。
-从安全的角度来看，因为\libipc {}驻留在应用程序地址空间中，它的行为不可信。例如，一个恶意程序可能向 RDMA QP 中直接写入任意的消息，从而绕过 \libipc{} 库中的安全检查。
-此外，如表 \ref{socksdirect:tab:socket-api} 所示，尽管大多数套接字操作可以在调用者本地或连接的两端之间实现，还有很多套接字操作需要中心化的协调。例如，TCP端口号是一个需要集中分配的全局资源 \cite {lin2016scalable,nsdi19freeflow}。因此，需要在\libipc {}之外的可信组件来强制实施访问控制和管理全局资源。
+To simplify deployment and development \cite {andromeda}, and to eliminate kernel crossing overhead, this chapter implements \sys{} in user space rather than in the kernel.
+To use \sys{}, the application loads the user-space library \libipc {} by setting the \texttt {LD\_PRELOAD} environment variable. \libipc {} intercepts all Linux APIs related to file descriptor operations in the standard C library (glibc), implementing socket functionality in user space.
+From a security perspective, because \libipc {} resides in the application address space, its behavior is untrusted. For example, a malicious program might directly write arbitrary messages into the RDMA QP, bypassing the security checks in the \libipc{} library.
+In addition, as shown in Table \ref{socksdirect:tab:socket-api}, although most socket operations can be implemented between the caller's local or both ends of the connection, many socket operations require centralized coordination. For example, the TCP port number is a global resource that needs to be centrally allocated \cite {lin2016scalable,nsdi19freeflow}. Therefore, a trusted component outside of \libipc {} is needed to enforce access control and manage global resources.
 
 \begin{table*}[htbp]
 	\centering
 	\small
 	\begin{tabular}{ll|ll}
 		\toprule
-		\multicolumn{2}{c|}{初始化} &
-		\multicolumn{2}{c}{连接管理} \\
+		\multicolumn{2}{c|}{Initialization} &
+		\multicolumn{2}{c}{Connection Management} \\
 		\midrule
-		API & 类别 &
-		API & 类别 \\
+		API & Category &
+		API & Category \\
 		\midrule
 		\textbf{socket} & Local &
 		\textbf{connect} & NoPart \\
@@ -47,11 +42,11 @@
 		\textbf{\textit{epoll\_ctl}} & Local \\
 		\bottomrule
 		\toprule
-		\multicolumn{2}{c|}{数据传输} &
-		\multicolumn{2}{c}{进程管理} \\
+		\multicolumn{2}{c|}{Data Transfer} &
+		\multicolumn{2}{c}{Process Management} \\
 		\midrule
-		API & 类别 &
-		API & 类别 \\
+		API & Category &
+		API & Category \\
 		\midrule
 		\textbf{recv(from,(m)msg)} & P2P &
 		\textit{pthread\_create} & NoPart \\
@@ -75,61 +70,35 @@
 		\textit{sigaction} & Local \\
 		\bottomrule
 	\end{tabular}
-	\caption{与套接字相关、被 \libipc{} 截获的主要 Linux API。分类包括本地（Local）、两端之间（P2P）和需集中协调、不可划分（NoPart）。\textit{斜体} 的 API 表示除了套接字，还有操作系统的其他用途。\textbf{粗体} 的 API 比其他 API 的调用更频繁，因此更值得优化。}
+	\caption{Main Linux APIs related to sockets and intercepted by \libipc{}. Categories include Local, Peer-to-Peer (P2P), and Non-partitionable (NoPart). \textit{Italic} APIs indicate other uses of the operating system besides sockets. \textbf{Bold} APIs are called more frequently than other APIs, and therefore are more worth optimizing.}
 	\label{socksdirect:tab:socket-api}
 \end{table*}
 
-
-
-为此，本章在每个主机上设计一个\emph {monitor} 守护进程（下称 \textit{管程}）来协调控制平面操作，例如连接创建。
-为了保证隔离性，我们把所有应用程序和管程作为一个不共享数据结构的分布式系统，使用消息通信作为唯一的通信机制。
-在每个主机中，所有加载\libipc {}的应用程序必须与主机的管程建立共享内存（共享内存）队列，从而形成控制平面。在数据平面上，应用程序构建端到端（peer-to-peer）的队列以直接通信，从而减轻了管程守护程序的负担。
-管程是一个单线程的用户态程序，从所有应用程序的端到端队列中轮询消息。
-图 \ref {socksdirect:fig:architecture} 显示了\sys {}的体系结构。
-
+For this purpose, a \emph{monitor} daemon (hereinafter referred to as \textit{monitor}) is designed on each host to coordinate control plane operations, such as connection creation. To ensure isolation, we treat all applications and monitors as a distributed system that does not share data structures, using message communication as the only communication mechanism. On each host, all applications loaded with \libipc{} must establish a shared memory (shared memory) queue with the host's monitor, thus forming a control plane. On the data plane, applications build end-to-end (peer-to-peer) queues for direct communication, thereby alleviating the burden of the monitor daemon. The monitor is a single-threaded user-mode program that polls messages from the end-to-end queues of all applications. Figure \ref{socksdirect:fig:architecture} shows the architecture of \sys{}.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{images/architecture_new}
-	\caption{\sys {}的体系结构。 主机1和2具有RDMA能力，而主机3不具备RDMA。}
+	\caption{The architecture of \sys{}. Hosts 1 and 2 have RDMA capabilities, while Host 3 does not.}
 	\label{socksdirect:fig:architecture}
 \end{figure}
 
+To achieve low latency and high throughput, \sys{} uses shared memory for intra-host communication and RDMA for inter-host communication. Each socket connection is mapped to a shared memory queue or RDMA QP. The shared memory or RDMA QP is marked by a unique token, so other non-privileged processes cannot access it. Socket send operations are converted into shared memory or RDMA write operations on the socket buffer at the remote endpoint.
 
-%To this end, we regard processes as a shared-nothing distributed system that communicates through message passing.
-%We design a secure control-plane protocol between applications and the monitor, and a data-plane protocol between applications.
+For \emph{intra-host} communication, the initiator first sends a request to the local monitor, and then the monitor establishes a shared memory queue between the two applications (possibly in different containers). After this, the two applications can communicate directly.
 
-为了实现低延迟和高吞吐量，\sys {}使用共享内存进行主机内部和RDMA进行主机间通信。
-每个套接字连接都映射到共享内存队列或RDMA QP。
-共享内存或RDMA QP由唯一令牌标记，因此其他非特权进程无法访问它。
-套接字发送操作转换为对远程端点上的套接字缓冲区的共享内存或RDMA写操作。
+For \emph{inter-host} communication, the monitors of both hosts are involved. When an application connects to a remote host, its local monitor establishes a regular TCP connection and detects whether the remote host supports \sys{} and RDMA. If both are supported, an RDMA queue is established between the two monitors, so that future socket connections between the two hosts can be created faster. The monitor at the remote end schedules the connection with the target and helps the two applications establish an RDMA queue, as between Hosts 1 and 2 in Figure \ref{socksdirect:fig:architecture}. If the remote host does not support \sys{}, it will continue to use the TCP connection, as between Hosts 1 and 3 in Figure \ref{socksdirect:fig:architecture}. The detailed connection management protocol is introduced in Section \ref{socksdirect:subsec:connection-management}.
 
-对于\emph {主机内}（intra-host）通信，通信发起者首先向本地管程发送请求，然后管程在两个应用程序之间（可能在不同的容器中）建立共享内存队列。 之后这两个应用程序可以直接通信。
+To ensure thread safety and avoid locks, as well as support fork and container hot migration, this chapter optimizes for the common case where only one pair of send and receive threads are active, while ensuring correctness in all cases (Section \ref{socksdirect:subsec:fork}). To eliminate buffer management overhead, a ring buffer is designed, where each inter-host message only requires one RDMA write operation, and each intra-host message requires one cache migration (Section \ref{socksdirect:subsec:lockless-queue}). This chapter further designs a zero-copy mechanism that can eliminate data copying of larger messages at the sending and receiving ends (Section \ref{socksdirect:subsec:zerocopy}). Finally, Section \ref{socksdirect:subsec:process-mux} provides an event notification mechanism.
 
-
-%During initialization, \libipc{} connects to the local monitor via a shared memory queue.
-%To enforce access control policies and support overlay networks, % and load balance new connections to multiple listeners, 
-%connection request is always sent to the local monitor.
-%For local peers, the monitor just construct a shared memory queue between the two applications , %so they can communicate directly.
-
-对于\emph {主机间}（inter-host）通信，两个主机的管程都参与其中。当应用程序连接到远程主机时，其本地管程会建立常规TCP连接，并检测远程主机是否支持 \sys {} 和 RDMA。
-如果都支持，两个管程之间会建立一个RDMA队列，以便两个主机之间未来的套接字连接可以更快创建。远程端的管程调度与目标的连接，并帮助两个应用程序建立RDMA队列，如图 \ref {socksdirect:fig:architecture} 中的主机1和2之间。如果远程主机不支持\sys {}，它将继续使用TCP连接，如图 \ref {socksdirect:fig:architecture} 中的主机1和3之间。详细的连接管理协议在第 \ref {socksdirect:subsec:connection-management} 节中介绍。
-
-为了确保线程安全并避免锁，以及支持fork和容器热迁移，本章针对只有一对发送和接收线程处于活动状态的常见情况进行了优化，同时确保所有情况下的正确性（第 \ref {socksdirect:subsec:fork} 节）。
-为了消除缓冲区管理开销，设计了一个环形缓冲区，每个主机间消息平摊下来只需要一次RDMA写操作，每个主机内消息需要一次缓存迁移（第 \ref {socksdirect:subsec:lockless-queue}  节）。
-本章进一步设计了一种零拷贝机制，可以在发送和接收端消除较大消息的数据拷贝（第 \ref {socksdirect:subsec:zerocopy} 节）。
-最后，第 \ref {socksdirect:subsec:process-mux} 节提供了事件通知机制。
-
-
-如图 \ref{socksdirect:fig:libsd-architecture} 所示，\libipc{} 运行库由 API 封装、虚拟文件系统（VFS）、队列、传输等四层构成。API 封装层使用 \emph {文件描述符重映射表} 来区分套接字文件描述符与内核文件描述符（例如文件和设备），在用户空间中实现套接字功能，并将其他系统调用通过标准 C 库（glibc）转发到内核。虚拟文件系统层实现了连接创建与关闭、事件轮询与通知、多进程共享套接字、fork、容器迁移等功能，是最复杂的一层。虚拟文件系统的旁边是信号层，负责接收来自操作系统的事件以及与管程、对端通信。下面一层是基于环形缓冲区的无锁队列。最下层是传输层，用共享内存（SHM）或 RDMA 实现。
+As shown in Figure \ref{socksdirect:fig:libsd-architecture}, the \libipc{} runtime library consists of four layers: API encapsulation, Virtual File System (VFS), queue, and transmission. The API encapsulation layer uses a \emph{file descriptor remapping table} to distinguish between socket file descriptors and kernel file descriptors (such as files and devices), implements socket functions in user space, and forwards other system calls to the kernel through the standard C library (glibc). The Virtual File System layer implements functions such as connection creation and closure, event polling and notification, multi-process shared sockets, fork, container migration, etc., and is the most complex layer. Next to the Virtual File System is the signal layer, which is responsible for receiving events from the operating system and communicating with the monitor and the other end. The next layer is the lock-free queue based on the ring buffer. The bottom layer is the transmission layer, implemented with Shared Memory (SHM) or RDMA.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.5\textwidth]{images/libsd_architecture}
-	\caption{\libipc{} 运行库的架构。}
+	\caption{The architecture of \libipc{} runtime library.}
 	\label{socksdirect:fig:libsd-architecture}
 \end{figure}
-
 
 %In order to remove synchronization overhead for multi-threaded applications, we treat each thread as a separate process.
 %%Although threads in a process share memory, we use thread-specific storage for most states in \libipc{}.
@@ -138,32 +107,30 @@
 %To maintain performance with many concurrent connections, rather than creating separate queues for each connection, we multiplex data from all connections through one queue.
 %In Sec.~\ref{socksdirect:subsec:multiplex-conn}, we present the design of multiplexed queue that avoids head-of-line blocking and supports fetching data from any multiplexed connections.
 
-%Inspired by Unikernels~\cite{madhavapeddy2013unikernels}, we move networking and IPC functions from the kernel to user space. Similar to existing works~\cite{peter2016arrakis,jeong2014mtcp,libvma}, we leverage multiple queues in modern 网卡s to enable user-space direct access to network. %The kernel is still responsible for process creation, scheduling, virtual memory and device management, but no longer on the critical path of performance.
+%Inspired by Unikernels~\cite{madhavapeddy2013unikernels}, we move networking and IPC functions from the kernel to user space. Similar to existing works~\cite{peter2016arrakis,jeong2014mtcp,libvma}, we leverage multiple queues in modern network cards to enable user-space direct access to network. %The kernel is still responsible for process creation, scheduling, virtual memory and device management, but no longer on the critical path of performance.
 %To maintain compatibility with existing Linux applications, we design a user-mode library \libipc as a drop-in replacement of the system call wrappers in the GNU C library (glibc). \libipc{} implements network socket functions in user mode, and adds a wrapper to other system calls to track process creation and memory allocation. \libipc{} is not considered a secure domain, as it shares memory space with the application. When \libipc{} is loaded, it creates a Linux native \textit{bootstrap socket} to the \textit{monitor} daemon, then creates a shared memory queue to the monitor.
 
 %Even though multiple threads in the same process share memory space, we still treat each thread as a separated process and use thread-specific storage to store states in \libipc. In the following text, unless explicitly mentioned, we use a ``process'' to refer to a regular process or a thread.
 
-\section{系统设计}
+\section{System Design}
 \label{socksdirect:sec:design}
 
 
-\subsection{基于令牌的套接字共享}
+\subsection{Token-based Socket Sharing}
 \label{socksdirect:subsec:fork}
 
 
-大多数套接字系统为每个文件描述符维护一个锁，以使线程和进程共享套接字。
-以前的工作 \cite {boyd2010analysis,clements2015scalable} 表明，许多套接字操作不可交换，并且不能始终避免同步。
-本章利用共享内存消息传递比锁 \cite {roghanchi2017ffwd} 便宜得多的事实，并使用消息传递作为唯一的同步机制。
+Most socket systems maintain a lock for each file descriptor to enable socket sharing among threads and processes.
+Previous work \cite {boyd2010analysis,clements2015scalable} has shown that many socket operations are not commutative and synchronization cannot always be avoided.
+This chapter takes advantage of the fact that shared memory message passing is much cheaper than locks \cite {roghanchi2017ffwd}, and uses message passing as the only synchronization mechanism.
 
 
-逻辑上，套接字由两个相反传输方向的FIFO \emph {队列}组成，每个FIFO具有多个并发的发送方和接收方。
-系统设计目标是在保持FIFO语义的同时最大化通用情况性能。
-本文观察到应用程序的如下两个特征：首先，由于成本高，高性能应用程序很少fork和创建线程。
-其次，几个进程并发从共享套接字发送或接收并不常见，因为套接字的字节流语义使得很难避免接收部分消息。
-需要同时发送或接收的应用程序通常使用消息代理（message broker） \cite {hintjens2013zeromq,rabbitmq2017rabbitmq,kreps2011kafka} 而非直接共享套接字。
-常见的进程间套接字共享情况是应用程序隐式地将套接字从一个进程迁移到另一个进程，例如将事务从主进程卸载到工作进程。
-
-
+Logically, a socket consists of two FIFO \emph {queues} in opposite transmission directions, each with multiple concurrent senders and receivers.
+The system design goal is to maximize general case performance while maintaining FIFO semantics.
+This paper observes the following two characteristics of applications: first, high-performance applications rarely fork and create threads due to high costs.
+Second, it is not common for several processes to concurrently send or receive from a shared socket, as the byte stream semantics of sockets make it difficult to avoid receiving partial messages.
+Applications that need to send or receive simultaneously usually use a message broker \cite {hintjens2013zeromq,rabbitmq2017rabbitmq,kreps2011kafka} instead of directly sharing sockets.
+The common case of inter-process socket sharing is that applications implicitly migrate sockets from one process to another, such as offloading transactions from the main process to a worker process.
 
 
 
@@ -186,68 +153,49 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 \end{enumerate}
 \fi
 
-本章的解决方案是每个 \emph {套接字队列}（套接字的一个传输方向）有一个 \emph {发送令牌} 和一个 \emph {接收令牌}。
-每个令牌都由一个 \emph {活跃线程} 持有，它具有发送或接收的权限。
-因此，在任何时间点只有一个活动的发送方线程和一个活动的接收方线程。
-套接字队列在线程和进程之间共享，允许来自一个发送方和一个接收方的并发无锁访问（详细信息将在第 \ref {socksdirect:subsec:lockless-queue} 节中讨论）。
-当另一个线程想要发送或接收时，它应该请求 \emph {接管}（take over）令牌。
-
-
+The solution in this chapter is that each \emph{socket queue} (a transmission direction of a socket) has a \emph{send token} and a \emph{receive token}. Each token is held by an \emph{active thread}, which has the authority to send or receive. Therefore, at any point in time, there is only one active sender thread and one active receiver thread. The socket queue is shared between threads and processes, allowing concurrent lock-free access from a sender and a receiver (details will be discussed in section \ref{socksdirect:subsec:lockless-queue}). When another thread wants to send or receive, it should request to \emph{take over} the token.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.6\textwidth]{images/queue_arch}
-	\caption{两个发送方和两个接收方线程共享一个基于令牌的套接字。虚线箭头表示每个套接字的活动发送方和接收方。每个线程跟踪其活动套接字并通过独占队列与管程通信。}
+	\caption{Two sender threads and two receiver threads share a token-based socket. The dashed arrows represent the active sender and receiver for each socket. Each thread tracks its active sockets and communicates with the monitor through an exclusive queue.}
 	\label{socksdirect:fig:queue-arch}
 \end{figure}
 
-
 %\RED{Need performance comparison in a figure.}
 
-每种类型的操作的详细信息如下:a）数据传输（\texttt {send}和\texttt {recv}），b）添加新的发送方和接收方（\texttt {fork}和线程创建 ），c）容器热迁移，和d）连接关闭。
+Detailed information for each type of operation is as follows: a) data transmission (\texttt{send} and \texttt{recv}), b) adding new senders and receivers (\texttt{fork} and thread creation), c) container hot migration, and d) connection closure.
 
-\subsubsection{发送/接收操作}
+\subsubsection{Send/Receive Operations}
 \label{socksdirect:subsubsec:fork_rdwr}
 
 \iffalse
 \begin{figure}[htbp]
 	\centering
-	\subfloat[传统加锁。]{
+	\subfloat[Traditional locking.]{
 		\includegraphics[width=0.3\textwidth]{images/one_conn3}
 		\label{socksdirect:fig:fork-locking}
 	}
 	\hspace{0.02\textwidth}
-	\subfloat[\sys{} 每个发送端一个。]{
+	\subfloat[\sys{} one per sender.]{
 		\includegraphics[width=0.22\textwidth]{images/one_conn1}
 		\label{socksdirect:fig:fork-p2p}
 	}
 	\hspace{0.02\textwidth}
-	\subfloat[S2 fork 成为 S2' 和 S3]{
+	\subfloat[S2 forks into S2' and S3]{
 		\includegraphics[width=0.2\textwidth]{images/one_conn2}
 		\label{socksdirect:fig:fork-fork}
 	}
-	\caption{共享套接字的进程间队列结构。虚线箭头代表没有被启用的队列。}
+	\caption{Inter-process queue structure of shared sockets. Dashed arrows represent queues that are not enabled.}
 	\label{socksdirect:fig:inter-process-queue}
 \end{figure}
 \fi
 
+When a thread does not have a send token but wants to send through a socket, the non-active thread needs to \emph{take over} the token. If a direct communication channel is created between the non-active thread and the active thread, it requires point-to-point queues, the number of which is the square of the number of threads, or a shared queue with locks. To avoid these two overheads, a monitor is used as a proxy during the \emph{takeover} process. Since takeover is an infrequent operation, the monitor generally does not become a bottleneck. This message passing design also has the following advantages: the sender process can be located on different hosts, which is very useful in container hot migration.
 
-当一个线程没有发送令牌但想要通过套接字发送时，非活动线程需要\emph {接管}令牌。
-如果在非活动线程和活动线程之间创建直接通信通道，则需要点对点的队列，其数量为线程数的平方，或者是具有锁的共享队列。
-为了避免这两种开销，在\emph {接管}过程中使用管程作为代理。
-由于接管是不频繁的操作，管程一般不会成为瓶颈。
-此消息传递设计还具有以下优点：发送方进程可以位于不同的主机上，这在容器热迁移中非常有用。
+The takeover process is as follows: the non-active sender sends a \emph{takeover} command to the monitor through the shared memory queue. The monitor polls messages from various shared memory queues, adds the sender to the waiting list, and proxies the command to the current active sender. When the active sender receives the request, it sends the send token to the monitor. The monitor grants the token to the first non-active sender in the waiting list and updates the active sender. The non-active sender can send after receiving the token. This mechanism is deadlock-free because at least one sender or monitor holds the send token. It is also starvation-free because each sender can appear in the waiting list at most once and is served in FIFO order. The takeover process on the receiver side is similar.
 
-接管过程如下：
-非活动发送方通过共享内存队列向管程发送\emph {接管}命令。管程轮询来自各个共享内存队列的消息，将发送方添加到等待列表中，并将命令代理到目前的活动发送方。
-当活动发送方收到请求时，它会将发送令牌发送给管程。
-管程将令牌授予等待列表中的第一个非活动发送方，并更新活动发送方。
-非活动发送方可以在收到令牌后发送。
-此机制无死锁，因为至少有一个发送方或管程持有发送令牌。
-它也是无饥饿的，因为每个发送方最多可以出现在等待列表中一次，并按FIFO顺序提供。
-接收器侧的接管过程类似。
-
-接管过程需要 0.6 微秒，因此，如果多个进程并发地通过同一个套接字发送，总吞吐量可能下降到 1.6 M 次操作每秒。但是，如果我们简单地使用锁，通常情况的吞吐量将下降到 5 M 次操作每秒，远低于基于令牌的套接字共享所能达到的 27 M 次操作每秒吞吐量。
+The takeover process requires 0.6 microseconds, so if multiple processes send concurrently through the same socket, the total throughput may drop to 1.6 M operations per second. However, if we simply use locks, the throughput in the usual case will drop to 5 M operations per second, far lower than the 27 M operations per second throughput that can be achieved by token-based socket sharing.
 
 %\begin{figure}[t]
 %	\centering
@@ -256,127 +204,94 @@ For compatibility with Linux semantics, we also need to ensure message ordering 
 %	\label{socksdirect:fig:fork-bipartitegraph}
 %\end{figure}
 
-\subsubsection{Fork，Exec 和线程创建}
+\subsubsection{Fork, Exec and Thread Creation}
 \label{socksdirect:subsubsec:fork_fork}
 
+\textbf {Socket data sharing.}
+The main challenge is to share socket metadata, buffers, and the underlying transport layer after \texttt {fork} and \texttt {exec}. After fork, the memory space becomes copy-on-write and is erased after exec, but the socket file descriptor still needs to be available. \sys{} uses shared memory to store socket metadata and buffers, so the data is still shared after fork. To attach shared memory after exec, \libipc {} connects to the monitor to get the shared memory key of its parent process. After fork, because the parent process cannot see the sockets created by the child process, the child process creates a new shared memory to store the metadata and buffers of the new socket.
 
-\textbf {套接字数据共享。}
-主要的挑战是在\texttt {fork}和\texttt {exec}之后共享套接字元数据、缓冲区和底层的传输层。
-在fork之后，内存空间变为写时复制，并在exec之后被擦除，但是套接字文件描述符仍需要可用。
-\sys{} 使用共享内存（共享内存）来存储套接字元数据和缓冲区，因此在fork之后，数据仍然是共享的。
-要在exec之后附加共享内存，\libipc {}将连接到管程以获取其父进程的共享内存密钥。
-在fork之后，因为父进程看不到子进程创建的套接字，所以子进程创建一个新的共享内存来存储新套接字的元数据和缓冲区。
-
-下面考虑底层传输层机制。
-基于共享内存的传输层不需要特殊处理，因为fork / exec之前创建的共享内存仍然在fork / exec之后共享。
-但是，RDMA在fork / exec后存在问题，因为DMA内存区域不在共享内存中。
-它们在fork之后变为写时复制，而网卡仍然从原始物理页面DMA，因此子进程不能使用现有的RDMA资源。
-而在exec之后，整个RDMA上下文将被清除。
-本章的解决方案是让子进程在fork / exec之后重新初始化RDMA资源（PD，MR等）。
-当子进程使用在fork之前创建的套接字时，它会要求管程与远程端点重新建立RDMA QP。
-因此，对端进程可能会看到一个套接字的两个或更多QP，但它们链接到套接字元数据和缓冲区的唯一拷贝。
-下一节（\S\ref{socksdirect:subsec:lockless-queue}）我们将看到，我们仅使用 RDMA 单边写原语，因此使用任何一个 QP 都是等效的。
-图 \ref {socksdirect:fig:fork-memory} 显示了一个fork示例。
-
+Next, consider the underlying transport layer mechanism. The shared memory-based transport layer does not require special handling, as the shared memory created before fork / exec is still shared after fork / exec. However, there are problems with RDMA after fork / exec, because the DMA memory area is not in shared memory. They become copy-on-write after fork, and the network card still DMAs from the original physical page, so the child process cannot use the existing RDMA resources. After exec, the entire RDMA context will be cleared. The solution in this chapter is to let the child process reinitialize the RDMA resources (PD, MR, etc.) after fork / exec. When the child process uses a socket created before fork, it asks the monitor to re-establish the RDMA QP with the remote endpoint. Therefore, the peer process may see two or more QPs of a socket, but they link to the only copy of the socket metadata and buffer. In the next section (\S\ref{socksdirect:subsec:lockless-queue}), we will see that we only use the RDMA one-sided write primitive, so using any QP is equivalent. Figure \ref {socksdirect:fig:fork-memory} shows an example of fork.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.6\textwidth]{images/fork_memory}
-	\caption{fork后的内存布局。 文件描述符 3和4在fork之前创建并因此共享。 在fork之后，父进程和子进程分别创建一个新的文件描述符 5，它在文件描述符表中写入时被复制。 文件描述符 3和4的套接字元数据和缓冲区在共享内存中并因此被共享。 子进程创建一个新的共享内存来存储文件描述符 5的套接字元数据和缓冲区，当它再次fork时，它将与子进程共享。 RDMA QP位于私有内存中，而共享内存队列是共享的。}
+	\caption{Memory layout after fork. File descriptors 3 and 4 were created before fork and are therefore shared. After fork, the parent process and the child process each create a new file descriptor 5, which is copied on write in the file descriptor table. The socket metadata and buffers of file descriptors 3 and 4 are in shared memory and are therefore shared. The child process creates a new shared memory to store the socket metadata and buffers of file descriptor 5, which will be shared with the child process when it forks again. RDMA QP is in private memory, while the shared memory queue is shared.}
 	\label{socksdirect:fig:fork-memory}
 \end{figure}
 
+\textbf {File descriptor space sharing.}
+Unlike socket data, the file descriptor space becomes copy-on-write after fork: file descriptors created before fork are shared, but new file descriptors are exclusive to the creating process. Therefore, just keep the file descriptor remapping table in heap memory, taking advantage of the operating system's copy-on-write mechanism after fork. To restore the file descriptor remapping table after exec, it is copied to shared memory before exec and copied back to the new process during \libipc {} initialization.
 
-\textbf {文件描述符空间共享。}
-与套接字数据不同，文件描述符空间在fork之后变为写时复制：fork 前创建的文件描述符是共享的，但新文件描述符由创建者进程独享。
-因此，只需将文件描述符重映射表驻留在堆内存（heap memory）中，利用 fork 之后操作系统的写时复制机制。
-要在exec之后恢复文件描述符重映射表，它将在exec之前复制到共享内存，并在\libipc {}初始化期间拷贝回新进程。
+\textbf{Security.}
+Security is an issue because a malicious process may masquerade as a child process of a privileged parent process. To identify parent-child relationships in the monitor, when an application calls \texttt {fork}, \texttt {clone}, or \texttt {pthread\_create}, \libipc {} first generates a key for pairing and sends it to the monitor, then calls the original function in \emph {libc}. After fork, the child process creates a new shared memory queue for the monitor and sends the key (the child process inherits the parent memory space, thus knowing the key). Therefore, the monitor can pair the child process with the parent process.
 
-\textbf{安全。}
-安全性是一个问题，因为恶意进程可能将自己伪装成特权父进程的子进程。
-要在管程中标识父关系和子关系，当应用程序调用\texttt {fork}，\texttt {clone}或\texttt {pthread\_create}时，\libipc {}首先生成一个用于配对的密钥并将其发送到管程，然后调用\emph {libc}中的原始函数。
-在fork之后，子进程为管程创建一个新的共享内存队列并发送密钥（子进程继承父内存空间，从而知道该密钥）。
-因此，管程可以将子进程与父进程配对。
+\textbf {Monitor operations.}
+During fork, exec, or thread creation, the monitor needs to add the new process to the sender and receiver lists of each existing socket to manage takeover operations.
 
-\textbf {管程操作。}
-在fork，exec或线程创建时，管程需要新进程添加到每个现有套接字的发送方和接收方列表中，以便管理接管操作。
+%A more difficult challenge arises from the sharing of socket connections between parent and child processes.
+%A significant challenge is how to manage the remaining data in the original send and receive queues.
 
-%The socket queues are in 共享内存 between parent and child processes.
-%However, to avoid synchronization in accessing shared metadata, the metadata is in thread local storage and copied from parent to child.
-%To maintain isolation between parent and child, monitor creates new shared memory queues to replace all queues in \emph{both} parent and child, as Figure~\ref{socksdirect:fig:fork-fork} shows. We do not reuse queues due to potential isolation violation. %The monitor then sends credentials of new queues to parent and child via bootstrap sockets. 
-%Each peer process is notified of the new queues and the new process. From then on, parent and child processes have isolated queues to the monitor and peers.
-
-%A harder challenge comes from socket connection sharing between parent and child processes.
-%A major challenge is how to handle the remaining data in the original send and receive queues.
-
-%For each unidirectional queue, we discuss the behavior of related processes in four cases:
+%For each unidirectional queue, we examine the behavior of related processes in four scenarios:
 %\begin{enumerate}
-%	\item A sender process itself forks.
-%	\item A receiver of a sender process forks.
-%	\item A receiver process itself forks.
-%	\item A sender of a receiver process forks.
+%	\item A sender process itself initiates a fork.
+%	\item A receiver of a sender process initiates a fork.
+%	\item A receiver process itself initiates a fork.
+%	\item A sender of a receiver process initiates a fork.
 %\end{enumerate}
 
-%The general process of fork is that after monitor is notified of the fork, it creates shared memory between the newly created process and all the processes which previously have connections with the parent process. The key challenge lies in the fork is that how to deal with the existing data in the connection to guarantee the order requirements.
+%The general procedure of a fork is that, after the monitor is notified of the fork, it creates shared memory between the newly created process and all the processes that previously had connections with the parent process. The key challenge in the fork is how to handle the existing data in the connection to ensure the order requirements are met.
 
 %\textbf{Receiver fork.}
-%First we look at a simple case when a receiver forks. Recall that only one receiver has exclusive access to a socket, as stated in Sec.~\ref{socksdirect:subsubsec:fork_rdwr}. The parent process inherits receive permission. When a sender receives fork notification of its peer, it copies all data from original queues to new queues of the parent process.
+%First, we consider a simple case where a receiver initiates a fork. Remember that only one receiver has exclusive access to a socket, as stated in Sec.~\ref{socksdirect:subsubsec:fork_rdwr}. The parent process inherits the receive permission. When a sender receives a fork notification from its peer, it copies all data from the original queues to the new queues of the parent process.
 
 %\textbf{Sender fork.}
-%When a sender forks, things are more complicated. We need to guarantee that all data sent prior to \texttt{fork} is consumed before the data sent after \texttt{fork}.
+%When a sender initiates a fork, the situation becomes more complex. We need to ensure that all data sent before the \texttt{fork} is consumed before the data sent after the \texttt{fork}.
 
-%Our solution is to let receivers drain the original queue first before switching to the new queues. After \texttt{fork}, both parent and child send data to its new queue. When the receiver is notified of the fork, it keeps track of the original queue and consumes all data in it before activating new queues. Note that the parent or child may fork again before the original queue is drained. With this in mind, the receiver maintains a forest data structure to track dependency of queues. The root of each tree in the forest is the oldest queue to receive from. Each non-leaf node has two children indicating the new queue of parent and child processes. If a non-leaf root queue becomes empty, it will be removed, and the two children queues will be promoted to root nodes.
+%Our solution is to allow receivers to drain the original queue first before switching to the new queues. After the \texttt{fork}, both the parent and child send data to their new queue. When the receiver is notified of the fork, it keeps track of the original queue and consumes all data in it before activating the new queues. Note that the parent or child may initiate another fork before the original queue is drained. With this in mind, the receiver maintains a forest data structure to track the dependency of queues. The root of each tree in the forest is the oldest queue to receive from. Each non-leaf node has two children indicating the new queue of parent and child processes. If a non-leaf root queue becomes empty, it will be removed, and the two children queues will be promoted to root nodes.
 
-%\textbf{Takeover During Fork.}
-%After a sender forks, the receivers still need the takeover mechanism to arbitrate remaining messages in the original queue. However, both parent and child senders have dropped the original queue and will not respond to takeover requests. A similar situation occurs when a sender process dies. Our solution is to let the receivers use atomic operations to compete for remaining data in the original queue. Since this case rarely happens, the performance of the overall design is not affected.
-
-%Things become much more complicated when cases 1,4 happens after cases 2,3 happening. After receiver forks, the unique sender is responsible for receiving ``takeover message'' and resend the data to new receivers. However, if sender forks following the receiver forks, according to the methods we mentioned above, there is no sender responsible for processing ``takeover message''. Our solution is that we require the receivers to poll the data from the old shared memory queue and compete for data. Since this case rarely happens, the performance of the overall design is not affected.
-
-\subsubsection{容器热迁移}
+\subsubsection{Container Live Migration}
 \label{socksdirect:subsubsec:container_live_migration}
 
+\textbf{Migrating Remaining Data in Socket Queue.}
+Since \libipc {} runs in the same process as the application, its memory state will be migrated to the new host along with the application.
+The memory state includes the socket queue, so data in transit (sent but not received) will not be lost.
+Sockets can only be shared within a container, and all processes in the container are migrated together, so the memory on the original host can be deallocated after migration.
 
-\textbf {在套接字队列中迁移剩余数据。}
-由于\libipc {}在与应用程序相同的进程中运行，因此其内存状态将与应用程序一起迁移到新主机。
-内存状态包括套接字队列，因此不会丢失正在传输（已发送但未接收）的数据。
-套接字只能在容器内共享，并且容器中的所有进程都会一起迁移，因此迁移后可以取消分配原始主机上的内存。
+\textbf{Migration of Monitor State.}
+The monitor tracks information about listening sockets, active threads, and the waiting list for each connection as well as shared memory keys.
+During migration, the old monitor dumps the state of the migrated container and sends them to the new monitor.
 
-\textbf {管程状态的迁移。}
-管程跟踪侦听套接字信息，活动线程和每个连接的等待列表以及共享内存密钥。
-在迁移期间，旧管程会转储已迁移容器的状态并将它们发送到新管程。
-
-\textbf {建立新的通信通道。}
-迁移后，所有通信通道都已过时，因为共享内存在主机上是本地的，而RDMA不支持热迁移 \cite{nsdi19freeflow,slim}。
-首先，新主机上的迁移容器需要与本地管程建立连接。
-本地管程指示以下过程。
-两个容器之间的主机内连接可能变为主机间，因此\libipc {}在这种情况下创建RDMA连接。
-两个容器之间的主机间连接可能成为主机内部，\libipc {}创建共享内存连接。
-最后，\libipc {}重新建立剩余的主机间RDMA和主机内共享内存连接。
-
+\textbf{Establishing New Communication Channels.}
+After migration, all communication channels are obsolete, because shared memory is local on the host, and RDMA does not support live migration \cite{nsdi19freeflow,slim}.
+First, the migrated container on the new host needs to establish a connection with the local monitor.
+The local monitor instructs the following process.
+A host-internal connection between two containers may become host-external, so \libipc {} creates an RDMA connection in this case.
+A host-external connection between two containers may become host-internal, \libipc {} creates a shared memory connection.
+Finally, \libipc {} re-establishes the remaining host-external RDMA and host-internal shared memory connections.
 
 %\subsubsection{Connection Creation}
 %\label{socksdirect:subsubsec:fork_new}
 %
 
 %A connection created by a thread can be accessed by all threads in the same process.
-%To avoid creating redundant queues and connection states, \libipc does not share the 文件描述符 eagerly with other threads, because most threads in existing applications do not use connections created by other threads.
-%When a thread do want to accesses a 文件描述符 that belongs to another thread, \libipc sends a message to the owner thread and requests sharing the 文件描述符. %This procedure is exactly the same as sharing existing connections during thread creation (Sec.~\ref{socksdirect:subsubsec:fork_fork}). %The sharing procedure only happens once for every connection and thread. Sharing existing connections eagerly during thread creation is an optimization. First, children threads are more likely to use existing connections than siblings. Second, batch processing improves performance.
+%To avoid creating redundant queues and connection states, \libipc does not share the file descriptor eagerly with other threads, because most threads in existing applications do not use connections created by other threads.
+%When a thread do want to accesses a file descriptor that belongs to another thread, \libipc sends a message to the owner thread and requests sharing the file descriptor. %This procedure is exactly the same as sharing existing connections during thread creation (Sec.~\ref{socksdirect:subsubsec:fork_fork}). %The sharing procedure only happens once for every connection and thread. Sharing existing connections eagerly during thread creation is an optimization. First, children threads are more likely to use existing connections than siblings. Second, batch processing improves performance.
 
 %\subsubsection{Connection Close}
 %\label{socksdirect:subsubsec:fork_close}
 %
 
-%Close is the operation that all of the processes leave the connection. The synchronization is  especially challenging since all the processes are run in parallel. One challenge lies in file descriptors are managed by decentralized processes and are possibly reused. One process close a connection while the others are doing compute intensive tasks is a case. It is possible that the file descriptor of the old process is reused and a new connection is setup with the same file descriptor. The other process may notice the close of the old connection and also call close on its own side, which lead to the new connection setup by the previous process closed due to the match of same file descriptor. 
+%Close is the operation where all of the processes leave the connection. The synchronization is especially challenging since all the processes are run in parallel. One challenge lies in the fact that file descriptors are managed by decentralized processes and can possibly be reused. A case in point is when one process closes a connection while the others are performing compute-intensive tasks. It is possible that the file descriptor of the old process is reused and a new connection is set up with the same file descriptor. The other process may notice the closure of the old connection and also call close on its own side, which leads to the new connection set up by the previous process being closed due to the match of the same file descriptor. 
 
-%To satisfy the synchronization requirements, the close function call is all completed by message passing. The caller of close need to wait for ACK from all the other peers before release resources. i.e. the status of the connection.
+%To satisfy the synchronization requirements, the close function call is all completed by message passing. The caller of close needs to wait for ACK from all the other peers before releasing resources, i.e., the status of the connection.
 
 %\textbf{Broadcast.}
-%When a process calls \texttt{close}, all its peers cannot send to or receive from the 文件描述符. In this sense, 
-%A socket is closed if all shared processes close it. So, we need to multicast a notification to the peers and collect responses from them. A challenge arises when \texttt{close} is interleaved with \texttt{fork}. Since \texttt{fork} and \texttt{close} do not commute~\cite{clements2015scalable}, we need a rule to determine their partial order. We make the choice that the ordering is determined by the initiator of \texttt{close}. If a process calls \texttt{close} before receiving fork notification, it will piggyback close notification with fork completion to both parent and child processes.
+%When a process calls \texttt{close}, all its peers cannot send to or receive from the file descriptor. In this sense, 
+%A socket is closed if all shared processes close it. Therefore, we need to multicast a notification to the peers and collect responses from them. A challenge arises when \texttt{close} is interleaved with \texttt{fork}. Since \texttt{fork} and \texttt{close} do not commute~\cite{clements2015scalable}, we need a rule to determine their partial order. We make the choice that the ordering is determined by the initiator of \texttt{close}. If a process calls \texttt{close} before receiving fork notification, it will piggyback close notification with fork completion to both parent and child processes.
 
 %\textbf{Handshake before releasing resource.}
-%Another challenge is caused by 文件描述符 reuse after close. As stated in Sec.~\ref{socksdirect:subsec:socket-api}, a 文件描述符 is deleted after receiving shutdown message of both directions. With multiple processes sharing a connection, after one process calls \texttt{close}, others can still use the connection. Consequently, a process deletes a 文件描述符 only after receiving shutdown messages of both directions from all peers of the 文件描述符.
+%Another challenge is caused by file descriptor reuse after close. As stated in Sec.~\ref{socksdirect:subsec:socket-api}, a file descriptor is deleted after receiving shutdown message of both directions. With multiple processes sharing a connection, after one process calls \texttt{close}, others can still use the connection. Consequently, a process deletes a file descriptor only after receiving shutdown messages of both directions from all peers of the file descriptor.
 
-%Another challenge lies in the close of a connection is that close is a broadcast operation while send/receive is sent to a specific process. Besides, fork and close are immutable operations while the scalability requirements of the system impose the constraint that all the operations run asynchronously. As a result, a rule to determine the partial order is required.
+%Another challenge lies in the termination of a connection, as termination is a broadcast operation while send/receive is directed to a specific process. Furthermore, fork and termination are immutable operations, while the scalability requirements of the system impose the constraint that all operations run asynchronously. Consequently, a rule to determine the partial order is necessary.
 
-%In \libipc, we make the choice that the order of fork and close is determined at the start point of the fork operation and the end point (after receiving all the ACKs). By making this choice, when a process waiting fork close ACK encounters fork message, it could send a separate close request to newly created process, which guarantees all the processes closed.
+%In \libipc, we opt for the order of fork and termination to be determined at the initiation point of the fork operation and the termination point (after receiving all the ACKs). By making this choice, when a process waiting for fork termination ACK encounters a fork message, it can send a separate termination request to the newly created process, ensuring all processes are terminated.

@@ -1,30 +1,15 @@
-% !TeX root = ../main.tex
+This thesis aims to explore high-performance data center systems based on programmable NICs. Programmable NICs can accelerate not only virtual networks but also network functions, data structures, and operating systems. For this purpose, this thesis implements full-stack acceleration of computing, networking, and memory storage nodes in cloud computing data centers using FPGA programmable NICs.
 
-\begin{abstract}
-数据中心是支持当今世界各种互联网服务的基础设施，面临硬件和应用两方面的挑战。硬件方面，通用处理器的性能提升逐渐放缓；应用方面，大数据与机器学习对算力的需求与日俱增。不同于容易并行的 Web 服务，大数据与机器学习需要各计算节点间更多的通信，这推动了数据中心网络性能的快速提高，也对共享数据存储的性能提出了更高的要求。然而，数据中心的网络和存储基础设施主要使用通用处理器上的软件处理，其性能落后于快速增长的网络、存储、定制化计算硬件性能，日益成为系统的瓶颈。与此同时，在云化的数据中心中，灵活性也是一项重要需求。为了同时提供高性能和灵活性，近年来，可编程网卡在数据中心被广泛部署，利用现场可编程门阵列（FPGA）等定制化硬件加速虚拟网络。
+Firstly, this thesis proposes to accelerate virtual network functions in cloud computing using programmable NICs, and designs and implements the first high-flexibility, high-performance network function processing platform, ClickNP, accelerated by FPGA in commercial servers. To simplify FPGA programming, this thesis designs a C-like ClickNP language and a modular programming model, and develops a series of optimization techniques to fully utilize the massive parallelism of FPGA; implements the ClickNP development toolchain, which can be integrated with various commercial high-level synthesis tools; designs and implements more than 200 network elements based on ClickNP, and uses these elements to build various network functions. Compared with CPU-based software network functions, the throughput of ClickNP is increased by 10 times, and the latency is reduced to 1/10.
 
-本文旨在探索基于可编程网卡的高性能数据中心系统。可编程网卡在加速虚拟网络之外，还可以加速网络功能、数据结构、操作系统等。为此，本文用 FPGA 可编程网卡实现云计算数据中心计算、网络、内存存储节点的全栈加速。
+Secondly, this thesis proposes to accelerate remote data structure access using programmable NICs. Based on the ClickNP programming framework, this thesis designs and implements a high-performance memory key-value storage system, KV-Direct, which bypasses the CPU on the server side and uses programmable NICs to directly access data structures in remote host memory via PCIe. By extending the memory operation semantics of one-sided RDMA to key-value operation semantics, KV-Direct solves the problem of high communication and synchronization overhead when operating data structures with one-sided RDMA. Taking advantage of the reconfigurable characteristics of FPGA, KV-Direct allows users to implement more complex data structures. Faced with the performance challenges of lower PCIe bandwidth and higher latency between the NIC and host memory, through a series of performance optimizations such as hash tables, memory allocators, out-of-order execution engines, load balancing and caching, and vector operations, KV-Direct achieves 10 times the energy efficiency of CPU and microsecond-level latency, and is the first general-purpose key-value storage system with a single-machine performance reaching 1 billion operations per second.
 
-首先，本文提出用可编程网卡加速云计算中的虚拟网络功能，设计和实现了首个在商用服务器中用 FPGA 加速的高灵活性、高性能网络功能处理平台 ClickNP。为了简化 FPGA 编程，本文设计了类 C 的 ClickNP 语言和模块化的编程模型，并开发了一系列优化技术，以充分利用 FPGA 的海量并行性；实现了 ClickNP 开发工具链，可以与多种商用高层次综合工具集成；基于 ClickNP 设计和实现了 200 多个网络元件，并用这些元件组建起多种网络功能。相比基于 CPU 的软件网络功能，ClickNP 的吞吐量提高了 10 倍，延迟降低到 1/10。
+The content you provided is already in English and it is written in an academic style. As per your instructions, I will keep it as-is. Here is the content:
 
-其次，本文提出用可编程网卡加速远程数据结构访问。本文基于 ClickNP 编程框架，设计实现了一个高性能内存键值存储系统 KV-Direct，在服务器端绕过 CPU，用可编程网卡通过 PCIe 直接访问远程主机内存中的数据结构。通过把单边 RDMA 的内存操作语义扩展到键值操作语义，KV-Direct 解决了单边 RDMA 操作数据结构时通信和同步开销高的问题。利用 FPGA 可重配置的特性，KV-Direct 允许用户实现更复杂的数据结构。面对网卡与主机内存之间 PCIe 带宽较低、延迟较高的性能挑战，通过哈希表、内存分配器、乱序执行引擎、负载均衡和缓存、向量操作等一系列性能优化，KV-Direct 实现了 10 倍于 CPU 的能耗效率和微秒级的延迟，是首个单机性能达到 10 亿次每秒的通用键值存储系统。
+Finally, this thesis proposes to provide socket communication primitives for applications by combining programmable NICs and user-mode runtime libraries, thereby bypassing the operating system kernel. This thesis designs and implements a user-mode socket system, SocksDirect, which is fully compatible with existing applications, can achieve near-hardware-limit throughput and latency, has scalable multi-core performance, and maintains high performance under high-concurrent loads. Intra-host and inter-host communications are implemented using shared memory and RDMA, respectively. To support a high number of concurrent connections, this thesis implements an RDMA programmable NIC based on KV-Direct. By eliminating a series of overheads such as inter-thread synchronization, buffer management, large data copying, process wakeup, etc., SocksDirect improves the throughput by 7 to 20 times compared to Linux, reduces the latency to 1/17 to 1/35, and reduces the HTTP latency of the web server to 1/5.5.
 
-最后，本文提出用可编程网卡和用户态运行库相结合的方法为应用程序提供套接字通信原语，从而绕过操作系统内核。本文设计和实现了一个用户态套接字系统 SocksDirect，与现有应用程序完全兼容，能实现接近硬件极限的吞吐量和延迟，多核性能具有可扩放性，并在高并发负载下保持高性能。主机内和主机间的通信分别使用共享内存和 RDMA 实现。为了支持高并发连接数，本文基于 KV-Direct 实现了一个 RDMA 可编程网卡。通过消除线程间同步、缓冲区管理、大数据拷贝、进程唤醒等一系列开销，SocksDirect 相比 Linux 提升了 7 至 20 倍吞吐量，降低延迟到 1/17 至 1/35，并将 Web 服务器的 HTTP 延迟降低到 1/5.5。
-
-\keywords{数据中心；可编程网卡；现场可编程门阵列；网络功能虚拟化；键值存储；网络协议栈}
-\end{abstract}
-
-\begin{enabstract}
-	
-Data centers are the infrastructure that hosts Internet services all around the world.
-Data centers face challenges on hardware and application.
-On the hardware side, performance improvement of general processors is slowing down.
-On the application side, big data and machine learning impose increasing computational power requirements.
-Different from Web services that are easy to parallelize, big data and machine learning require more communication among compute nodes, which pushes the performance of data center network to improve rapidly, and also proposes higher requirements for shared data storage performance.
-However, networking and storage infrastructure services in data centers still mainly use software processing on general processors, whose performance lags behind the rapidly increasing performance of hardware in networking, storage and customized computing.
-As a result, software processing becomes a bottleneck in data center systems.
-In the meantime, in cloud data centers, flexibility is also of great importance.
-To provide high performance and flexibility at the same time, recent years witnessed large scale deployment of programmable NICs (Network Interface Cards) in data centers, which use customized hardware such as FPGAs to accelerate network virtualization services.
+\keywords{Data Center; Programmable NIC; Field Programmable Gate Array; Network Function Virtualization; Key-Value Storage; Network Protocol Stack}
+\end{enabstract}
 
 This thesis aims to explore high performance data center systems with programmable NICs.
 Besides accelerating network virtualization, programmable NICs can also accelerate network functions, data structures and operating systems.
@@ -36,21 +21,11 @@ The ClickNP tool-chain integrates with multiple commercial high-level synthesis 
 Based on ClickNP, this thesis designs and implements more than 200 network elements, and constructs various network functions using the elements.
 Compared to CPU-based software network functions, ClickNP improves throughput by 10 times and reduces latency to 1/10.
 
-Second, this thesis proposes to accelerate remote data structure access with programmable NICs.
-This thesis designs and implements KV-Direct, a high performance in-memory key-value storage system based on ClickNP programming framework.
-KV-Direct bypasses CPU on the server side and uses programmable NICs to directly access data structures in remote host memory via PCIe.
-KV-Direct extends memory semantics of one-sided RDMA to key-value semantics and therefore avoid the communication and synchronization overheads in data structure operations.
-KV-Direct further leverages the reconfigurability of FPGA to enable users to implement more complicated data structures.
-To tackle with the performance challenge of limited PCIe bandwidth and high latency between NIC and host memory, this thesis design a series of optimizations including hash table, memory allocator, out-of-order execution engine, load balancing, caching and vector operations.
-KV-Direct achieves 10 times power efficiency than CPU and microsecond scale latency.
-KV-Direct is the first general key-value storage system that achieves 1 billion operations per second performance on a single server.
+Secondly, this thesis proposes the acceleration of remote data structure access using programmable NICs. The thesis designs and implements KV-Direct, a high-performance in-memory key-value storage system based on the ClickNP programming framework. KV-Direct bypasses the server-side CPU and uses programmable NICs to directly access data structures in the remote host memory via PCIe. KV-Direct extends the memory semantics of one-sided RDMA to key-value semantics, thereby avoiding communication and synchronization overheads in data structure operations. KV-Direct further leverages the reconfigurability of FPGA to enable users to implement more complex data structures. To address the performance challenge of limited PCIe bandwidth and high latency between NIC and host memory, this thesis designs a series of optimizations including a hash table, memory allocator, out-of-order execution engine, load balancing, caching, and vector operations. KV-Direct achieves a power efficiency ten times greater than that of a CPU and microsecond-scale latency. KV-Direct is the first general key-value storage system to achieve a performance of 1 billion operations per second on a single server.
 
-Lastly, this thesis proposes to co-design programmable NICs and user-space libraries to provide kernel-bypass socket communication primitives for applications.
-This thesis designs and implements SocksDirect, a user-space socket system that is fully compatible with existing applications, achieves throughput and latency that are close to hardware limits, has scalable performance for multi-cores, and preserves high performance with many concurrent connections.
-SocksDirect uses shared memory and RDMA for intra-host and inter-host communication, respectively.
-To support many concurrent connections, SocksDirect implements an RDMA programmable NIC based on KV-Direct.
-SocksDirect further removes overheads such as thread synchronization, buffer management, large payload copying and process wakeup.
-Compared to Linux, SocksDirect improves throughput by 7 to 20 times, reduces latency to 1/17 to 1/35, and reduces HTTP latency of Web servers to 1/5.5.
+Finally, this dissertation proposes a co-design of programmable NICs and user-space libraries to provide kernel-bypass socket communication primitives for applications. The dissertation designs and implements SocksDirect, a user-space socket system that is fully compatible with existing applications, achieves throughput and latency that are close to hardware limits, has scalable performance for multi-cores, and maintains high performance with many concurrent connections. SocksDirect uses shared memory and RDMA for intra-host and inter-host communication, respectively. To support many concurrent connections, SocksDirect implements an RDMA programmable NIC based on KV-Direct. SocksDirect further removes overheads such as thread synchronization, buffer management, large payload copying, and process wakeup. Compared to Linux, SocksDirect improves throughput by 7 to 20 times, reduces latency to 1/17 to 1/35, and reduces the HTTP latency of web servers to 1/5.5.
+
+The content you provided is already in English, so according to your instructions, I will keep it as-is:
 
 \enkeywords{Data Center; Programmable NIC; FPGA; Network Function Virtualization; Key-Value Store; Networking Stack}
 \end{enabstract}

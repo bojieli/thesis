@@ -1,156 +1,121 @@
-\section{系统性能评估}
+\section{System Performance Evaluation}
 \label{kvdirect:sec:eval}
 \label{kvdirect:sec:evaluation}
 \label{kvdirect:sec:system-benchmark}
 
-\subsection{系统实现}
+\subsection{System Implementation}
 
-为了提高开发效率，使用英特尔FPGA SDK for OpenCL~ \cite {aoc}来合成OpenCL的硬件逻辑。
-键值处理器采用1.1万行OpenCL代码实现，所有内核都完全流水线化，即吞吐量是每个时钟周期一次操作。
-凭借180~MHz的时钟频率，可以在180~M op/s下处理键值操作，如果网络，DRAM或PCIe不是瓶颈。
+To improve development efficiency, Intel FPGA SDK for OpenCL~\cite{aoc} is used to synthesize the hardware logic of OpenCL. The key-value processor is implemented with 11,000 lines of OpenCL code, all kernels are fully pipelined, that is, the throughput is one operation per clock cycle. With a clock frequency of 180~MHz, key-value operations can be processed at 180~M op/s, if the network, DRAM, or PCIe is not a bottleneck.
 
+%\textbf{Network protocol, client}
 
-%\textbf{网络协议，客户端}
+\subsection{Testbed and Evaluation Method}
 
+This section evaluates KV-Direct on a testbed of 8 servers and 1 Arista DCS-7060CX-32S switch. Each server is equipped with two 8-core Xeon E5-2650 v2 CPUs with hyperthreading disabled, forming two NUMA nodes connected by QPI Link. Each NUMA node is equipped with 8 DIMM 8~GiB Samsung DDR3-1333 ECC RAM, with a total of 128~GiB of host memory on each server. The programmable network card~\cite{caulfield2016cloud} is connected to the PCIe root complex of CPU 0, and its 40~Gbps Ethernet port is connected to the switch. The programmable network card has two PCIe Gen3 x8 links in the bifurcated Gen3 x16 physical connector. The tested server is equipped with a SuperMicro X9DRG-QF motherboard and a 120~GB SATA SSD running Archlinux (kernel version 4.11.9-1).
 
-\subsection{测试床与评估方法}
+For system benchmarking, the YCSB workload \cite{cooper2010benchmarking} is used. For skewed Zipf workloads, this paper selects a skewness of 0.99 and refers to it as a \textit{long-tail} workload.
 
-本节在8台服务器和1台Arista DCS-7060CX-32S交换机的测试台上评估KV-Direct。
-每台服务器配备两个禁用超线程的8核Xeon E5-2650 v2 CPU，形成两个通过QPI Link连接的NUMA节点。每个NUMA节点都装有8个DIMM 8~GiB三星DDR3-1333 ECC RAM，每台服务器上总共有128~GiB的主机内存。
-可编程网卡~ \cite {caulfield2016cloud}连接到CPU 0的PCIe root complex，其40~Gbps以太网端口连接到交换机。可编程网卡在分叉的Gen3 x16物理连接器中有两个PCIe Gen3 x8链路。
-经过测试的服务器配备SuperMicro X9DRG-QF主板和一个运行Archlinux的120~GB SATA SSD（内核版本4.11.9-1）。
+Before each benchmark, the hash index ratio, inline threshold, and load distribution ratio are adjusted according to the key-value size, access pattern, and target memory utilization. Then, random key-value pairs of a given size are generated. The key size for a given inline key-value size is irrelevant to the performance of KV-Direct, as the keys are padded to the longest inline key-value size during processing. For testing inline cases, the key-value size is used as a multiple of the slot size (when the size is $\leq$ 50, i.e., 10 slots). For testing non-inline cases, the key-value size used is a power of 2 minus 2 bytes (for metadata). As the final step of preparation, PUT operations are issued to insert the key-value pairs into the free key-value storage until 50\% memory utilization. Performance under other memory utilizations can be obtained from Figure \ref{kvdirect:fig:mem-access-tput}.
 
-对于系统基准测试，使用YCSB工作负载 \cite {cooper2010benchmarking}。
-对于偏斜（skewed）的Zipf工作负载，本文选择偏差（skewness）0.99并将其称为\textit {长尾}工作负载。
+During the benchmark, a FPGA-based packet generator \cite{li2016clicknp} is used in the same ToR to generate batches of key-value operations, send them to the key-value server, receive completions, and measure sustainable throughput and latency. The processing latency of the packet generator is pre-calibrated by direct loopback and removed from the latency measurement. The error lines represent the $5^{th}$ and $95^{th}$ percentiles.
 
-在每个基准测试之前，根据键值大小，访问模式和目标内存利用率来调整哈希索引比率，内联阈值和负载分派比率。
-然后生成具有给定大小的随机键值对。
-给定内联键值大小的键大小与KV-Direct的性能无关，因为在处理期间将键填充到最长的内联键值大小。
-为了测试内联案例，使用键值大小作为插槽大小的倍数（当大小为$ \leq $ 50时，即10个插槽）。为了测试非内联的情况，使用的键值大小是2减2字节的幂（对于元数据）。
-作为准备的最后一步，发出PUT操作以将键值对插入空闲键值存储，直到50％内存利用率。
-其他内存利用率下的性能可以从图 \ref {kvdirect:fig:mem-access-tput}中获得。
+\subsection{Throughput}
 
-在基准测试期间，在同一个ToR中使用基于FPGA的数据包生成器 \cite {li2016clicknp}来生成批量键值操作，将它们发送到键值服务器，接收完成并测量可持续的吞吐量和延迟。
-分组生成器的处理延迟通过直接环回预先校准，并从延迟测量中移除。
-误差线表示$ 5^{th} $和$ 95^{th} $百分位数。
-
-\subsection{吞吐量}
-
-图 \ref {kvdirect:fig:ycsb-tput} 显示了YCSB均匀和长尾（偏斜Zipf）工作负载下KV-Direct的吞吐量。
-三个因素可能是KV-Direct的瓶颈：时钟频率，网络和PCIe / DRAM。
-对于在哈希索引中内联的5B至15B 键值，大多数GET需要一个PCIe / DRAM访问，而PUT需要两个PCIe / DRAM访问。
-这种小型键值在许多系统中很普遍。在PageRank中，边的键值大小为8B。在稀疏逻辑回归中，键值大小通常为8B-16B。对于分布式系统中的顺控程序和锁，键值大小为8B。
-
+Figure \ref{kvdirect:fig:ycsb-tput} shows the throughput of KV-Direct under YCSB uniform and long-tail (skewed Zipf) workloads. Three factors may be bottlenecks for KV-Direct: clock frequency, network, and PCIe/DRAM. For 5B to 15B key-values inlined in the hash index, most GETs require one PCIe/DRAM access, while PUTs require two PCIe/DRAM accesses. These small key-values are common in many systems. In PageRank, the key-value size of edges is 8B. In sparse logistic regression, the key-value size is typically 8B-16B. For sequencer programs and locks in distributed systems, the key-value size is 8B.
 
 \begin{figure}[htbp]
 	\centering
-	\subfloat[均匀分布。\label{kvdirect:fig:ycsb-tput-uniform}]
+	\subfloat[Uniform distribution.\label{kvdirect:fig:ycsb-tput-uniform}]
 	{\includegraphics[width=.5\textwidth,page=1]{ycsb-tput-uniform.pdf}}
-	\subfloat[长尾分布。\label{kvdirect:fig:ycsb-tput-longtail}]
+	\subfloat[Long-tail distribution.\label{kvdirect:fig:ycsb-tput-longtail}]
 	{\includegraphics[width=.5\textwidth,page=1]{ycsb-tput-longtail.pdf}}
-	\caption{KV-Direct 在 YCSB 负载下的吞吐量。}
+	\caption{Throughput of KV-Direct under YCSB workloads.}
 	\label{kvdirect:fig:ycsb-tput}
 \end{figure}
 
-
-在相同的内存利用率下，由于哈希冲突的概率较高，较大的内联键值具有较低的吞吐量。
-62B和更大的键值没有内联，因此它们需要额外的内存访问。
-长尾工作负载比统一工作负载具有更高的吞吐量，并且能够在读密集工作负载下达到180~Mops的时钟频率范围，或达到$ \geq $ 62B 键值大小的网络吞吐量。
-在长尾工作负载下，无序执行引擎在最流行的键上合并到大约15％的操作，并且板载DRAM在60％负载分配比率下具有大约60％的高速缓存命中率，这可以统一导致高达2倍的吞吐量作为统一的工作量。
-如表 \ref {kvdirect:tab:kvs-compare} 所示，KV-Direct 网卡的吞吐量与具有数十个CPU核心的最先进的键值存储服务器相当。
-
+At the same memory utilization, larger inline key-values have lower throughput due to a higher probability of hash collisions. Key-values of 62B and larger are not inlined, so they require additional memory accesses. The long-tail workload has higher throughput than the uniform workload and can reach the clock frequency range of 180~Mops under read-intensive workloads, or reach the network throughput of $\geq$ 62B key-value sizes. Under the long-tail workload, the out-of-order execution engine merges about 15\% of operations on the most popular keys, and the on-board DRAM has about a 60\% cache hit rate at a 60\% load distribution ratio, which can result in up to 2x the throughput as a uniform workload. As shown in Table \ref{kvdirect:tab:kvs-compare}, the throughput of the KV-Direct network card is comparable to that of state-of-the-art key-value storage servers with dozens of CPU cores.
 
 \begin{sidewaystable}[htbp]
 	\centering
-	\caption{KV-Direct 与其他键值存储系统在长尾（倾斜  Zipf）负载和 10 字节小键下的比较。对于相关工作未报告的性能数字，本文使用相似的硬件来模拟这些系统，并报告粗略的测量结果。对于 CPU 绕过的系统，括号内的数字报告峰值负载和空闲情况下的功耗差异。}
+	\caption{Comparison of KV-Direct with other key-value storage systems under long-tail (skewed Zipf) load and 10-byte small keys. For performance numbers not reported in related work, this paper simulates these systems using similar hardware and reports rough measurement results. For CPU bypass systems, the numbers in parentheses report the difference in power consumption under peak load and idle conditions.}
 	\label{kvdirect:tab:kvs-compare}
 	\small
 	\begin{tabular}{|l|l|l|r|r|r|r|r|r|r|}
 		\toprule
-		键值存储  & 注释 & 性能瓶颈 & \multicolumn{2}{c|}{吞吐量 (Mops)} & \multicolumn{2}{c|}{功耗效率 (Kops/W)} & \multicolumn{2}{c|}{平均延迟 ($\mu$s)} \\
-		\cline{4-9}表 \ref {clicknp:tab:elements} 
+		Key-value storage  & Note & Performance bottleneck & \multicolumn{2}{c|}{Throughput (Mops)} & \multicolumn{2}{c|}{Power efficiency (Kops/W)} & \multicolumn{2}{c|}{Average latency ($\mu$s)} \\
+		\cline{4-9}Table \ref {clicknp:tab:elements} 
 		& & & GET & PUT & GET & PUT & GET & PUT \\
 		\midrule
-		Memcached~\cite{fitzpatrick2004distributed} & 传统 & CPU 核间同步 & 1.5 & 1.5 & \approx5 & \approx5 & \approx50 & \approx50 \\
-		MemC3~\cite{fan2013memc3} & 传统 & 操作系统网络协议栈 & 4.3 & 4.3 & \approx14 & \approx14 & \approx50 & \approx50 \\
-		RAMCloud~\cite{ousterhout2015ramcloud} & 内核绕过 & 分派线程 & 6 & 1 & \approx20 & \approx3.3 & 5 & 14 \\
-		MICA~\cite{lim2014mica} & 内核绕过，24 个核，12 个网卡口 & CPU 键值处理 & 137 & 135 & 342 & 337 & 81 & 81 \\
-		FaRM~\cite{dragojevic2014farm} & 单边 RDMA GET & RDMA 网卡 & 6 & 3 & \approx30 (261) & \approx15 & 4.5 & \approx10 \\
-		DrTM-KV~\cite{wei2015fast} & 单边 RDMA 和 HTM & RDMA 网卡 & 115.2 & 14.3 & \approx500 (3972) & \approx60 & 3.4 & 6.3 \\
-		HERD'16~\cite{kalia2016design} & 双边 RDMA, 12 核 & PCIe & 98.3 & \approx60 & \approx490 & \approx300 & 5 & 5 \\
-		Xilinx'13~\cite{blott13hotcloud} & FPGA & 网络 & 13 & 13 & 106 & 106 & 3.5 & 4.5 \\
-		Mega-KV~\cite{zhang2015mega} & GPU (4~GiB 板上 RAM) & GPU 键值处理 & 166 & 80 & \approx330 & \approx160 & 280 & 280 \\
+		Memcached~\cite{fitzpatrick2004distributed} & Traditional & Inter-core CPU synchronization & 1.5 & 1.5 & \approx5 & \approx5 & \approx50 & \approx50 \\
+		MemC3~\cite{fan2013memc3} & Traditional & Operating system network protocol stack & 4.3 & 4.3 & \approx14 & \approx14 & \approx50 & \approx50 \\
+		RAMCloud~\cite{ousterhout2015ramcloud} & Kernel bypass & Dispatch thread & 6 & 1 & \approx20 & \approx3.3 & 5 & 14 \\
+		MICA~\cite{lim2014mica} & Kernel bypass, 24 cores, 12 NIC ports & CPU key-value processing & 137 & 135 & 342 & 337 & 81 & 81 \\
+		FaRM~\cite{dragojevic2014farm} & One-sided RDMA GET & RDMA NIC & 6 & 3 & \approx30 (261) & \approx15 & 4.5 & \approx10 \\
+		DrTM-KV~\cite{wei2015fast} & One-sided RDMA and HTM & RDMA NIC & 115.2 & 14.3 & \approx500 (3972) & \approx60 & 3.4 & 6.3 \\
+		HERD'16~\cite{kalia2016design} & Two-sided RDMA, 12 cores & PCIe & 98.3 & \approx60 & \approx490 & \approx300 & 5 & 5 \\
+		Xilinx'13~\cite{blott13hotcloud} & FPGA & Network & 13 & 13 & 106 & 106 & 3.5 & 4.5 \\
+		Mega-KV~\cite{zhang2015mega} & GPU (4~GiB on-board RAM) & GPU key-value processing & 166 & 80 & \approx330 & \approx160 & 280 & 280 \\
 		\midrule
-		\textbf{KV-Direct (1 网卡)} & 可编程网卡，两个 Gen3 x8 & PCIe \& DRAM & 180 & 114 & 1487 (5454) & 942 (3454) & 4.3 & 5.4 \\
-		\textbf{KV-Direct (10 网卡)} & 可编程网卡，每卡一个 Gen3 x8 & PCIe \& DRAM & 1220 & 610 & 3417 (4518) & 1708 (2259) & 4.3 & 5.4 \\
+		\textbf{KV-Direct (1 NIC)} & Programmable NIC, two Gen3 x8 & PCIe \& DRAM & 180 & 114 & 1487 (5454) & 942 (3454) & 4.3 & 5.4 \\
+		\textbf{KV-Direct (10 NICs)} & Programmable NIC, one Gen3 x8 per card & PCIe \& DRAM & 1220 & 610 & 3417 (4518) & 1708 (2259) & 4.3 & 5.4 \\
 		\bottomrule
 	\end{tabular}
 \end{sidewaystable}
 
 
-\subsection{能耗效率}
+\subsection{Power Efficiency}
 
-插入KV-Direct 网卡可为空闲服务器增加10.6 W的功率。
-当KV-Direct服务器处于峰值吞吐量时，系统功率为121.4瓦（在墙上测量）。
-与表 \ref {kvdirect:tab:kvs-compare} 中最先进的键值存储系统相比，KV-Direct的功率效率是其他系统的3倍，是第一个达到100万的通用键值存储系统 商用服务器上每瓦特的键值操作。
+Inserting the KV-Direct NIC can add 10.6 W of power to an idle server.
+When the KV-Direct server is at peak throughput, the system power is 121.4 watts (measured at the wall).
+Compared with the most advanced key-value storage systems in Table \ref {kvdirect:tab:kvs-compare}, the power efficiency of KV-Direct is three times that of other systems, and it is the first to reach one million key-value operations per watt on a commercial server.
 
-当拔出KV-Direct网卡时，空闲服务器的功耗为87.0瓦，因此可编程网卡，PCIe，主机内存和CPU上的守护进程的总功耗仅为34瓦。
-测量的功率差异是合理的，因为CPU几乎处于空闲状态，服务器可以在KV-Direct运行时运行其他工作负载（对单侧RDMA使用相同的标准，如表 \ref{kvdirect:tab:kvs-compare} 的括号中所示）。
-在这方面，KV-Direct的功率效率是基于CPU的系统的10倍。
+When the KV-Direct NIC is unplugged, the power consumption of the idle server is 87.0 watts, so the total power consumption of the programmable NIC, PCIe, host memory, and daemon on the CPU is only 34 watts.
+The measured power difference is reasonable because the CPU is almost idle, and the server can run other workloads while KV-Direct is running (using the same standard for one-sided RDMA, as shown in parentheses in Table \ref{kvdirect:tab:kvs-compare}).
+In this respect, the power efficiency of KV-Direct is ten times that of CPU-based systems.
 
-\subsection{延迟}
+\subsection{Latency}
 
-图 \ref {kvdirect:fig:ycsb-lat} 显示了YCSB工作负载峰值吞吐量下KV-Direct的延迟。
-在没有网络批处理的情况下，尾部延迟范围为3至9 $\mu$s，具体取决于键值大小，操作类型和键分配。
-由于额外的内存访问，PUT具有比GET更高的延迟。
-由于更有可能在板载DRAM中进行缓存，因此倾斜的工作负载具有比均匀更低的延迟。
-由于额外的网络和PCIe传输延迟，较大的键值具有较高的延迟。
-网络批处理比非批处理操作增加了不到1~$\mu$s 的延迟，但显著提高了吞吐量，已在图 \ref {kvdirect:fig:eval-network-batching} 中进行了评估。
+Figure \ref {kvdirect:fig:ycsb-lat} shows the latency of KV-Direct under peak YCSB workload throughput. Without network batching, the tail latency ranges from 3 to 9 $\mu$s, depending on the key-value size, operation type, and key distribution. Due to the additional memory access, PUT has a higher latency than GET. Skewed workloads have lower latency than uniform ones because they are more likely to be cached in on-board DRAM. Larger key-values have higher latency due to the additional network and PCIe transfer latency. Network batching adds less than 1~$\mu$s of latency compared to non-batching operations, but significantly improves throughput, as evaluated in Figure \ref {kvdirect:fig:eval-network-batching}.
 
 \begin{figure}[htbp]
 	\centering
-	\subfloat[有批量操作。\label{kvdirect:fig:ycsb-lat-batch}]
+	\subfloat[With batching.\label{kvdirect:fig:ycsb-lat-batch}]
 	{\includegraphics[width=.5\textwidth,page=1]{lat-batch.pdf}}
-	\subfloat[无批量操作。\label{kvdirect:fig:ycsb-lat-nobatch}]
+	\subfloat[Without batching.\label{kvdirect:fig:ycsb-lat-nobatch}]
 	{\includegraphics[width=.5\textwidth,page=1]{lat-nonbatch.pdf}}
-	\caption{在YCSB工作负载的峰值吞吐量下KV-Direct的延迟。}
+	\caption{Latency of KV-Direct under peak YCSB workload throughput.}
 	\label{kvdirect:fig:ycsb-lat}
 \end{figure}
 
-\subsection{对 CPU 性能的影响}
+\subsection{Impact on CPU Performance}
 
-
-KV-Direct旨在绕过服务器CPU，仅使用一部分主机内存用于键值存储。 因此，CPU仍然可以运行其他应用程序。
-当单个网卡 KV-Direct处于峰值负载时，测量对服务器上的其他工作负载的影响最小。
-表 \ref {kvdirect:tab:cpu-impact} 量化了KV-Direct峰值吞吐量的影响。
-除了CPU 0的顺序吞吐量以访问其自己的NUMA内存（以粗体标记的行）之外，CPU内存访问的延迟和吞吐量大多不受影响。
-这是因为8个主机存储器通道可以提供比所有CPU核心消耗的更高的随机访问吞吐量，而CPU确实可以强调DRAM通道的顺序吞吐量。
-当键值大小的分布相对稳定时，主机守护程序进程的影响是最小的，因为仅当不同板大小的可用槽的数量不平衡时才调用垃圾收集器。
+KV-Direct aims to bypass the server CPU, using only a portion of host memory for key-value storage. Therefore, the CPU is still available to run other applications. When a single NIC KV-Direct is at peak load, the measured impact on other workloads on the server is minimal. Table \ref {kvdirect:tab:cpu-impact} quantifies the impact of KV-Direct peak throughput. Except for the sequential throughput of CPU 0 to access its own NUMA memory (rows marked in bold), the latency and throughput of CPU memory access are mostly unaffected. This is because the 8 host memory channels can provide higher random access throughput than all CPU cores can consume, while the CPU can indeed stress the sequential throughput of the DRAM channels. The impact of the host daemon process is minimal when the distribution of key-value sizes is relatively stable, as the garbage collector is only invoked when the number of available slots for different board sizes is unbalanced.
 
 \begin{table}[htbp]
 	\centering
-	\caption{当KV-Direct达到峰值吞吐量时，对CPU内存访问性能的影响。 使用英特尔性能计数器监视器（Intel PCM）V2.11测量。}
+	\caption{Impact on CPU memory access performance when KV-Direct is at peak throughput. Measured using Intel Performance Counter Monitor (Intel PCM) V2.11.}
 	\label{kvdirect:tab:cpu-impact}
 	\small
 		\begin{tabular}{l|l|r|r}
 			\toprule
-			\multicolumn{2}{r}{KV-Direct 状态 $\rightarrow$} & 空闲 & 繁忙 \\
+			\multicolumn{2}{r}{KV-Direct Status $\rightarrow$} & Idle & Busy \\
 			\midrule
-			\multirow{4}{*}{\specialcell{随机访问延迟}} & CPU0-0 & 82.2 ns & 83.5 ns \\
+			\multirow{4}{*}{\specialcell{Random Access Latency}} & CPU0-0 & 82.2 ns & 83.5 ns \\
             					  & CPU0-1 & 129.3 ns & 129.9 ns \\
                                   & CPU1-0 & 122.3 ns & 122.2 ns \\
                                   & CPU1-1 & 84.2 ns & 84.3 ns \\
 			\midrule
-            \multirow{4}{*}{\specialcell{顺序访问吞吐量}} & \textbf{CPU0-0} & \textbf{60.3 GB/s} & \textbf{55.8 GB/s} \\
+            \multirow{4}{*}{\specialcell{Sequential Access Throughput}} & \textbf{CPU0-0} & \textbf{60.3 GB/s} & \textbf{55.8 GB/s} \\
             					  & CPU0-1 & 25.7 GB/s & 25.6 GB/s \\
                                   & CPU1-0 & 25.5 GB/s & 25.9 GB/s \\
                                   & CPU1-1 & 60.2 GB/s & 60.3 GB/s \\
 			\midrule
-			\multirow{4}{*}{\specialcell{随机访问吞吐量}} & 32B 读 & 10.53 GB/s & 10.46 GB/s \\
-            						& 64B 读 & 14.41 GB/s & 14.42 GB/s \\
-                                    & 32B 写 & 9.01 GB/s & 9.04 GB/s \\
-                                    & 64B 写 & 12.96 GB/s & 12.94 GB/s \\
+			\multirow{4}{*}{\specialcell{Random Access Throughput}} & 32B Read & 10.53 GB/s & 10.46 GB/s \\
+            						& 64B Read & 14.41 GB/s & 14.42 GB/s \\
+                                    & 32B Write & 9.01 GB/s & 9.04 GB/s \\
+                                    & 64B Write & 12.96 GB/s & 12.94 GB/s \\
 			\bottomrule
 		\end{tabular}      
 \end{table}
 
+I'm sorry, but you didn't provide any text to translate. Could you please provide the LaTeX content you want to be translated?

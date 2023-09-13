@@ -1,214 +1,195 @@
-\chapter{系统架构}
+\chapter{System Architecture}
 
-本文提出一个基于可编程网卡的高性能数据中心系统架构。
-如图 \ref{arch:fig:virt-architecture} 所示，本文把普通网卡升级为可编程网卡，将虚拟化、网络和存储功能、操作系统中需要高性能的数据平面卸载到可编程网卡，以降低 ``数据中心税''，让 CPU 集中精力于客户的应用程序。
-
+This paper proposes a high-performance data center system architecture based on programmable network cards. As shown in Figure \ref{arch:fig:virt-architecture}, this paper upgrades ordinary network cards to programmable network cards, offloads the high-performance data plane required by virtualization, network and storage functions, and the operating system to the programmable network card, in order to reduce the "data center tax" and allow the CPU to focus on the client's applications.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/virt_arch.pdf}
-	\caption{回顾：虚拟化的数据中心架构。}
+	\caption{Review: Data center architecture with virtualization.}
 	\label{arch:fig:virt-architecture}
 \end{figure}
 
-第 \ref{chapter:intro} 章已经讨论过，虚拟化的数据中心主要可以分为计算、网络、存储节点。
-在网络和存储节点，采用控制面与数据面分离的设计思想。数据面是操作相对频繁、逻辑相对简单的处理，而控制面是操作相对不频繁、逻辑相对复杂的处理。在可编程网卡中实现数据面，在主机 CPU 上实现控制面，实现了数据面完全不经过主机 CPU。这包括第 \ref{chapter:clicknp} 章的虚拟网络功能和第 \ref{chapter:kvdirect} 章的数据结构处理。加速虚拟网络功能和远程数据结构访问也是本文最重要的创新。
+As discussed in Chapter \ref{chapter:intro}, a virtualized data center can mainly be divided into computing, network, and storage nodes. In network and storage nodes, a design concept of separating the control plane from the data plane is adopted. The data plane handles relatively frequent and simple operations, while the control plane handles relatively infrequent and complex operations. The data plane is implemented in the programmable network card, and the control plane is implemented on the host CPU, achieving a data plane that does not pass through the host CPU at all. This includes the virtual network functions in Chapter \ref{chapter:clicknp} and the data structure processing in Chapter \ref{chapter:kvdirect}. Accelerating virtual network functions and remote data structure access are also the most important innovations of this paper.
 
-在计算节点，亦即客户虚拟机所在的服务器主机上，用可编程网卡实现虚拟机监控器（hypervior）的虚拟化功能和操作系统原语。
-虚拟化分为 ``一虚多'' 和 ``多虚一'' 两个方面。
-``一虚多''，即可编程网卡把计算节点内的硬件资源虚拟化成多个逻辑资源，实现其他计算节点和本地多台虚拟机的多路复用。例如，第 \ref{chapter:clicknp} 章的 ClickNP 将硬件网卡和网络链路虚拟化为每个虚拟机一张虚拟网卡；第 \ref{chapter:kvdirect} 章的 KV-Direct 实现了多个客户端并发访问共享键值存储，并能保证一致性。
-``多虚一''，即可编程网卡把数据中心内物理上分散的资源虚拟化成一个逻辑资源，实现逻辑资源到物理资源的映射和路由。例如，第 \ref{chapter:clicknp} 章的 ClickNP 将数据中心内网络功能虚拟化成逻辑上统一的网络功能；第 \ref{chapter:kvdirect} 章的 KV-Direct 客户端将分布式键值存储虚拟化成逻辑上统一的键值映射；还可以实现存储和内存的解聚（disaggregation）。
-为了加速操作系统原语并控制硬件的复杂度，把操作系统原语划分为可编程网卡上的可靠通信协议和主机 CPU 上运行的用户态库、用户态管理程序，如第 \ref{chapter:socksdirect} 章 SocksDirect 实现的套接字通信原语。
+In the computing node, that is, the server host where the client virtual machine is located, the programmable network card implements the virtualization functions of the virtual machine monitor (hypervisor) and the operating system primitives. Virtualization is divided into "one-to-many" and "many-to-one" aspects. "One-to-many" means that the programmable network card virtualizes the hardware resources within the computing node into multiple logical resources, achieving multiplexing of other computing nodes and multiple local virtual machines. For example, ClickNP in Chapter \ref{chapter:clicknp} virtualizes the hardware network card and network link into a virtual network card for each virtual machine; KV-Direct in Chapter \ref{chapter:kvdirect} allows multiple clients to concurrently access shared key-value storage while ensuring consistency. "Many-to-one" means that the programmable network card virtualizes physically dispersed resources within the data center into a logical resource, achieving mapping and routing from logical resources to physical resources. For example, ClickNP in Chapter \ref{chapter:clicknp} virtualizes network functions within the data center into logically unified network functions; the KV-Direct client in Chapter \ref{chapter:kvdirect} virtualizes distributed key-value storage into logically unified key-value mapping; it can also achieve disaggregation of storage and memory. In order to accelerate operating system primitives and control hardware complexity, operating system primitives are divided into reliable communication protocols on the programmable network card and user-space libraries and user-space management programs running on the host CPU, such as the socket communication primitives implemented by SocksDirect in Chapter \ref{chapter:socksdirect}.
 
-图 \ref{arch:fig:accel-arch} 显示了基于可编程网卡的系统总体架构。下面将按照网络、存储和高层抽象的顺序，简要介绍本文后续各章的总体设计。
-
+Figure \ref{arch:fig:accel-arch} shows the overall architecture of the system based on the programmable network card. The overall design of the subsequent chapters of this paper will be briefly introduced in the order of network, storage, and high-level abstraction.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/accel_arch.pdf}
-	\caption{基于可编程网卡的数据中心系统总体架构。}
+	\caption{Overall architecture of the data center system based on the programmable network card.}
 	\label{arch:fig:accel-arch}
 \end{figure}
 
+\section{Network Acceleration}
 
+\subsection{Network Virtualization Acceleration}
 
-\section{网络加速}
-
-\subsection{网络虚拟化加速}
-
-从第 \ref{chapter:intro} 章的传统数据中心架构（图 \ref{intro:fig:virt-architecture}）开始，本文逐步把 ``数据中心税'' 消除或者卸载（offload）到可编程网卡上。
-如图 \ref{arch:fig:virtual-network} 所示，第一步是用可编程网卡替代原有的普通网卡，并把软件实现的虚拟网络卸载到可编程网卡上。
+Starting from the traditional data center architecture in Chapter \ref{chapter:intro} (Figure \ref{intro:fig:virt-architecture}), this paper gradually eliminates or offloads the "data center tax" to the programmable network card. As shown in Figure \ref{arch:fig:virtual-network}, the first step is to replace the original ordinary network card with a programmable network card and offload the software-implemented virtual network to the programmable network card.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/virtual_network.pdf}
-	\caption{用可编程网卡加速虚拟网络后的架构。}
+	\caption{Architecture after accelerating the virtual network with a programmable network card.}
 	\label{arch:fig:virtual-network}
 \end{figure}
 
+In order for the operating system network protocol stack on the virtual machine to use the virtual network to send and receive data packets, the programmable network card uses SR-IOV (Single Root I/O Virtualization) technology \cite{dong2012high} to virtualize into multiple PCIe virtual devices (VF, Virtual Function), and assigns a PCIe virtual device to each virtual machine. The original virtual network card driver in the virtual machine (such as those based on virtio technology \cite{russell2008virtio}) needs to be replaced with the FPGA driver and FPGA-based virtual network card driver implemented in this paper. ClickNP in Chapter \ref{chapter:clicknp} virtualizes the hardware network card and network link into the virtual network of multiple tenants.
 
-为了让虚拟机上的操作系统网络协议栈能够使用虚拟网络收发数据包，可编程网卡利用 SR-IOV（Single Root I/O Virtualization）技术 \cite{dong2012high}，虚拟化成多个 PCIe 虚拟设备（VF，Virtual Function），并给每台虚拟机分配一个 PCIe 虚拟设备。
-虚拟机内原有的虚拟网卡驱动程序（如基于 virtio 技术 \cite{russell2008virtio} 的）需要替换为本文实现的 FPGA 驱动程序和基于 FPGA 的虚拟网卡驱动程序。
-第 \ref{chapter:clicknp} 章的 ClickNP 将硬件网卡和网络链路虚拟化为多个租户的虚拟网络。
+If we can bypass the network protocol stack of the virtual machine operating system and directly replace the standard library (i.e., system call interface libc) used by the application program on the virtual machine, there is no need to implement SR-IOV hardware virtualization.
+Chapter \ref{chapter:socksdirect} of SocksDirect intercepts the standard library calls about network sockets of the application program and implements the container overlay network (suitable for container virtual network) in user mode.
+For efficient communication between the user mode runtime library and the programmable network card, the FPGA driver is installed in the virtual machine, and a part of the PCIe address space of the programmable network card is mapped to the user mode, thereby bypassing the virtual machine kernel and the Virtual Machine Monitor or Hypervisor.
 
-如果可以绕过虚拟机操作系统的网络协议栈，直接替换虚拟机上应用程序所使用的标准库（即系统调用接口 libc），就不必实现 SR-IOV 硬件虚拟化。
-第 \ref{chapter:socksdirect} 章的 SocksDirect 通过截获应用程序关于网络套接字的标准库调用，在用户态实现了容器覆盖网络（container overlay network），即适用于容器的虚拟网络。
-为了用户态运行库与可编程网卡间的高效通信，在虚拟机内安装 FPGA 驱动程序，将可编程网卡的 PCIe 地址空间的一部分映射到用户态，从而绕过了虚拟机内核和虚拟机监视器（Virtual Machine Monitor 或 Hypervisor）。
+\subsection{Network Function Acceleration}
 
+As shown in Figure \ref{arch:fig:network-function}, the second step is to divide the software-implemented virtual network function into a data plane and a user plane on the network node, and unload the data plane into the programmable network card.
+It should be noted that the division of network nodes and computing nodes is logical. It is possible that the virtual network function is orchestrated to the same server host as the virtual machine, at which time the functions of the network node and the computing node are combined into one, and the connection between the virtual network and the virtual network function is simplified from the data center network to the connection between modules in the programmable network card.
 
-
-\subsection{网络功能加速}
-
-如图 \ref{arch:fig:network-function} 所示，第二步是在网络节点上，把软件实现的虚拟网络功能划分为数据面和用户面，并把数据面卸载到可编程网卡中。
-需要注意的是，网络节点和计算节点的划分是逻辑上的。有可能虚拟网络功能被编排到与虚拟机相同的服务器主机上，这时网络节点和计算节点的功能就合二为一了，虚拟网络和虚拟网络功能之间的连接也从数据中心网络简化成了可编程网卡内模块间的连接。
-
-来自源计算节点（或上一个网络节点）的数据包被网络节点的可编程网卡接收之后，在网卡内的数据面进行处理，大多数情况下不需要 CPU 上的控制面介入，就可以把处理后的数据包再发送回数据中心网络，到达目的计算节点（或下一个网络节点）。
-第 \ref{chapter:clicknp} 章将介绍如何用高级语言模块化编程实现网络功能，实现 FPGA 数据面与 CPU 控制面的协同处理。
-
+After the data packet from the source computing node (or the previous network node) is received by the programmable network card of the network node, it is processed in the data plane of the network card. In most cases, the control plane on the CPU does not need to be involved, and the processed data packet can be sent back to the data center network, reaching the destination computing node (or the next network node).
+Chapter \ref{chapter:clicknp} will introduce how to use high-level language modular programming to implement network functions, and implement the collaborative processing of the FPGA data plane and the CPU control plane.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/NFV_accel.pdf}
-	\caption{用可编程网卡加速网络功能后的架构。}
+	\caption{Architecture after accelerating network functions with a programmable network card.}
 	\label{arch:fig:network-function}
 \end{figure}
 
-\section{存储加速}
+\section{Storage Acceleration}
 
-\subsection{存储虚拟化加速}
+\subsection{Storage Virtualization Acceleration}
 
-在网络加速之后，第三、四步是存储加速。作为第三步，首先将计算节点的存储虚拟化功能卸载到可编程网卡中，如图 \ref{arch:fig:virt-storage} 所示 \footnote{本文没有在存储虚拟化方面做出贡献，包含在系统架构中是为了完整性。}。
+After network acceleration, the third and fourth steps are storage acceleration. As the third step, the storage virtualization function of the computing node is first offloaded to the programmable network card, as shown in Figure \ref{arch:fig:virt-storage} \footnote{This paper does not make contributions in the area of storage virtualization, it is included in the system architecture for completeness.}.
 
-为了支持多个存储节点组成的分布式存储，虚拟云存储服务需要把逻辑地址映射到存储节点地址。例如，在第 \ref{chapter:clicknp} 章的分布式键值存储中，客户端需要根据一致性哈希（consistent hashing） \cite{nishtala2013scaling}，把键（key）映射到存储节点，再把请求路由到该节点。
+To support distributed storage composed of multiple storage nodes, the virtual cloud storage service needs to map logical addresses to storage node addresses. For example, in the distributed key-value storage in Chapter \ref{chapter:clicknp}, the client needs to map the key to the storage node according to consistent hashing \cite{nishtala2013scaling}, and then route the request to that node.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/virt_storage.pdf}
-	\caption{用可编程网卡加速本地存储和云存储后的架构。}
+	\caption{Architecture after accelerating local storage and cloud storage with a programmable network card.}
 	\label{arch:fig:virt-storage}
 \end{figure}
 
-\subsection{数据结构处理加速}
+\subsection{Data Structure Processing Acceleration}
 
-第四步，将存储节点上的数据结构处理卸载（offload）到可编程网卡。
-以第 \ref{chapter:kvdirect} 章将详细介绍的键值存储为例。
-存储节点上的可编程网卡从网络上收到查询（GET）或写入（PUT）某个键（key）的请求后，要从本地的内存或闪存中查询出对应的键值对，处理请求后把结果发送给网络上的请求方。
-如图 \ref{arch:fig:data-structure-accel}，这个过程称为数据结构处理的数据面，通常不需要控制面介入。
-然而，由于可编程网卡上不适合运行复杂的逻辑，把内存分配器分为网卡和主机 CPU 两部分。网卡上缓存若干固定大小的空闲内存块。当空闲内存块不足时，需要主机 CPU 上的控制面通过拆分更大的内存块来补充空闲内存块；当空闲内存块过多时，又需要主机 CPU 来进行垃圾回收，合并成更大的内存块。
-通过网卡直接访问内存数据结构的另一个挑战是网卡与内存之间的 PCIe 带宽较低、延迟较高。为此，第 \ref{chapter:kvdirect} 章设计了一系列优化方法来节约带宽、通过并发处理来隐藏延迟。
-尽管请求是并发处理的，第 \ref{chapter:kvdirect} 章的设计还能保证多个客户端并发访问的强一致性，即请求在逻辑上按照网络接收的顺序被依次处理。
-如果存储节点同时也作为计算节点运行虚拟机，为了解决本地和远程访问同一块存储区域时的一致性问题，不管是本地还是远程访问，都经过可编程网卡处理。
+The fourth step is to offload the data structure processing on the storage node to the programmable network card.
+Take the key-value storage detailed in Chapter \ref{chapter:kvdirect} as an example.
+After the programmable network card on the storage node receives a request to query (GET) or write (PUT) a certain key from the network, it needs to query the corresponding key-value pair from the local memory or flash memory, process the request, and then send the result to the requester on the network.
+As shown in Figure \ref{arch:fig:data-structure-accel}, this process is called the data plane of data structure processing, and usually does not require the intervention of the control plane.
+However, since complex logic is not suitable for running on the programmable network card, the memory allocator is divided into two parts: the network card and the host CPU. The network card caches several fixed-size free memory blocks. When the free memory blocks are insufficient, the control plane on the host CPU needs to supplement the free memory blocks by splitting larger memory blocks; when there are too many free memory blocks, the host CPU needs to perform garbage collection and merge into larger memory blocks.
+Another challenge of directly accessing memory data structures through the network card is the lower PCIe bandwidth and higher latency between the network card and memory. For this, Chapter \ref{chapter:kvdirect} designed a series of optimization methods to save bandwidth and hide latency through concurrent processing.
+Despite the concurrent processing of requests, the design of Chapter \ref{chapter:kvdirect} can still ensure the strong consistency of concurrent access by multiple clients, that is, the requests are logically processed in the order they are received by the network.
+If the storage node also runs a virtual machine as a computing node, in order to solve the consistency problem when accessing the same storage area locally and remotely, whether it is local or remote access, it is processed through the programmable network card.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/data_structure_accel.pdf}
-	\caption{用可编程网卡加速数据结构处理后的架构。}
+	\caption{Architecture after accelerating data structure processing with a programmable network card.}
 	\label{arch:fig:data-structure-accel}
 \end{figure}
 
-\section{操作系统加速}
+\section{Operating System Acceleration}
 
-最后一步，将操作系统中需要高性能的功能拆分为三部分，分别在可编程网卡、主机 CPU 的用户态运行库和主机 CPU 的用户态守护进程（daemon）中处理。
-如图 \ref{arch:fig:os-primitives-accel}，操作系统在图中被替换成了用户态运行库，而可编程网卡中增加了传输协议的功能。
-用户态运行库通过替换标准库（如 libc），截获了应用程序的系统调用，从而可以在用户态实现操作系统功能的一部分，而把另一部分功能卸载到可编程网卡。
-用户态守护进程主要用于控制面操作，为简化起见，图 \ref{arch:fig:os-primitives-accel} 中没有画出。
+The final step is to divide the high-performance functions in the operating system into three parts, which are processed in the programmable network card, the user-mode runtime library of the host CPU, and the user-mode daemon of the host CPU, respectively.
+As shown in Figure \ref{arch:fig:os-primitives-accel}, the operating system is replaced by a user-mode runtime library in the figure, and the function of the transport protocol is added in the programmable network card.
+The user-mode runtime library intercepts the system calls of the application program by replacing the standard library (such as libc), so that part of the operating system functions can be implemented in user mode, and the other part of the functions can be offloaded to the programmable network card.
+The user-mode daemon is mainly used for control plane operations, which are not shown in Figure \ref{arch:fig:os-primitives-accel} for simplicity.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth]{figures/os_primitives_accel.pdf}
-	\caption{用可编程网卡加速操作系统通信原语后的架构。}
+	\caption{Architecture after accelerating operating system communication primitives with a programmable network card.}
 	\label{arch:fig:os-primitives-accel}
 \end{figure}
 
-操作系统中包括通信、存储等子系统，本文以通信系统的加速为例。套接字是应用程序最常用的通信原语，但由于操作系统的多种开销，其性能不令人满意。
-第 \ref{chapter:socksdirect} 章设计并实现了一个高性能的用户态套接字系统，与现有应用程序完全兼容，并且对主机内进程间通信和跨主机的通信都能达到接近硬件极限的低延迟和高吞吐量。
-系统由可编程网卡上的可靠通信协议和主机 CPU 上运行的用户态库、用户态守护进程三部分构成。
-对于跨主机的通信，数据面由可编程网卡和用户态库构成，可编程网卡负责多路复用和可靠传输等低层语义，提供远程直接内存访问（RDMA）原语；用户态库负责把 RDMA 原语封装成 Linux 虚拟文件系统（Virtual File System）的套接字语义，提供无锁消息队列、缓冲区管理、等待事件、零拷贝内存页面重映射等高层语义。
-对于主机内的通信，数据面由 CPU 的硬件内存一致性协议（coherence protocol）和用户态库构成。用户态库在进程间建立共享内存队列，并依靠 CPU 的内存一致性协议自动同步。用户态库的功能与跨主机通信类似。
-用户态守护进程负责控制面，即初始化、进程创建和退出、连接建立和关闭、与 RDMA 网卡建立队列、在进程之间建立共享内存队列等。
+The operating system includes subsystems such as communication and storage. This article takes the acceleration of the communication system as an example. The socket is the most commonly used communication primitive for application programs, but its performance is not satisfactory due to various overheads of the operating system.
+Chapter \ref{chapter:socksdirect} designs and implements a high-performance user-mode socket system, which is fully compatible with existing applications, and can achieve low latency and high throughput close to the hardware limit for both intra-host process communication and cross-host communication.
+The system is composed of a reliable communication protocol on the programmable network card and a user-mode library and user-mode daemon running on the host CPU.
+For cross-host communication, the data plane is composed of the programmable network card and the user-mode library. The programmable network card is responsible for low-level semantics such as multiplexing and reliable transmission, and provides Remote Direct Memory Access (RDMA) primitives; the user-mode library is responsible for encapsulating RDMA primitives into the socket semantics of the Linux Virtual File System, providing high-level semantics such as lock-free message queues, buffer management, waiting events, and zero-copy memory page remapping.
+For intra-host communication, the data plane is composed of the CPU's hardware memory coherence protocol and the user-mode library. The user-mode library establishes shared memory queues between processes and relies on the CPU's memory coherence protocol for automatic synchronization. The functions of the user-mode library are similar to those of cross-host communication.
+The user-mode daemon is responsible for the control plane, that is, initialization, process creation and exit, connection establishment and closure, establishing queues with the RDMA network card, and establishing shared memory queues between processes.
 
-在第 \ref{chapter:socksdirect} 章的设计中，客户应用程序通过 SocksDirect 运行库，直接访问可编程网卡中的 RDMA 功能，不需要经过操作系统内核和虚拟机监控器，可编程网卡也就不需要支持 SR-IOV 硬件虚拟化。
+In the design of Chapter \ref{chapter:socksdirect}, the client application accesses the RDMA function in the programmable network card directly through the SocksDirect runtime library, without going through the operating system kernel and the virtual machine monitor, so the programmable network card does not need to support SR-IOV hardware virtualization.
 
 
 
-\section{可编程网卡}
+\section{Programmable Network Card}
 
-在结束基于可编程网卡的数据中心系统架构介绍后，本节介绍可编程网卡内部的软硬件架构。如图 \ref{arch:fig:sw-hw-codesign} 所示，可编程网卡内的逻辑主要由第 \ref{chapter:clicknp} 章的编程框架、第 \ref{chapter:kvdirect} 章的基础服务中间件以及第 \ref{chapter:kvdirect} 章和第 \ref{chapter:socksdirect} 章的应用层构成。主机 CPU 上配套的软件包括第 \ref{chapter:clicknp} 章的 FPGA 通信库和驱动程序、第 \ref{chapter:kvdirect} 章的键值操作库和第 \ref{chapter:socksdirect} 章兼容 Linux 操作系统的套接字通信库。
+After introducing the data center system architecture based on the programmable network card, this section introduces the software and hardware architecture inside the programmable network card. As shown in Figure \ref{arch:fig:sw-hw-codesign}, the logic inside the programmable network card is mainly composed of the programming framework in Chapter \ref{chapter:clicknp}, the basic service middleware in Chapter \ref{chapter:kvdirect}, and the application layer in Chapters \ref{chapter:kvdirect} and \ref{chapter:socksdirect}. The corresponding software on the host CPU includes the FPGA communication library and driver in Chapter \ref{chapter:clicknp}, the key-value operation library in Chapter \ref{chapter:kvdirect}, and the socket communication library compatible with the Linux operating system in Chapter \ref{chapter:socksdirect}.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.5\textwidth]{figures/sw_hw_codesign.pdf}
-	\caption{软硬件协同设计的可编程网卡架构。}
+	\caption{Programmable network card architecture with software-hardware co-design.}
 	\label{arch:fig:sw-hw-codesign}
 \end{figure}
 
 
-图 \ref{arch:fig:my-smartnic-current} 显示了本文使用的 Catapult 可编程网卡 \cite{putnam2014reconfigurable} 硬件架构。
-Catapult 可编程网卡由 Stratix V FPGA 和 Mellanox ConnectX-3 商用网卡构成。FPGA 有两个连接 40 Gbps 以太网络的 QSFP 接口，一个连接数据中心交换机，另一个连接可编程网卡内的商用网卡。由于本文使用的 FPGA 没有 PCIe Gen3 x16 硬核，FPGA 与主机之间通过两个 PCIe Gen3 x8 接口连接，它们共享一个 PCIe Gen3 x16 物理插槽。商用网卡有两个 40 Gbps 以太网接口，一个连接 FPGA，另一个闲置。商用网卡与主机之间通过 PCIe Gen3 x16 接口连接。
-
+Figure \ref{arch:fig:my-smartnic-current} shows the hardware architecture of the Catapult programmable network card \cite{putnam2014reconfigurable} used in this paper.
+The Catapult programmable network card consists of a Stratix V FPGA and a Mellanox ConnectX-3 commercial network card. The FPGA has two QSFP interfaces connecting to the 40 Gbps Ethernet network, one connecting to the data center switch, and the other connecting to the commercial network card inside the programmable network card. Since the FPGA used in this paper does not have a PCIe Gen3 x16 hard core, the FPGA is connected to the host through two PCIe Gen3 x8 interfaces, which share a PCIe Gen3 x16 physical slot. The commercial network card has two 40 Gbps Ethernet interfaces, one connecting to the FPGA and the other idle. The commercial network card is connected to the host through a PCIe Gen3 x16 interface.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.4\textwidth]{figures/smartnic-current.pdf}
-	\caption{本文使用的 Catapult 可编程网卡。}
+	\caption{The Catapult programmable network card used in this paper.}
 	\label{arch:fig:my-smartnic-current}
 \end{figure}
 
-本文使用的 FPGA 有 172,600 个逻辑元件（ALM），2,014 个 20 Kb 大小的 M20K 片上内存（BRAM）以及 1,590 个可以执行 16 位乘法的数字信号处理单元（DSP）。FPGA 板上还有 4 GB 大小的 DRAM，通过一个 DDR3 通道与 FPGA 相连。
+The FPGA used in this paper has 172,600 logic elements (ALM), 2,014 on-chip memories (BRAM) of 20 Kb size, and 1,590 digital signal processing units (DSP) that can perform 16-bit multiplication. The FPGA board also has 4 GB of DRAM, which is connected to the FPGA via a DDR3 channel.
 
-
-本文第 \ref{chapter:clicknp} 章和第 \ref{chapter:kvdirect} 章使用其中的 FPGA 可重构逻辑来实现网络功能和数据结构处理；第 \ref{chapter:socksdirect} 章使用其中的商用 RDMA 网卡实现套接字原语中的硬件传输协议部分。
-来自数据中心网络的数据包从 FPGA 左上角的网络接口被可编程网卡接收。如果它是网络功能或者数据结构处理需求，就直接在 FPGA 可重构逻辑中进行处理，处理过程中 FPGA 需要使用板上 DRAM 和通过 CPU 互连（如 PCIe）访问主机 DRAM。
-如果数据包是用于第 \ref{chapter:socksdirect} 章中的套接字通信，它将在 FPGA 中进行虚拟网络的解封装，并通过 FPGA 与商用 RDMA 网卡之间的网络接口发送给商用 RDMA 网卡。
-商用 RDMA 网卡会把数据包的内容通过 CPU 互连（如 PCIe） DMA 发送给主机上的用户态套接字库。
+Chapters \ref{chapter:clicknp} and \ref{chapter:kvdirect} of this paper use the reconfigurable logic of the FPGA to implement network functions and data structure processing; Chapter \ref{chapter:socksdirect} uses the commercial RDMA network card to implement the hardware transport protocol part of socket primitives.
+Data packets from the data center network are received by the programmable network card from the network interface in the upper left corner of the FPGA. If it is a network function or data structure processing requirement, it is directly processed in the FPGA reconfigurable logic, and the FPGA needs to use the on-board DRAM and access the host DRAM through the CPU interconnect (such as PCIe) during the processing.
+If the data packet is for socket communication in Chapter \ref{chapter:socksdirect}, it will be decapsulated in the FPGA's virtual network and sent to the commercial RDMA network card through the network interface between the FPGA and the commercial RDMA network card.
+The commercial RDMA network card will DMA the content of the data packet to the user-space socket library on the host through the CPU interconnect (such as PCIe).
 
 \iffalse
-\textbf{细节移动到后面章节}
+\textbf{Details moved to later chapters}
 
 
-\subsection{高级语言编程框架}
+\subsection{High-level language programming framework}
 
-为了简化 FPGA 编程，本文第 \ref{chapter:clicknp} 章将提出适合流式处理的模块化 FPGA 高级语言编程框架 ClickNP。
-如图 \ref{arch:fig:element_arch} 所示，ClickNP 的基本处理模块是元件（element）。元件之间使用管道（channel）连接。
-每个元件使用类 C 语言编程，可以被编译成 FPGA 上的逻辑模块或者 CPU 上的线程。
-每个元件逻辑上可以类比成一个 CPU 核，是一个状态机，由私有内部状态、全局状态、若干输入管道、若干输出管道、数据处理函数和信号处理函数构成。
-全局状态使用板上 DRAM 实现，私有内部状态使用片上 BRAM 或寄存器实现。
-FPGA 上逻辑模块之间的管道用先进先出队列（FIFO）实现，CPU 上线程之间的管道用共享内存队列实现，FPGA 和 CPU 元件之间的管道用 PCIe I/O 管道实现。
-数据处理函数从输入管道中读取数据，处理后发送到输出管道中。信号处理函数用于响应主机控制程序的信号。
+To simplify FPGA programming, Chapter \ref{chapter:clicknp} of this paper will propose a modular FPGA high-level language programming framework ClickNP suitable for stream processing.
+As shown in Figure \ref{arch:fig:element_arch}, the basic processing module of ClickNP is the element. Elements are connected by channels.
+Each element is programmed in C-like language and can be compiled into a logic module on the FPGA or a thread on the CPU.
+Each element can be logically compared to a CPU core, is a state machine, and consists of private internal states, global states, several input channels, several output channels, data processing functions, and signal processing functions.
+The global state is implemented using on-board DRAM, and the private internal state is implemented using on-chip BRAM or registers.
+The channels between logic modules on the FPGA are implemented with first-in-first-out queues (FIFO), the channels between threads on the CPU are implemented with shared memory queues, and the channels between FPGA and CPU elements are implemented with PCIe I/O channels.
+The data processing function reads data from the input channel and sends it to the output channel after processing. The signal processing function is used to respond to signals from the host control program.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.5\textwidth]{chapters/clicknp/image/element_arch.pdf}
-	\caption{ClickNP 编程框架中的元件。}
+	\caption{Elements in the ClickNP programming framework.}
 	\label{arch:fig:element_arch}
 \end{figure}
 
-元件的结构设计使其能实现无阻塞、完全流水线的数据处理。
-元件不仅可以在主机上用传统软件开发工具进行调试和测试，ClickNP 编程框架还可以为其生成调试逻辑，实现在 FPGA 运行过程中的日志、断点、查询状态等调试功能。
-此外，在虚拟机热迁移（live migration）和高可用（high availability，HA）中，网卡等外设中的状态备份和迁移是一个挑战。
-ClickNP 编程框架可以自动生成状态导入导出逻辑，并与管道输入输出控制配合，可以通过状态迁移实现元件和虚拟机的热迁移，通过热备份或冷备份实现可编程网卡不同等级的高可用性。
+The structure of the element enables it to implement non-blocking, fully pipelined data processing.
+Not only can elements be debugged and tested on the host with traditional software development tools, but the ClickNP programming framework can also generate debugging logic for them, enabling logging, breakpoints, state queries, and other debugging functions during FPGA operation.
+In addition, in live migration and high availability (HA) of virtual machines, state backup and migration in peripherals such as network cards is a challenge.
+The ClickNP programming framework can automatically generate state import and export logic, and cooperate with pipeline input and output control, can achieve hot migration of elements and virtual machines through state migration, and achieve different levels of high availability of programmable network cards through hot backup or cold backup.
 
-\subsection{基础服务中间件}
+\subsection{Basic service middleware}
 
-本文第 \ref{chapter:clicknp} 章将提出的 ClickNP 架构比较适合无状态或状态简单的流水线式数据包处理，而对基于连接状态或应用层请求的处理，就显得捉襟见肘。
-例如，四层负载均衡器应用中的调度器和哈希表与应用逻辑耦合紧密，既不容易扩放到大量并发连接，代码的可维护性也不强。事实上在开发过程中花费了大量的时间来解决死锁问题。
-为此，本文第 \ref{chapter:kvdirect} 章的 KV-Direct 系统将提出 FPGA 内的有状态处理（stateful processing）和哈希表数据结构设计，这些基础组件可以作为第 \ref{chapter:clicknp} 章的有状态网络功能（如四层负载均衡器）、第 \ref{chapter:kvdirect} 章的内存键值存储、第 \ref{chapter:socksdirect} 章的可扩放 RDMA 的基础。
+The ClickNP architecture proposed in Chapter \ref{chapter:clicknp} of this paper is more suitable for stateless or simple pipeline packet processing, but it is inadequate for processing based on connection state or application layer requests.
+For example, the scheduler and hash table in the application of the four-layer load balancer are tightly coupled with the application logic, which is not easy to scale to a large number of concurrent connections, and the code maintainability is not strong. In fact, a lot of time was spent in the development process to solve the deadlock problem.
+For this reason, the KV-Direct system proposed in Chapter \ref{chapter:kvdirect} of this paper will propose stateful processing and hash table data structure design within the FPGA. These basic components can serve as the basis for stateful network functions (such as four-layer load balancers) in Chapter \ref{chapter:clicknp}, memory key-value storage in Chapter \ref{chapter:kvdirect}, and scalable RDMA in Chapter \ref{chapter:socksdirect}.
 
-为了模块化和可扩放性，使用 KV-Direct 作为基础后，可编程网卡上应用的架构如图 \ref{arch:fig:kvdirect_arch} 所示。
-事务代表着前后依赖关系，例如有状态网络处理中的一个连接，分多个数据包的一个应用层 HTTP 请求，或者键值存储中对同一个键（key）的操作。
-同一个事务中的不同请求需要依次处理，而不同事务中的请求可以并发处理。
-为了隐藏延迟、最大化并发处理能力，请求调度器从基于 KV-Direct 的事务状态键值存储中查找该请求对应的事务编号，并将正在处理事务的请求排入队列。
-基于 ClickNP 的数据处理流水线根据请求数据和事务状态进行处理，在处理过程中可能查询其他的数据结构（如内存分配表、主机虚拟地址映射表、防火墙规则表、路由表等）。
-如果请求处理完成，响应数据进入输出重排模块，重新排列响应的顺序以满足事务处理的一致性要求（例如，不同事务的请求也要按照到达顺序依次响应），最终输出到网络。
-如果请求的处理还需要依赖下一数据包或从主机内存 DMA 来的数据，为了不阻塞数据处理流水线，该请求会返回到调度器，等待依赖操作完成后再进行下一阶段的处理。
 
+For modularity and scalability, the architecture of applications on programmable network cards using KV-Direct as a basis is shown in Figure \ref{arch:fig:kvdirect_arch}.
+Transactions represent dependencies, such as a connection in stateful network processing, an application layer HTTP request split across multiple packets, or operations on the same key in key-value storage.
+Different requests within the same transaction need to be processed in sequence, while requests in different transactions can be processed concurrently.
+To hide latency and maximize concurrent processing capabilities, the request scheduler looks up the transaction number corresponding to the request from the transaction state key-value store based on KV-Direct and queues the requests of the transactions being processed.
+The data processing pipeline based on ClickNP processes according to the request data and transaction status, and may query other data structures (such as memory allocation tables, host virtual address mapping tables, firewall rule tables, routing tables, etc.) during the process.
+If the request processing is completed, the response data enters the output rearrangement module, rearranges the order of the responses to meet the consistency requirements of transaction processing (for example, requests from different transactions also need to respond in the order of arrival), and finally outputs to the network.
+If the processing of the request still depends on the next packet or data from the host memory DMA, in order not to block the data processing pipeline, the request will return to the scheduler, waiting for the dependent operation to complete before proceeding to the next stage of processing.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=1.0\textwidth]{figures/kvdirect_arch.pdf}
-	\caption{基于 KV-Direct 的可编程网卡应用层架构。}
+	\caption{Application layer architecture based on KV-Direct.}
 	\label{arch:fig:kvdirect_arch}
 \end{figure}
 \fi
 
-接下来的三章将依次详细讨论本文的三个主要创新点，即基于可编程网卡的网络功能（ClickNP）、存储数据结构（KV-Direct）和操作系统通信原语（SocksDirect）加速。
+The next three chapters will discuss in detail the three main innovations of this paper, namely the acceleration of network functions based on programmable network cards (ClickNP), storage data structures (KV-Direct), and operating system communication primitives (SocksDirect).

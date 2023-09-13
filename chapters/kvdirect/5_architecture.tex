@@ -1,149 +1,98 @@
-\section{KV-Direct 操作原语}
+\section{KV-Direct Operation Primitives}
 \label{kvdirect:sec:architecture}
 \label{kvdirect:sec:kv-operations}
 
-KV-Direct 将远程直接内存访问（Remote Direct Memory Access，RDMA）原语扩展到\textit {远程直接键值访问}原语，如表 \ref {kvdirect:tab:kv-operations} 所述。
-客户端将\textit {KV-Direct 操作}发送到键值存储服务器，而可编程网卡处理请求并发送回结果，绕过CPU。
-键值存储服务器上的可编程网卡是一个重配置为\textit {键值处理器}的FPGA。
+KV-Direct extends the Remote Direct Memory Access (RDMA) primitives to \textit{remote direct key-value access} primitives, as shown in Table \ref{kvdirect:tab:kv-operations}.
+The client sends \textit{KV-Direct operations} to the key-value storage server, and the programmable network card processes the requests and sends back the results, bypassing the CPU.
+The programmable network card on the key-value storage server is an FPGA reconfigured as a \textit{key-value processor}.
 
-除了表 \ref {kvdirect:tab:kv-operations} 顶部所示的标准键值存储操作外，KV-Direct还支持两种类型的向量运算：
-将标量发送到服务器上的网卡，网卡将更新应用于向量中的每个元素；或者向服务器发送一个向量，并且网卡逐个元素地更新原始向量。
-此外，KV-Direct 支持在原子操作中包含用户定义的函数。
-用户定义函数需要预先注册并编译为硬件逻辑，运行时使用函数 ID 来索引。
-使用用户定义函数的键值操作类似于\textit {动态消息}（active message）\cite {eicken1992active}，从而节省了将键值取回客户端处理的通信和同步成本。
-
+In addition to the standard key-value storage operations shown at the top of Table \ref{kvdirect:tab:kv-operations}, KV-Direct also supports two types of vector operations:
+sending a scalar to the network card on the server, the network card will apply the update to each element in the vector; or sending a vector to the server, and the network card updates the original vector element by element.
+Furthermore, KV-Direct supports including user-defined functions in atomic operations.
+User-defined functions need to be pre-registered and compiled into hardware logic, indexed at runtime using the function ID.
+Key-value operations using user-defined functions are similar to \textit{active messages} \cite{eicken1992active}, saving the communication and synchronization costs of retrieving the key-value to the client for processing.
 
 \begin{table}
 \centering
-\caption{KV-Direct 操作。}
+\caption{KV-Direct operations.}
 \label{kvdirect:tab:kv-operations}
 \small
 \begin{tabular}{p{.4\textwidth}|p{.5\textwidth} }
 \toprule
-get ($k$) $\rightarrow v$ & 获取键 $k$ 的值。 \\
+get ($k$) $\rightarrow v$ & Get the value of key $k$. \\
 \midrule
-put ($k, v$) $\rightarrow$ bool & 插入或替换 $(k, v)$ 对。 \\
+put ($k, v$) $\rightarrow$ bool & Insert or replace the pair $(k, v)$. \\
 \midrule
-delete ($k$) $\rightarrow$ bool & 删除键 $k$。 \\
+delete ($k$) $\rightarrow$ bool & Delete key $k$. \\
 \midrule
 \midrule
-update{\_}scalar2scalar ($k, \Delta, \lambda(v, \Delta) \rightarrow v$) $\rightarrow v$ & 原子更新键 $k$，使用函数 $\lambda$，作用于 $\Delta$ 上，返回原始值。\\
+update{\_}scalar2scalar ($k, \Delta, \lambda(v, \Delta) \rightarrow v$) $\rightarrow v$ & Atomically update key $k$ using function $\lambda$, acting on $\Delta$, returning the original value.\\
 \midrule
-update{\_}scalar2vector ($k, \Delta, \lambda(v, \Delta) \rightarrow v$) $\rightarrow [v]$ & 原子更新键 $k$ 中的所有元素，使用函数 $\lambda$ 和标量 $\Delta$，返回原始向量。 \\
+update{\_}scalar2vector ($k, \Delta, \lambda(v, \Delta) \rightarrow v$) $\rightarrow [v]$ & Atomically update all elements in key $k$ using function $\lambda$ and scalar $\Delta$, returning the original vector. \\
 \midrule
-update{\_}vector2vector ($k, [\Delta], \lambda(v, \Delta) \rightarrow v$) $\rightarrow [v]$ & 原子更新键 $k$ 中的所有元素，使用函数 $\lambda$，基于向量 $[\Delta]$ 中的对应元素，并返回原始向量。 \\
+update{\_}vector2vector ($k, [\Delta], \lambda(v, \Delta) \rightarrow v$) $\rightarrow [v]$ & Atomically update all elements in key $k$ using function $\lambda$, based on corresponding elements in vector $[\Delta]$, and return the original vector. \\
 \midrule
-reduce ($k, \Sigma, \lambda(v, \Sigma) \rightarrow \Sigma$) $\rightarrow \Sigma$ & 把向量 $k$ 归约成一个标量，使用函数 $\lambda$，并返回归约结果 $\Sigma$。 \\
+reduce ($k, \Sigma, \lambda(v, \Sigma) \rightarrow \Sigma$) $\rightarrow \Sigma$ & Reduce vector $k$ to a scalar using function $\lambda$, and return the reduced result $\Sigma$. \\
 \midrule
-filter ($k, \lambda(v) \rightarrow$ bool) $\rightarrow [v]$ & 在向量 $k$ 中筛选元素，使用函数 $\lambda$，并返回筛选后的向量。 \\
+filter ($k, \lambda(v) \rightarrow$ bool) $\rightarrow [v]$ & Filter elements in vector $k$ using function $\lambda$, and return the filtered vector. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-当对一个键执行向量操作更新（update），归约（reduce）或过滤（filter）时，其值被视为固定位宽元素的数组。
-每个函数 $\lambda$ 对向量中的一个元素、客户端指定的参数 $\Delta$ 和/或初始值 $\Sigma$ 进行归约操作。
-基于第 \ref{chapter:clicknp} 章的 KV-Direct 开发工具链将用户定义函数 $\lambda$ 复制多份，以利用FPGA中的并行性，并将计算吞吐量与键值处理器中其他组件的吞吐量相匹配，然后使用高层次综合（HLS）工具 \cite {aoc,sdaccel} 将其编译为可重新配置的硬件逻辑。
-得益于第 \ref{chapter:clicknp} 章的设计，开发工具链自动提取复制函数中的数据依赖性，并生成完全流水线的可编程逻辑。
-在键值存储客户端开始运行之前，键值存储服务器上的可编程网卡应加载用户定义函数 $\lambda$ 的硬件逻辑。
+When performing vector operation updates (update), reductions (reduce), or filters (filter) on a key, its value is considered an array of fixed-width elements.
+Each function $\lambda$ operates on an element in the vector, client-specified parameter $\Delta$, and/or initial value $\Sigma$ for reduction.
+Based on the KV-Direct development toolchain from Chapter \ref{chapter:clicknp}, user-defined function $\lambda$ is replicated multiple times to exploit the parallelism in FPGA and match the computation throughput with the throughput of other components in the key-value processor, then compiled into reconfigurable hardware logic using High-Level Synthesis (HLS) tools \cite{aoc,sdaccel}.
+Thanks to the design from Chapter \ref{chapter:clicknp}, the development toolchain automatically extracts data dependencies in the replicated function and generates fully pipelined programmable logic.
+Before the key-value storage client starts running, the programmable network card on the key-value storage server should load the hardware logic of user-defined function $\lambda$.
 
-利用用户定义函数，可以在向量操作中实现常见的流处理。
-例如，网络处理应用程序可以将该向量解释为用于网络功能的数据包流（packet stream），或用于数据包事务（packet transaction）的一组状态 \cite {sivaraman2016packet}。
-甚至可能实现完全在可编程网卡中的单对象事务处理，例如，TPC-C 基准测试中 S\_QUANTITY 达到阈值后归零的操作 \cite {council2010tpc}。
-向量归约操作可以支持 PageRank \cite {page1999pagerank} 中累加邻居节点权重的计算。
-还可以使用向量过滤操作来获取稀疏向量中的非零值。
+Using user-defined functions, common stream processing can be implemented in vector operations. For example, network processing applications can interpret this vector as a packet stream for network functions, or a set of states for packet transactions \cite {sivaraman2016packet}. It is even possible to implement single-object transaction processing entirely within programmable network cards, such as the operation of resetting S\_QUANTITY to zero after reaching the threshold in the TPC-C benchmark test \cite {council2010tpc}. Vector reduction operations can support the calculation of accumulating neighbor node weights in PageRank \cite {page1999pagerank}. Vector filtering operations can also be used to obtain non-zero values in sparse vectors.
 
-\section{键值处理器}
+\section{Key-Value Processor}
 \label{kvdirect:sec:kv-processor}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.6\textwidth]{kvdirect_arch.pdf}
-\caption{键值处理器架构。}
+\caption{Architecture of the key-value processor.}
 \label{kvdirect:fig:kvprocessor-arch}
 \end{figure}
 
-如图 \ref {kvdirect:fig:kvprocessor-arch} 所示，键值处理器从板载网卡接收数据包，解码向量操作并将键值操作缓冲在保留站 \footnote{保留站（reservation station）是计算机体系结构中的概念，存储待执行的操作，并调度合适的操作并发执行。} 中（第 \ref {kvdirect:sec:ooo} 节）。
-接下来，乱序执行引擎（第 \ref {kvdirect:sec:ooo} 节）从保留站发送可并发执行的键值操作到键值操作译码器。
-根据操作类型，键值处理器查找哈希表（第 \ref {kvdirect:sec:hashtable} 节）并执行相应的操作。
-为了最小化内存访问次数，较小的键值对在哈希表中内联（inline）存储，其他的键值对存储在 slab 内存分配器（第 \ref {kvdirect:sec:slab} 节）的动态分配内存中。
-哈希索引和slab分配的内存都由统一的内存访问引擎（第 \ref {kvdirect:sec:dram-cache} 节）管理，它通过PCIe DMA访问主机内存并将部分主机内存缓存在板载DRAM中。
-键值操作完成后，结果被发送回乱序执行引擎（第 \ref {kvdirect:sec:ooo} 节），在保留站中寻找依赖它的键值操作并执行之。
+As shown in Figure \ref {kvdirect:fig:kvprocessor-arch}, the key-value processor receives packets from the onboard network card, decodes vector operations, and buffers key-value operations in the reservation station \footnote{The reservation station is a concept in computer architecture that stores operations to be executed and schedules appropriate operations for concurrent execution.} (Section \ref {kvdirect:sec:ooo}). Next, the out-of-order execution engine (Section \ref {kvdirect:sec:ooo}) sends concurrently executable key-value operations from the reservation station to the key-value operation decoder. Depending on the operation type, the key-value processor looks up the hash table (Section \ref {kvdirect:sec:hashtable}) and performs the corresponding operation. To minimize memory access times, smaller key-value pairs are stored inline in the hash table, while other key-value pairs are stored in dynamically allocated memory in the slab memory allocator (Section \ref {kvdirect:sec:slab}). Both the hash index and the memory allocated by the slab are managed by a unified memory access engine (Section \ref {kvdirect:sec:dram-cache}), which accesses the host memory via PCIe DMA and caches part of the host memory in the onboard DRAM. After the key-value operation is completed, the result is sent back to the out-of-order execution engine (Section \ref {kvdirect:sec:ooo}), which looks for key-value operations that depend on it in the reservation station and executes them.
 
-正如第 \ref {kvdirect:sec:challenge} 节所讨论的，PCIe 吞吐量的稀缺性要求键值处理器节约 DMA 访问。
-对于 GET 操作，至少需要读取一次内存。
-对于 PUT 或 DELETE 操作，对于哈希表数据结构，至少需要一次读取和一次写入 \footnote{读取操作取出哈希槽内的键，如果槽位为空或与待查找的键相同，且不需要重新分配内存空间，则需要一次写入操作来写回数据}。
-基于日志的数据结构可以实现每个 PUT 平摊下来少于一次的写入操作，但它牺牲了 GET 性能。
-KV-Direct 仔细设计哈希表，以便在每次查找和插入时实现接近理想的 DMA 访问。KV-Direct 也仔细设计了内存分配器，使每次动态内存分配平摊下来，只需不到 0.1 次 DMA 操作。
+As discussed in Section \ref {kvdirect:sec:challenge}, the scarcity of PCIe throughput requires the key-value processor to save DMA access. For GET operations, at least one memory read is required. For PUT or DELETE operations, for the hash table data structure, at least one read and one write are required \footnote{The read operation takes out the key in the hash slot. If the slot is empty or the same as the key to be searched, and no memory space needs to be reallocated, a write operation is required to write back the data}. Log-based data structures can achieve less than one write operation per PUT on average, but it sacrifices GET performance. KV-Direct carefully designs the hash table to achieve near-ideal DMA access for each lookup and insertion. KV-Direct also carefully designs the memory allocator so that each dynamic memory allocation averages less than 0.1 DMA operations.
 
-\subsection{哈希表}
+\subsection{Hash Table}
 \label{kvdirect:sec:hashtable}
 
-为了存储可变大小的键值，键值存储分为两部分。 第一部分是哈希索引（图 \ref {kvdirect:fig:hashtable}），它包含固定数量的\textit {哈希桶}。 每个哈希桶包含几个\textit {哈希槽}和一些元数据。 内存的其余部分是动态分配的，由slab分配器（第 \ref {kvdirect:sec:slab} 节）管理。
-初始化时配置的\textit {哈希索引比率}（hash index ratio）是哈希索引的大小占键值存储总内存大小的比例。
-哈希索引比率的选择将在第 \ref {kvdirect:sec:hashtable-eval} 节讨论。
-
+To store variable-sized key-values, key-value storage is divided into two parts. The first part is the hash index (Figure \ref {kvdirect:fig:hashtable}), which contains a fixed number of \textit {hash buckets}. Each hash bucket contains several \textit {hash slots} and some metadata. The rest of the memory is dynamically allocated and managed by the slab allocator (Section \ref {kvdirect:sec:slab}). The \textit {hash index ratio} configured at initialization is the proportion of the size of the hash index to the total memory size of the key-value storage. The choice of hash index ratio will be discussed in Section \ref {kvdirect:sec:hashtable-eval}.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=1.0\textwidth,page=1]{hashline.PNG}
-	\caption{哈希索引结构。每行是一个哈希桶，包含10个哈希槽，每个哈希槽包括 3 位的 slab 内存类型，一个位图标记内联键值对的开始和结束，以及指向哈希冲突时下一个链接桶的指针。}
+	\caption{Hash index structure. Each row is a hash bucket, containing 10 hash slots, each hash slot includes 3 bits of slab memory type, a bitmap marking the start and end of inline key-value pairs, and a pointer to the next linked bucket in case of hash collision.}
 	\label{kvdirect:fig:hashtable}
 \end{figure}
 
-
 %\textbf{Hash Table.}
 %Each bucket includes 10 hash slots, 3b type code per slot, 50b metadata, plus 31b address and a valid bit of the next chained bucket, as shown in Figure~\ref{kvdirect:fig:hashtable}.
-%For offline 键值s, each hash slot needs to store 31b of address, 9b of secondary hash and 3b type code for the slab size.
-%For inline 键值s, to mark the begin and end of each hash slot, as well as the separation between inline key and value, the information is encoded in a 50b metadata corresponding to 50 bytes of hash slots.
+%For offline keys and values, each hash slot needs to store 31b of address, 9b of secondary hash and 3b type code for the slab size.
+%For inline keys and values, to mark the begin and end of each hash slot, as well as the separation between inline key and value, the information is encoded in a 50b metadata corresponding to 50 bytes of hash slots.
 %The inline keys and secondary hashes of offline keys in all hash slots are compared in parallel, and the first match is found.
 
-每个哈希槽包括指向动态分配的存储器中的键值数据的指针和\textit{辅助哈希}。
-辅助哈希是一种优化，采用与主哈希函数独立的另一个哈希函数。由于每个哈希桶中有多个哈希槽，键值处理器需要判断哪个哈希槽对应待查找的键。
-通过 9 位的辅助哈希，可以 511/512 的概率确定哪个是待查找的键。但为了确保正确性，仍然需要一次额外的内存访问，将键取出，逐字节比较。
-假设主机内存中的64~GiB 键值存储和32字节分配粒度~\footnote{32 字节的分配粒度权衡了内部碎片和用于内存分配的元数据开销。}，指针需要31位。
-每个哈希槽的大小是 5 字节~\footnote{本文中的设计参数是根据本文所用硬件平台的参数配置的，对于不同容量的内存，哈希槽大小、指针位宽等参数可能改变。}。
-为了确定哈希桶大小，需要在每个桶的哈希槽数和 DMA 吞吐量之间进行权衡。
-图 \ref {kvdirect:fig:dma-tput} 表明，低于 64B 粒度时，DMA 读取吞吐量受 DMA 引擎中 PCIe 延迟和并行性的约束。
-小于 64B 的桶大小将增加哈希冲突的可能性。
-另一方面，将桶大小增加到 64B 以上会降低哈希查找的吞吐量。
-因此桶大小选择为 64 字节。
+Each hash slot includes a pointer to the key-value data in dynamically allocated memory and an \textit{auxiliary hash}. The auxiliary hash is an optimization that uses another hash function independent of the main hash function. Since there are multiple hash slots in each hash bucket, the key-value processor needs to determine which hash slot corresponds to the key to be found. With a 9-bit auxiliary hash, it can be determined with a probability of 511/512 which is the key to be found. However, to ensure correctness, an additional memory access is still needed to fetch the key and compare it byte by byte. Assuming a 64~GiB key-value storage in the host memory and a 32-byte allocation granularity~\footnote{The 32-byte allocation granularity balances the internal fragmentation and the overhead for memory allocation metadata.}, the pointer requires 31 bits. The size of each hash slot is 5 bytes~\footnote{The design parameters in this paper are configured according to the parameters of the hardware platform used in this paper. For memory of different capacities, parameters such as hash slot size and pointer bit width may change.}. To determine the size of the hash bucket, a trade-off needs to be made between the number of hash slots in each bucket and the DMA throughput. Figure \ref{kvdirect:fig:dma-tput} shows that when the granularity is less than 64B, the DMA read throughput is constrained by the PCIe latency and parallelism in the DMA engine. A bucket size less than 64B will increase the possibility of hash collisions. On the other hand, increasing the bucket size to more than 64B will reduce the throughput of hash lookups. Therefore, the bucket size is chosen to be 64 bytes.
 
-\textit {键值大小}是指键和值的总大小。
-小于阈值大小的键值在哈希索引中内联（inline）存储，以节约对获取键值数据的额外存储器访问。
-内联键值可以跨越多个哈希槽，其指针和辅助哈希字段被重新用于存储键值数据。
-内联所有可装入哈希索引的键值可能不是最佳选择。
-一个内联的键值可能占用多个哈希槽，减小了哈希表可存储的键值数量。
-在哈希表容量允许的情况下，内联键值可以减少平均内存访问次数。
-为此，KV-Direct 根据哈希表被填满的比例来选择 \textit {内联阈值}，并内联小于该阈值的键值。
-传统上，哈希表采用负载因子（load factor） \footnote{负载因子是已被占用的哈希槽数量与总哈希槽数量之比。} 来衡量哈希表被填满的比例，然而这忽略了哈希表的元数据（metadata）和内部碎片（internal fragmentation）带来的开销。为了更科学地比较哈希表不同参数的选择，本章使用 \textit {内存利用率}（memory utilization） \footnote{内存利用率是键值存储中所有键值的大小之和与键值存储的总大小之比。由于元数据和内部碎片的存在，内存利用率总是小于 1 的。}。
-如图 \ref {kvdirect:fig:inline-offline} 所示，对于某个内联阈值，由于更多的哈希冲突，每个键值操作的平均内存访问次数随内存利用率的增加而增加。
-较高的内联阈值下，平均内存访问次数的增长曲线更陡峭。
-因此可以找到最佳内联阈值以最小化在给定内存利用率下的内存访问次数。
-与哈希索引比率一样，内联阈值也可以在初始化时配置。
-
+The \textit{key-value size} refers to the total size of the key and value. Key-values smaller than the threshold size are stored inline in the hash index to save additional memory accesses to fetch the key-value data. Inline key-values can span multiple hash slots, and their pointer and auxiliary hash fields are reused to store key-value data. Inlining all key-values that can fit into the hash index may not be the best choice. An inline key-value may occupy multiple hash slots, reducing the number of key-values that the hash table can store. If the capacity of the hash table allows, inlining key-values can reduce the average number of memory accesses. For this, KV-Direct selects the \textit{inline threshold} based on the proportion of the hash table that is filled, and inlines key-values smaller than this threshold. Traditionally, the load factor~\footnote{The load factor is the ratio of the number of occupied hash slots to the total number of hash slots.} is used to measure the proportion of the hash table that is filled, but this ignores the overhead brought by the metadata and internal fragmentation of the hash table. To compare the choices of different parameters of the hash table more scientifically, this chapter uses \textit{memory utilization}~\footnote{Memory utilization is the ratio of the sum of the sizes of all key-values in the key-value storage to the total size of the key-value storage. Due to the existence of metadata and internal fragmentation, memory utilization is always less than 1.}. As shown in Figure \ref{kvdirect:fig:inline-offline}, for a certain inline threshold, the average number of memory accesses per key-value operation increases with the increase of memory utilization due to more hash collisions. Under a higher inline threshold, the growth curve of the average number of memory accesses is steeper. Therefore, the optimal inline threshold can be found to minimize the number of memory accesses at a given memory utilization. Like the hash index ratio, the inline threshold can also be configured at initialization.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.6\textwidth]{inline_thresh.pdf}
-	\caption{不同内联阈值下的平均内存访问次数和内存利用率。}
+	\caption{Average number of memory accesses and memory utilization under different inline thresholds.}
 	\label{kvdirect:fig:inline-offline}
 \end{figure}
 
+When all the hash slots in the hash bucket are filled, there are several solutions to solve the hash collision. Cuckoo Hashing~\cite{pagh2004cuckoo} and Hopscotch Hashing~\cite{herlihy2008hopscotch} ensure that newly inserted key-values are always inserted into the hash bucket by moving occupied hash slots during the insertion process, so that only a constant number of hash slots in the same hash bucket need to be compared during the lookup, achieving constant time lookup. However, in write-intensive workloads, the memory access time under high load rates can fluctuate significantly. In extreme cases, insertion may even fail, requiring hash table expansion. Another solution to hash collisions is \textit{linear probing}, which may be affected by clustering, so its performance is sensitive to the uniformity of the hash function. For this, this paper chooses \textit{chaining} to solve hash collisions, which balances the performance of lookup and insertion, and is more robust to hash clustering.
 
-当哈希桶中的所有哈希槽都已填满时，有几种解决方案可以解决哈希冲突。
-布谷鸟哈希（Cuckoo Hashing）\cite {pagh2004cuckoo} 和跳房子哈希（Hopscotch Hashing）\cite {herlihy2008hopscotch} 通过在插入过程中移动已被占用的哈希槽来保证新插入的键值总是被插入到哈希桶中，从而查找时仅需比较同一哈希桶中恒定数量的哈希槽，实现恒定时间查找。
-但是，在写入密集型工作负载中，高负载率下的内存访问时间会有较大的波动。
-在极端情况下，甚至可能出现插入失败，需要哈希表扩容的情况。
-另一种解决哈希冲突的方法是 \textit{线性探测法}，它可能受到群集（clustering）的影响，因此其性能对哈希函数的均匀性敏感。
-为此，本文选择 \textit {拉链法} 来解决哈希冲突，这平衡了查找和插入的性能，同时对哈希群集更加健壮。
-
-为了比较 KV-Direct 的拉链法、MemC3中的桶式布谷鸟哈希（bucketized Cuckoo Hash）\cite {fan2013memc3} 和 FaRM \cite {dragojevic2014farm} 中的链式关联（chain associative）跳房子哈希（Hopscotch Hash），图 \ref {kvdirect:fig:mem-access-tput} 绘制了三种可能的哈希表设计中每个GET和PUT操作的平均内存访问次数。
-在 KV-Direct 的实验中，针对给定的键值大小和内存利用率要求，为内联阈值和哈希索引比率做出最佳选择。
-在布谷鸟和跳房子哈希实验中，假设键是内联的并且可以并行比较，而值存储在动态分配的 slab 存储区中。
-由于MemC3和FaRM的哈希表不能对 10B 键值大小支持超过55％的内存利用率（即它们的元数据和内部碎片占用空间较多），图 \ref {kvdirect:fig:mem-access-10-get} 和图 \ref {kvdirect:fig:mem-access-10-put} 仅显示KV-Direct的性能。
-
-
-
+To compare KV-Direct's chaining, bucketized Cuckoo Hash in MemC3~\cite{fan2013memc3}, and chain associative Hopscotch Hash in FaRM~\cite{dragojevic2014farm}, Figure \ref{kvdirect:fig:mem-access-tput} plots the average number of memory accesses per GET and PUT operation in three possible hash table designs. In the KV-Direct experiment, the best choices are made for the inline threshold and hash index ratio for a given key-value size and memory utilization requirement. In the Cuckoo and Hopscotch hash experiments, it is assumed that the key is inlined and can be compared in parallel, and the value is stored in dynamically allocated slab storage. Since the hash tables of MemC3 and FaRM cannot support a memory utilization rate of more than 55% for a key-value size of 10B (i.e., they have more space occupied by metadata and internal fragmentation), Figure \ref{kvdirect:fig:mem-access-10-get} and Figure \ref{kvdirect:fig:mem-access-10-put} only show the performance of KV-Direct.
 
 \begin{figure}[htbp]
 	\centering
@@ -158,297 +107,178 @@ KV-Direct 仔细设计哈希表，以便在每次查找和插入时实现接近�
 	{\includegraphics[width=.5\textwidth,page=1]{254B_get.pdf}}
 	\subfloat[254B PUT.\label{kvdirect:fig:mem-access-254-put}]
 	{\includegraphics[width=.5\textwidth,page=1]{254B_put.pdf}}
-	\caption{每个键值操作的内存访问次数。}
+	\caption{Number of memory accesses per key-value operation.}
 	\label{kvdirect:fig:mem-access-tput}
 \end{figure}
 
-
-对于内联键值，KV-Direct的每个GET操作仅需接近1次内存访问，在非极端内存利用率下每个PUT也仅需2次内存访问。
-非内联键值的GET和PUT则有一次额外的内存访问。
-在高内存利用率下比较KV-Direct和链式跳房子哈希，跳房子哈希在GET中表现更好，但在PUT中表现更差。
-虽然KV-Direct无法保证最坏情况下的DMA访问次数，但会在GET和PUT之间取得平衡。
-布谷鸟哈希的GET操作能保证访问最多两个哈希槽，因此在大多数内存利用率下，KV-Direct的内存访问次数更多。
-但是，在高内存利用率下，布谷鸟哈希会导致PUT操作的内存访问次数出现大幅波动。
-
-
-%In KV-Direct, we measure memory utilization instead of load factor, because chaining has dynamic size and that we care more about the overall storage efficiency counting all indexing, metadata and memory fragmentation overhead.
-%Clearly, small 键值s cause lower memory utilization due to metadata overhead.
-%The optimal hash index ratio is chosen at initialization time according to workload to balance average access time and memory utilization.
+For inline key-values, each GET operation in KV-Direct only requires close to 1 memory access, and each PUT also only requires 2 memory accesses under non-extreme memory utilization. Non-inline key-values have one additional memory access for GET and PUT. Comparing KV-Direct and chained hopscotch hashing under high memory utilization, hopscotch hashing performs better in GET but worse in PUT. Although KV-Direct cannot guarantee the worst-case DMA access times, it will balance between GET and PUT. The GET operation of cuckoo hashing can guarantee access to at most two hash slots, so under most memory utilizations, KV-Direct has more memory accesses. However, under high memory utilization, cuckoo hashing will cause a large fluctuation in the number of memory accesses for PUT operations.
 
 \label{kvdirect:sec:hashtable-eval}
 
-哈希表设计中有两个自由参数：（1）内联阈值，（2）整个内存空间中哈希索引的比率。
-如图 \ref {kvdirect:fig:optimize_fix_mem} 所示，当哈希索引比率增长时，可以内联存储更多的键值对，从而产生更低的平均内存访问次数。
-图 \ref {kvdirect:fig:optimize_fix_ratio} 显示了随着使用更多内存而增加的内存访问次数。
-
+There are two free parameters in the hash table design: (1) inline threshold, (2) the ratio of hash index in the entire memory space. As shown in Figure \ref {kvdirect:fig:optimize_fix_mem}, as the hash index ratio grows, more key-value pairs can be stored inline, resulting in a lower average number of memory accesses. Figure \ref {kvdirect:fig:optimize_fix_ratio} shows the increased number of memory accesses with the use of more memory.
 
 \begin{figure}[htbp]
-	\subfloat[固定内存利用率 0.5。\label{kvdirect:fig:optimize_fix_mem}]
+	\subfloat[Fixed memory utilization 0.5.\label{kvdirect:fig:optimize_fix_mem}]
 	{\includegraphics[width=.5\textwidth,page=1]{fix_mem.pdf}}
-	\subfloat[固定哈希索引率 0.5。\label{kvdirect:fig:optimize_fix_ratio}]
+	\subfloat[Fixed hash index ratio 0.5.\label{kvdirect:fig:optimize_fix_ratio}]
 	{\includegraphics[width=.5\textwidth,page=1]{fix_ratio.pdf}}
-	\caption{不同内存利用率或哈希索引率下的内存占用。}
+	\caption{Memory occupancy at different memory utilization or hash index ratios.}
 	\label{kvdirect:fig:memory-access-count}
 \end{figure}
 
-如图 \ref {kvdirect:fig:hashline-ratio} 所示，最大内存利用率在哈希索引比率较高时下降，因为可用于动态分配的内存较少。
-因此，为了在给定的内存空间中容纳所有需存储的键值，哈希索引比率具有上限。
-本节选择此上限以获得最小的平均内存访问次数，如图 \ref {kvdirect:fig:hashline-ratio} 中的虚线所示，首先根据目标内存利用率，得到有大的哈希索引比率；然后根据哈希索引比率可以得到理论上 GET 操作查找索引所需的平均内存访问次数。
-
+As shown in Figure \ref {kvdirect:fig:hashline-ratio}, the maximum memory utilization decreases when the hash index ratio is high, because less memory is available for dynamic allocation. Therefore, to accommodate all key-values to be stored in a given memory space, the hash index ratio has an upper limit. This section chooses this upper limit to obtain the minimum average number of memory accesses, as shown by the dashed line in Figure \ref {kvdirect:fig:hashline-ratio}, first according to the target memory utilization, to get a large hash index ratio; then according to the hash index ratio, the average number of memory accesses required for the GET operation to find the index can be theoretically obtained.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.6\textwidth,page=1]{optimize.png}
-	\caption{如何在给定内存利用率需求和键值大小的情况下决定最优哈希索引率。}
+	\caption{How to determine the optimal hash index rate given the memory utilization requirement and key-value size.}
 	\label{kvdirect:fig:hashline-ratio}
 \end{figure}
 
-
-
-
-
-\subsection{Slab 内存分配器}
+\subsection{Slab Memory Allocator}
 \label{kvdirect:sec:slab}
 
-链式哈希槽和非内联键值需要动态内存分配。
-为此，本章选择slab内存分配器 \cite {bonwick1994slab} 来实现每次内存分配和释放的 $O(1)$ 平均内存访问次数。主slab分配器逻辑在主机CPU上运行，并通过PCIe与键值处理器通信。
-Slab分配器将分配大小四舍五入到最接近的2的幂，称为\textit {slab 大小}。
-它为每个可能的slab大小（32，64，\ldots，512字节）和全局 \textit {分配位图}（allocation bitmap）维护\textit {空闲 slab 池}，以帮助将小的空闲slab合并回更大的slab。
-每个空闲slab池是一个\textit {slab 条目}数组，由一个地址字段和一个slab类型字段组成。slab类型字段表示slab条目的大小。
+Chain hash slots and non-inline key-values require dynamic memory allocation. For this, this chapter chooses the slab memory allocator \cite {bonwick1994slab} to achieve $O(1)$ average memory access times for each memory allocation and release. The main slab allocator logic runs on the host CPU and communicates with the key-value processor via PCIe. The slab allocator rounds the allocation size to the nearest power of 2, known as \textit {slab size}. It maintains a \textit {free slab pool} for each possible slab size (32, 64, \ldots, 512 bytes) and a global \textit {allocation bitmap} to help merge small free slabs back into larger slabs. Each free slab pool is an array of \textit {slab entries}, consisting of an address field and a slab type field. The slab type field indicates the size of the slab entry.
 
-可以在网卡上缓存可用的slab池，并与主机内存同步。通过批处理的 PCIe DMA 同步操作，每次分配或释放内存平摊下来只需少于 0.07 次 DMA 操作。
-当一个空闲 slab 池几乎是空的时，需要拆分较大的 slab。
-因为slab类型已经包含在slab条目中，所以在 \textit {slab 分割} 时，slab条目只需从较大的池复制到较小的池，而不需要分割出多个小 slab 条目。
+The available slab pool can be cached on the network card and synchronized with the host memory. Through batch PCIe DMA synchronization operations, each memory allocation or release requires less than 0.07 DMA operations on average. When a free slab pool is almost empty, it is necessary to split larger slabs. Because the slab type is already included in the slab entry, during \textit {slab splitting}, slab entries only need to be copied from the larger pool to the smaller pool, without needing to split into multiple small slab entries.
 
-在重新分配时，slab分配器需要检查释放的slab是否可以与其邻居合并，需要至少一次读取和写入分配位图。
-受垃圾收集的启发，主机上的 \textit {懒惰 slab 合并} 在一个slab池几乎为空，并且没有更大的slab池有足够的slab来拆分时，批量合并空闲slab。
-
+During reallocation, the slab allocator needs to check whether the released slab can be merged with its neighbors, requiring at least one read and write to the allocation bitmap. Inspired by garbage collection, \textit {lazy slab merging} on the host merges free slabs in bulk when a slab pool is almost empty and there are not enough slabs in a larger slab pool to split.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=.8\textwidth,page=1]{figure/cropped_slab.pdf}
-	\caption{Slab 内存分配器。}
+	\caption{Slab memory allocator.}
 	\label{kvdirect:fig:slab}
 \end{figure}
 
-如图 \ref {kvdirect:fig:slab} 所示，对于每个slab大小，网卡上的slab缓存使用两个双端堆栈（double-end stack）与主机DRAM同步。
-网卡端的双端堆栈（图 \ref {kvdirect:fig:slab} 中的左侧）左端由分配器出栈、解除分配器入栈，右端通过DMA对应的​​主机端双端堆栈与左端同步。
-网卡监视网卡堆栈的大小，并根据高水位线和低水位线与主机堆栈同步。
-主机守护进程定期检查主机端双端堆栈的大小。如果高于高水位线，则触发 slab 合并；低于低水位线时，会触发 slab 分裂。
-因为双端堆栈的每一端都是仅由网卡或主机之一独占访问的，并且在移动指针之前先搬移数据，所以只要双端堆栈中的数据量大于保护阈值，就不会发生竞争条件。
-
+As shown in Figure \ref {kvdirect:fig:slab}, for each slab size, the slab cache on the network card uses two double-end stacks to synchronize with the host DRAM. The left end of the network card's double-end stack (the left side in Figure \ref {kvdirect:fig:slab}) is popped by the allocator and pushed by the deallocator, and the right end synchronizes with the corresponding host end double-end stack via DMA. The network card monitors the size of the network card stack and synchronizes with the host stack according to the high watermark and low watermark. The host daemon periodically checks the size of the host end double-end stack. If it is higher than the high watermark, it triggers slab merging; if it is lower than the low watermark, it triggers slab splitting. Because each end of the double-end stack is exclusively accessed by either the network card or the host, and data is moved before moving the pointer, race conditions will not occur as long as the amount of data in the double-end stack is greater than the protection threshold.
 
 \label{kvdirect:sec:slab-eval}
 
+The communication overhead of the slab memory allocator comes from the network card accessing the available slab queue in the host memory. In this chapter, each slab entry is 5 bytes, the DMA granularity is 64 bytes, so the amortized DMA overhead for each slab operation is $5/64$ DMA operations. In addition, newly released slab slots on the network card can often be reused by subsequent allocation operations on the network card, so in many cases, no DMA operation is needed at all. To maintain a maximum throughput of 180M operations per second, in the worst case, 180M slab entries need to be transferred, consuming 720 MB/s PCIe throughput, which is 5% of the total PCIe throughput of the network card.
 
-Slab内存分配器的通信开销来自网卡访问主机内存中的可用slab队列。
-在本章中，每个slab条目是5个字节，DMA粒度是64个字节，因此每个slab操作的平摊DMA开销是$5/64$次DMA操作。此外，网卡上新释放的 slab 槽往往可被网卡后续的分配操作重新使用，因此很多情况下根本不需要 DMA 操作。
-为了维持每秒180M操作的最大吞吐量，在最坏的情况下，需要传输180M个slab条目，消耗720 MB/s PCIe吞吐量，即网卡的总PCIe吞吐量的5\%。
+The computational overhead of the slab memory allocator comes from slab splitting and merging on the host CPU. Fortunately, they are not often called. For workloads with a stable key-value size distribution, newly released slab slots are reused by subsequent allocations, so they do not trigger splitting and merging.
 
-Slab内存分配器的计算开销来自主机CPU上的slab拆分和合并。
-幸运的是，它们并不经常被调用。
-对于具有稳定键值大小分布的工作负载，新释放的slab槽由后续分配重用，因此不会触发拆分和合并。
+Slab splitting requires moving continuous slab entries from one slab queue to another. When the workload switches from large key-values to small key-values, in the worst case, the CPU needs to move 90M slab entries per second, which only takes up 10% of the core, as it is just continuous memory copying.
 
-Slab 拆分需要将连续的slab条目从一个slab队列移动到另一个slab队列。当工作负载从大键值转换到小键值时，在最坏的情况下，CPU需要每秒移动90M个slab 条目，这只占核心的10％，因为它只是连续的内存复制。
-
-将可用slab条目合并到较大的slab条目是相当耗时的任务，因为这个垃圾回收过程需要用 slab 条目的地址填充分配位图，因此需要随机存储器访问。
-要对可用slab条目的地址进行排序并合并连续的slab，基数排序 \cite {satish2010fast} 比简单的位图具有更好的多核可扩放性。
-如图 \ref {kvdirect:fig:slab-garbage-collection} 所示，将16 GiB向量中的所有40亿个空闲 slab 槽位合并，在一个 CPU 核上需要30秒，而在32个核上使用基数排序仅需1.8秒 \cite{satish2010fast}。
-虽然空闲 slab 槽位的垃圾收集需要几秒钟，但它在后台运行而不会停止 slab 分配器，并且实际上仅在工作负载从小键值转换到大键值时触发。
-
+Merging available slab entries into larger slab entries is a fairly time-consuming task, as this garbage collection process needs to fill the allocation bitmap with the addresses of slab entries, thus requiring random memory access. To sort the addresses of available slab entries and merge continuous slabs, radix sort \cite {satish2010fast} has better multi-core scalability than a simple bitmap. As shown in Figure \ref {kvdirect:fig:slab-garbage-collection}, merging all 4 billion free slab slots in a 16 GiB vector takes 30 seconds on a single CPU core, but only 1.8 seconds on 32 cores using radix sort \cite{satish2010fast}. Although garbage collection of free slab slots takes a few seconds, it runs in the background without stopping the slab allocator, and in fact only triggers when the workload switches from small key-values to large key-values.
 
 \begin{figure}[t]
 	\centering
 	\includegraphics[width=0.6\textwidth]{slab-gc.pdf}
-	\caption{合并 40 亿个 slab 槽位的时间开销。}
+	\caption{Time overhead of merging 4 billion slab slots.}
 	\label{kvdirect:fig:slab-garbage-collection}
 \end{figure}
 
-
-
-
-\subsection{乱序执行引擎}
+\subsection{Out-of-Order Execution Engine}
 \label{kvdirect:sec:ooo}
 
-在键值处理器中，相同键的两个键值操作之间的依赖性将导致数据危险（data hazard）和流水线暂停（pipeline stall）。
-在单键原子操作（single-key atomics）中，这个问题更为显著，因为其中所有操作都是有依赖的，必须逐个处理。这限制了原子操作的吞吐量。
-本节借用计算机体系结构领域中\textit{动态调度}的概念，并实现 \textit {保留站}（reservation station）来跟踪所有正在进行的键值操作及其 \textit {执行上下文}。
+In the key-value processor, the dependency between two key-value operations with the same key can lead to data hazards and pipeline stalls. This problem is more pronounced in single-key atomics, where all operations are dependent and must be processed one by one, limiting the throughput of atomic operations. This section borrows the concept of \textit{dynamic scheduling} from the field of computer architecture and implements a \textit{reservation station} to track all ongoing key-value operations and their \textit{execution contexts}.
 
-为了饱和利用PCIe、DRAM带宽和处理流水线，需要多达256个并发执行的键值操作。
-但是，并行比较256个16字节键将占用FPGA的40\%逻辑资源。
-为了避免并行比较，本节将键值操作存储在片上BRAM中的小哈希表中，由键的哈希索引。
-相同哈希值的键值操作被视为具有依赖关系。
-不同的键可能具有相同的哈希值，因此可能存在误报的依赖关系，但它永远不会错过依赖关系。
-具有相同哈希的键值操作组织成链表结构，由键值处理器顺序处理。
-哈希冲突会增加误报的依赖关系，降低键值处理效率，因此保留站包含1024个哈希槽，使哈希冲突可能性低于25\%。
+To fully utilize PCIe, DRAM bandwidth, and processing pipelines, up to 256 concurrent key-value operations are needed. However, parallel comparison of 256 16-byte keys would occupy 40\% of the FPGA's logical resources. To avoid parallel comparison, this section stores key-value operations in a small hash table in on-chip BRAM, indexed by the hash of the key. Key-value operations with the same hash value are considered to have dependencies. Different keys may have the same hash value, so there may be false dependencies, but it will never miss dependencies. Key-value operations with the same hash are organized into a linked list structure, processed sequentially by the key-value processor. Hash collisions increase false dependencies and reduce key-value processing efficiency, so the reservation station includes 1024 hash slots, keeping the possibility of hash collisions below 25\%.
 
-保留站不仅保存因依赖关系而暂时挂起的操作，还缓存了最近被访问的键值以便进行 \textit {数据转发}（data forwarding）。
-当主处理流水线完成键值操作时，其结果返回给客户端，最新值被转发到保留站。
-保留站逐个检查相同哈希槽中的待定操作，立即执行具有匹配键的操作并从保留站移除。
-对于原子操作，计算在专用执行引擎中执行。
-对于写入操作，将更新缓存的值。
-执行结果直接返回给客户端。
-在扫描完成依赖关系链表后，如果保留站缓存的值被更新了，则向主处理流水线发出PUT操作，以将高速缓存写回到主存。
-这种数据转发和快速执行路径使单键原子操作能够在每个时钟周期内处理一次操作 \footnote{本章中 FPGA 键值处理器的时钟频率是 180 MHz，因此吞吐量可达 180 M op/s。}，消除了频繁被访问的键的线头阻塞（head-of-line blocking）。
-保留站确保了数据一致性，因为在同一个键上没有两个操作可以在主处理流水线中同时进行。
-图 \ref{kvdirect:fig:ooo-mem-access} 描述了乱序执行引擎的结构。
+The reservation station not only saves operations temporarily suspended due to dependencies but also caches recently accessed key-values for \textit{data forwarding}. When the main processing pipeline completes a key-value operation, its result is returned to the client, and the latest value is forwarded to the reservation station. The reservation station checks pending operations in the same hash slot one by one, immediately executes operations with matching keys, and removes them from the reservation station. For atomic operations, calculations are performed in a dedicated execution engine. For write operations, the cached value is updated. The execution result is returned directly to the client. After scanning the dependency linked list, if the value cached in the reservation station has been updated, a PUT operation is issued to the main processing pipeline to write the cache back to the main memory. This data forwarding and fast execution path allows single-key atomic operations to process an operation per clock cycle\footnote{The clock frequency of the FPGA key-value processor in this chapter is 180 MHz, so the throughput can reach 180 M op/s.}, eliminating head-of-line blocking for frequently accessed keys. The reservation station ensures data consistency, as no two operations on the same key can proceed simultaneously in the main processing pipeline. Figure \ref{kvdirect:fig:ooo-mem-access} describes the structure of the out-of-order execution engine.
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=.9\textwidth,page=1]{dynamic_scheduler.PNG}
-	\caption{乱序执行引擎。}
+	\caption{Out-of-order execution engine.}
 	\label{kvdirect:fig:ooo-mem-access}
 \end{figure}
 
-
 \label{kvdirect:sec:ooo-eval}
 
-下面评估乱序执行的有效性。
-使用的工作负载包括单键原子操作和长尾分布。
-对比方法是遇到键冲突就暂停流水线的简单方法。
-使用单边RDMA和双边RDMA \cite {kalia2016design} 吞吐量作为基线。
-
+The following evaluates the effectiveness of out-of-order execution. The workloads used include single-key atomics and long-tail distribution. The comparison method is a simple method that stalls the pipeline when a key conflict is encountered. The throughput of one-sided RDMA and two-sided RDMA \cite{kalia2016design} is used as a baseline.
 
 \begin{figure}[htbp]
 	\centering
-	\subfloat[原子操作。\label{kvdirect:fig:ooo-atomic}]
+	\subfloat[Atomic operations.\label{kvdirect:fig:ooo-atomic}]
 	{\includegraphics[width=.5\textwidth,page=1]{ooo_atomic.pdf}}
-	\subfloat[长尾负载。\label{kvdirect:fig:ooo-longtail}]
+	\subfloat[Long-tail load.\label{kvdirect:fig:ooo-longtail}]
 	{\includegraphics[width=.5\textwidth,page=1]{ooo_long-tail.pdf}}
-	\caption{乱序执行引擎的效率。}
+	\caption{Efficiency of the out-of-order execution engine.}
 	\label{kvdirect:fig:ooo-eval}
 \end{figure}
 
-如果没有乱序执行引擎，原子操作需要等待网卡中的PCIe延迟和处理延迟，在此期间无法执行对同一键的后续原子操作。
-如图 \ref{kvdirect:fig:ooo-atomic}，暂停流水线方法的单键原子操作吞吐量为 0.94~Mops，与使用商用 RDMA 网卡测量的 2.24~Mops 接近 \cite {kalia2016design}。
-商用 RDMA 网卡的更高吞吐量可归因于其更高的时钟频率和更低的处理延迟。
-利用乱序执行，KV-Direct 的单键原子操作可达峰值吞吐量，即每个时钟周期处理一次键值操作。
-在 MICA \cite {lim2014mica} 中，单键原子吞吐量受限于单个 CPU 核的处理能力，无法随多核扩放。
-事实上，原子增加（atomic increment）操作的性能可以随多核扩放 \cite {kalia2016design}，但它依赖于原子操作之间的可交换性，因此不适用于不可交换的原子操作，如比较-交换（compare and swap）。
+Without the out-of-order execution engine, atomic operations have to wait for PCIe latency and processing latency in the network card, during which subsequent atomic operations on the same key cannot be executed. As shown in Figure \ref{kvdirect:fig:ooo-atomic}, the throughput of single-key atomic operations with the pipeline stalling method is 0.94~Mops, close to the 2.24~Mops measured using a commercial RDMA network card \cite{kalia2016design}. The higher throughput of the commercial RDMA network card can be attributed to its higher clock frequency and lower processing latency. With out-of-order execution, KV-Direct's single-key atomic operations can reach peak throughput, processing one key-value operation per clock cycle. In MICA \cite{lim2014mica}, the throughput of single-key atomics is limited by the processing capability of a single CPU core and cannot scale with multiple cores. In fact, the performance of atomic increment operations can scale with multiple cores \cite{kalia2016design}, but it relies on the commutativity between atomic operations, so it is not applicable to non-commutative atomic operations, such as compare-and-swap.
 
-利用乱序执行，单键原子吞吐量提高了191倍，达到了180~Mops的时钟频率极限。
-当原子操作在多个键之间均匀分布时，单边RDMA、双边RDMA和没有乱序执行的 KV-Direct 吞吐量随着键的数量线性增长，但仍然与 KV-Direct 使用乱序执行后的最佳吞吐量有很大差距。
+By utilizing out-of-order execution, the single-key atomic throughput has increased by 191 times, reaching the clock frequency limit of 180 Mops. When atomic operations are evenly distributed among multiple keys, the throughput of single-sided RDMA, double-sided RDMA, and KV-Direct without out-of-order execution grows linearly with the number of keys, but it still has a significant gap compared to the best throughput of KV-Direct using out-of-order execution.
 
-图 \ref {kvdirect:fig:ooo-longtail} 显示了长尾工作负载下的吞吐量。
-当PUT操作发现流水线中有任何正在进行的键相同的操作时，流水线会暂停。
-长尾工作负载具有多个访问非常频繁的键，因此具有相同键的两个操作很可能几乎同时到达。
-当PUT操作占所有操作的比例更高时，具有相同键的两个操作中更有可能至少一个是PUT操作，从而触发流水线暂停。
+Figure \ref {kvdirect:fig:ooo-longtail} shows the throughput under long-tail workloads. When a PUT operation finds any ongoing operation with the same key in the pipeline, the pipeline will pause. Long-tail workloads have multiple keys that are accessed very frequently, so two operations with the same key are likely to arrive almost simultaneously. When the proportion of PUT operations in all operations is higher, it is more likely that at least one of the two operations with the same key is a PUT operation, which triggers the pipeline to pause.
 
-
-
-
-
-\subsection{DRAM 负载分配器}
+\subsection{DRAM Load Balancer}
 \label{kvdirect:sec:dram-cache}
 
-为了进一步减轻PCIe的负担，本节在PCIe和网卡板载DRAM之间调度内存访问。
-网卡 DRAM具有4~GiB容量和12.8~GB/s的吞吐量，比主机DRAM（64~GiB）上的键值存储存储小一个数量级，并且比PCIe链路（14~GB / s）稍慢。
-一种方法是将固定部分的键值存储放入网卡 DRAM中。但是，网卡DRAM太小，只能容纳整个键值存储的一小部分。
-另一种方法是使用网卡 DRAM作为主机内存的缓存，但由于网卡 DRAM的吞吐量有限（甚至比 PCIe 的吞吐量更低），吞吐量甚至会降低。
-
+To further alleviate the burden of PCIe, this section schedules memory access between PCIe and the onboard DRAM of the network card. The network card DRAM has a capacity of 4 GiB and a throughput of 12.8 GB/s, which is an order of magnitude smaller than the key-value storage on the host DRAM (64 GiB) and slightly slower than the PCIe link (14 GB/s). One method is to put a fixed part of the key-value storage into the network card DRAM. However, the network card DRAM is too small to hold only a small part of the entire key-value storage. Another method is to use the network card DRAM as a cache for the host memory, but the throughput may even decrease due to the limited throughput of the network card DRAM (even lower than the PCIe throughput).
 
 \begin{figure}[htbp]
 	\centering
 	\includegraphics[width=0.8\textwidth,page=1]{load_balancer.PNG}
-	\caption{DRAM 负载分配器。}
+	\caption{DRAM load balancer.}
 	\label{kvdirect:fig:cache}
 \end{figure}
 
-
-本节采用混合解决方案，将DRAM用作主机内存中固定部分键值存储的缓存，如图 \ref {kvdirect:fig:cache} 所示。
-可缓存部分由存储器地址的哈希确定，哈希的粒度为64字节（DRAM 访存粒度）。
-选择哈希函数，使得哈希索引和动态分配的存储器中的地址具有相同的缓存概率。
-整个键值存储内存中可缓存内存所占的部分称为\textit {负载分配比例}（$ l $）。
-如果负载分配比例 $ l $ 增大，更大比例的负载将被分配给板载DRAM，并且缓存命中率 $h(l)$ 将增加。
-为了平衡PCIe和板载DRAM上的负载，应优化负载调度比$ l $，使得：
+This section adopts a hybrid solution, using DRAM as a cache for a fixed part of the key-value storage in the host memory, as shown in Figure \ref {kvdirect:fig:cache}. The cacheable part is determined by the hash of the memory address, with a granularity of 64 bytes (DRAM memory access granularity). Choose a hash function so that the hash index and the address in the dynamically allocated memory have the same cache probability. The part of the cacheable memory in the entire key-value storage memory is called the \textit {load distribution ratio} ($ l $). If the load distribution ratio $ l $ increases, a larger proportion of the load will be allocated to the onboard DRAM, and the cache hit rate $h(l)$ will increase. To balance the load on PCIe and onboard DRAM, the load scheduling ratio $ l $ should be optimized so that:
 $$\frac{l}{tput_{DRAM}} = \frac{(1-l) + l \cdot (1-h(l))}{tput_{PCIe}}$$
 
-特别的，在均匀（uniform）负载下，令 $k$ 是板上 DRAM 大小和主机键值 存储大小之比，则缓存命中率 $h(l) = \frac{\textnormal{cache size}}{\textnormal{cache-able memory size}} = \frac{k}{l}$。
-当 $k \leq l$ 时，均匀负载下的缓存并不高效。
-在长尾负载（Zipf 分布）下，设 $n$ 是键值的总数，则大致上 $h(l) = \frac{\log (\textnormal{缓存大小})}{\log (\textnormal{可缓存部分大小})} = \frac{\log (kn)}{\log (ln)}$，当 $k \leq l$ 时。
-在长尾工作负载下，1G 的键值存储中 1M 缓存的缓存命中概率高达0.7。
-最优的 $l$ 可以得出数值解，这将在第 \ref{kvdirect:sec:different-nic} 节讨论。
+Specifically, under uniform load, let $k$ be the ratio of the size of the onboard DRAM to the size of the host key-value storage, then the cache hit rate $h(l) = \frac{\textnormal{cache size}}{\textnormal{cache-able memory size}} = \frac{k}{l}$. When $k \leq l$, the cache under uniform load is not efficient. Under long-tail load (Zipf distribution), let $n$ be the total number of key-values, then roughly $h(l) = \frac{\log (\textnormal{cache size})}{\log (\textnormal{cache-able part size})} = \frac{\log (kn)}{\log (ln)}$, when $k \leq l$. Under long-tail workloads, the cache hit probability of 1M cache in 1G key-value storage is as high as 0.7. The optimal $l$ can be obtained numerically, which will be discussed in section \ref{kvdirect:sec:different-nic}.
 
+A technical challenge is to store metadata in the DRAM cache. For each cache line of 64 bytes, 4 address bits and a dirty flag bit of metadata are required. Because all key-value storage is accessed by the network card, no cache valid bit is needed. To store the 5 metadata bits of each cache line, if the cache line is expanded to 65 bytes, the DRAM performance will be reduced due to unaligned access; if the metadata is stored elsewhere, the number of memory accesses will double. Instead, this paper uses the spare bits in ECC (Error Correction Code) DRAM for metadata storage. ECC DRAM usually has 8 ECC bits for every 64 bits of data. In fact, to correct a one-bit error in 64 bits of data, only 7 additional check bits are needed. The 8th ECC bit is a parity bit used to detect double-bit errors. When accessing DRAM with a granularity of 64 bytes and in an aligned manner, each 64B data has 8 parity check bits. This paper increases the check granularity of parity from 64 data bits to 256 data bits, so double-bit errors can still be detected. This saves 6 additional bits that can be used to save address bits and dirty flag metadata.
 
-
-一个技术挑战是在DRAM高速缓存中存储元数据。
-每64字节的一个缓存行（cache line），需要4个地址位和一个脏标志位的元数据。
-因为所有键值存储都由网卡专门访问，不需要缓存有效位。
-为了存储每个高速缓存行的5个元数据位，如果将高速缓存行扩展到65个字节，会由于非对齐访问而降低DRAM性能；如果将元数据保存在别处，将使内存访问次数倍增。
-相反，本文利用ECC（纠错编码） DRAM中的备用位来进行元数据存储。
-ECC DRAM通常每64位数据具有8个ECC位。
-事实上，使用汉明码来纠正64位数据中的一位错误，只需要7个额外的校验位。
-第8个ECC位是用于检测双位错误的奇偶校验位。
-当以64字节粒度和对齐方式访问DRAM时，每64B数据有8个奇偶校验位。
-本文将奇偶校验的检查粒度从64个数据位增加到256个数据位，因此仍然可以检测到双位错误。这节约出了6个额外的位，可以用于保存地址位和脏标志这些元数据。
-
-
-图 \ref {kvdirect:fig:cache-tput} 显示了DRAM负载调度吞吐量相比仅使用PCIe的改进。
-在均匀工作负载下，DRAM的缓存效果可以忽略不计，因为它的大小仅为主机键值存储内存的6\%。
-在长尾工作负载下，大约30\%的内存访问由DRAM缓存提供。 总的来说，在95\%和100\% GET 情况下，总吞吐量达到了180 Mops的时钟频率限制。
-但是，如果简单地将DRAM用作高速缓存，则吞吐量将反而降低，因为DRAM吞吐量低于PCIe吞吐量。
-
+Figure \ref {kvdirect:fig:cache-tput} shows the improvement in DRAM load scheduling throughput compared to using only PCIe. Under uniform workloads, the caching effect of DRAM can be ignored because its size is only 6% of the host key-value storage memory. Under long-tail workloads, about 30% of memory accesses are provided by DRAM cache. In general, in the case of 95% and 100% GET, the total throughput reaches the clock frequency limit of 180 Mops. However, if DRAM is simply used as a cache, the throughput will decrease because the DRAM throughput is lower than the PCIe throughput.
 
 \begin{figure}[htbp]
 	\centering
 	{\includegraphics[width=.5\textwidth,page=1]{load_balancer.pdf}}
-	\caption{负载分派下的 DMA 吞吐量（固定负载分派比例为 0.5）。}
+	\caption{DMA throughput under load distribution (fixed load distribution ratio at 0.5).}
 	\label{kvdirect:fig:cache-tput}
 \end{figure}
 
+\subsection{Vector Operation Decoder}
 
+The entire key-value processor design views batch processing as a general principle.
+This includes batch fetching multiple hash slots in a bucket, batch synchronization of idle slab queues with host memory, lazy slab splitting and merging, and reservation stations batch processing dependent key-value operations along the linked list.
+Batch processing improves performance by spreading control plane overhead across multiple effective data plane payloads.
 
-\subsection{向量操作译码器}
+Compared to PCIe, the network is a more scarce resource, with lower bandwidth (5~GB / s) and higher latency (2~$\mu$s).
+Ethernet RDMA write packets have 88 bytes of header and padding overhead, while PCIe TLP packets only have 26 bytes of overhead.
+This is why previous FPGA-based key-value stores \cite{blott13hotcloud,blott2015scaling} did not saturate PCIe bandwidth, despite their hash table design being less efficient than KV-Direct.
+To fully utilize network bandwidth, \textit {client batching} is required in two aspects: batch processing multiple key-value operations in a single packet, and supporting vector operations for more compact representation. For this, a decoder is implemented in the key-value engine to decompress multiple key-value operations from a single RDMA packet.
+Observing that many key-values have the same size or repeated values, the key-value format includes two flag bits to allow copying key and value sizes, or values of previous key-values in the packet.
+Fortunately, many important workloads (\textit {such as graph traversal, parameter servers}) can be batched for key-value operations.
+Looking forward, if higher bandwidth networks can be used, batching will not be necessary.
 
-整个键值处理器设计将批处理视为通用原则。
-这包括在一个存储桶中批量获取多个哈希槽，空闲slab队列与主机内存的批量同步，懒惰slab拆分和合并，以及保留站对有依赖键值操作沿链表批量处理。
-批处理通过将控制平面开销分摊到多个数据平面的有效负载来提高性能。
-
-与PCIe相比，网络是一种更加稀缺的资源，具有更低的带宽（5~GB / s）和更高的延迟（2~$\mu$s）。
-以太网上的RDMA写数据包有88字节的包头（header）和填充（padding）开销，而PCIe TLP数据包只有26字节的开销。
-这就是以前基于FPGA的键值存储 \cite{blott13hotcloud,blott2015scaling} 没有使PCIe带宽饱和的原因，尽管它们的哈希表设计效率低于KV-Direct。
-为了充分利用网络带宽，需要在两个方面进行 \textit {客户端批处理}：在一个数据包中批量处理多个键值操作，并支持向量操作以实现更紧凑的表示。为此，在键值引擎中实现了一个解码器，从单个RDMA数据包中解压缩多个键值操作。
-观察到许多键值具有相同的大小或重复值，键值格式包括两个标志位以允许复制键和值大小，或者包中先前键值的值。
-幸运的是，许多重要的工作负载（\textit {例如图遍历，参数服务器}）的键值操作是可以批量化的。
-展望未来，如果可以使用更高带宽的网络，则无需批量处理。
-
-
-为了评估KV-Direct中向量操作的效率，
-表 \ref {kvdirect:tab:vec_throughput} 将原子向量增加（vector increment）的吞吐量与两种替代方法进行比较：
-（1）如果每个元素都存储为一个不同的键，则瓶颈是传输键值操作的网络。
-（2）如果整个向量存储为一个大的不透明值，由客户端取回处理，则通过网络发送向量的开销也很高。
-此外，表 \ref {kvdirect:tab:vec_throughput} 中的两个替代方案不能确保多个客户端同时访问时，向量内部的一致性。 添加客户端间的同步会产生进一步的开销。
-
+To evaluate the efficiency of vector operations in KV-Direct,
+Table \ref {kvdirect:tab:vec_throughput} compares the throughput of atomic vector increments with two alternatives:
+(1) If each element is stored as a different key, the bottleneck is the network transmitting key-value operations.
+(2) If the entire vector is stored as a large opaque value, retrieved and processed by the client, the overhead of sending the vector over the network is also high.
+In addition, the two alternatives in Table \ref {kvdirect:tab:vec_throughput} cannot ensure consistency within the vector when accessed by multiple clients simultaneously. Adding synchronization between clients would incur further overhead.
 
 \begin{table}[htbp]
 	\centering
-	\caption{向量操作的吞吐量 (GB/s)。}
+	\caption{Throughput of vector operations (GB/s).}
 	\label{kvdirect:tab:vec_throughput}
 	\small
 		\begin{tabular}{|l|r|r|r|r|r|}
 			\hline
-			向量大小 (字节)              & 64    & 128   & 256   & 512   & 1024  \\ \hline
-			向量更新（有返回）    & 11.52 & 11.52 & 11.52 & 11.52 & 11.52 \\ \hline
-			向量更新（无返回） & 4.37  & 4.53  & 4.62  & 4.66  & 4.68  \\ \hline
-			每个元素一个键         & 2.09  & 2.09  & 2.09  & 2.09  & 2.09  \\ \hline
-			取回客户端处理             & 0.03  & 0.06  & 0.12  & 0.24  & 0.46  \\ \hline
+			Vector size (bytes)              & 64    & 128   & 256   & 512   & 1024  \\ \hline
+			Vector update (with return)    & 11.52 & 11.52 & 11.52 & 11.52 & 11.52 \\ \hline
+			Vector update (no return) & 4.37  & 4.53  & 4.62  & 4.66  & 4.68  \\ \hline
+			Each element a key         & 2.09  & 2.09  & 2.09  & 2.09  & 2.09  \\ \hline
+			Retrieve for client processing             & 0.03  & 0.06  & 0.12  & 0.24  & 0.46  \\ \hline
 		\end{tabular}
 \end{table}
 
-
-
-
-KV-Direct客户端在网络数据包中打包键值操作，以降低数据包头的开销。
-图 \ref {kvdirect:fig:eval-network-batching} 表明，网络批处理可将网络吞吐量提高4倍，同时保持网络延迟低于3.5~$\mu$s。
-
+KV-Direct clients package key-value operations in network packets to reduce packet header overhead.
+Figure \ref {kvdirect:fig:eval-network-batching} shows that network batching can increase network throughput by 4 times, while keeping network latency below 3.5~$\mu$s.
 
 \begin{figure}[htbp]
 	\centering
-	\subfloat[吞吐量。\label{kvdirect:fig:network-batching-bw}]
+	\subfloat[Throughput.\label{kvdirect:fig:network-batching-bw}]
 	{\includegraphics[width=.5\textwidth,page=1]{net_batching_bw.pdf}}
-	\subfloat[延迟。\label{kvdirect:fig:network-batching-lat}]
+	\subfloat[Latency.\label{kvdirect:fig:network-batching-lat}]
 	{\includegraphics[width=.5\textwidth,page=1]{net_batching_lat.pdf}}
-	\caption{网络批量化的效率。}
+	\caption{Efficiency of network batching.}
 	\label{kvdirect:fig:eval-network-batching}
 \end{figure}
 
@@ -457,10 +287,10 @@ KV-Direct客户端在网络数据包中打包键值操作，以降低数据包�
 \label{kvdirect:sec:congestion-avoidance}
 
 In addition to throughput, another important factor is latency.
-From the client's perspective, the 键值 processor is a path with multiple bottlenecks and buffers, \eg, PCIe and DRAM access.
-If all buffers in the 键值 processor are filled up, the GET latency would exceed 10~$\mu$s.
-To mitigate the bufferbloat problem, we implement a congestion avoidance logic to limit the number of in-flight 键值 operations \textit{inside the 键值 processor}.
-The 键值 processor maintains a \textit{键值 operation window} and leverages credit-based flow control mechanism in RDMA to back-pressure 键值存储 clients.
-To adapt 键值 operation window size to the workload, we measure the running average of 键值 processing delay and adjust the window size according to TCP Vegas congestion avoidance algorithm~\cite{brakmo1995tcp}.
+From the client's perspective, the key-value processor is a path with multiple bottlenecks and buffers, \eg, PCIe and DRAM access.
+If all buffers in the key-value processor are filled up, the GET latency would exceed 10~$\mu$s.
+To mitigate the bufferbloat problem, we implement a congestion avoidance logic to limit the number of in-flight key-value operations \textit{inside the key-value processor}.
+The key-value processor maintains a \textit{key-value operation window} and leverages credit-based flow control mechanism in RDMA to back-pressure key-value storage clients.
+To adapt key-value operation window size to the workload, we measure the running average of key-value processing delay and adjust the window size according to TCP Vegas congestion avoidance algorithm~\cite{brakmo1995tcp}.
 %We use delay as the congestion signal instead of ECN, because the queues whose sizes are hard to measure.
 }

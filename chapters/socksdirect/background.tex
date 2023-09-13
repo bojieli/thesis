@@ -1,8 +1,8 @@
-\section{背景}
+\section{Background}
 \label{socksdirect:sec:background}
 
 
-\subsection{Linux 套接字简介}
+\subsection{Introduction to Linux Sockets}
 
 %\begin{figure}[t]
 %	\centering
@@ -33,9 +33,11 @@
 %	\label{socksdirect:fig:socket-comparison}
 %\end{figure}
 
-套接字（socket）是应用程序，容器和主机之间的标准通信原语。
-图 \ref{socksdirect:fig:socket-pseudo-code} 示意了使用套接字原语的典型服务器应用程序的伪代码。首先，服务器创建一个套接字文件描述符 \texttt{lfd} 用于监听端口、接收新连接，并设置为非阻塞以便异步处理。然后创建一个事件文件描述符 \texttt{efd} 用于接收新连接事件和各个连接发送接收数据的事件。
-接下来进入事件循环，对每个接收到的事件，如果是新连接，就调用 \texttt{accept} 接收之，并加入事件监视；如果是已有连接上有数据到达，就接收该连接上的所有数据（因为有接收缓冲区大小限制，一次 \texttt{recv} 可能接收不完）；如果对端已经准备好接收（即接收缓冲区有空闲空间），就将待发送的数据发送出去。
+Sockets are the standard communication primitives among applications, containers, and hosts. Figure \ref{socksdirect:fig:socket-pseudo-code} illustrates the pseudocode of a typical server application using socket primitives. First, the server creates a socket file descriptor \texttt{lfd} for listening to ports, receiving new connections, and sets it to non-blocking for asynchronous processing. Then it creates an event file descriptor \texttt{efd} for receiving new connection events and events of data transmission on each connection. 
+
+Next, it enters the event loop. For each received event, if it is a new connection, it calls \texttt{accept} to accept it and adds it to event monitoring. If data arrives on an existing connection, it receives all data on that connection (because of the size limit of the receive buffer, a single \texttt{recv} may not receive all data). If the peer is ready to receive (i.e., the receive buffer has free space), it sends out the data to be sent.
+
+The translation of your document is as follows:
 
 \begin{figure}[htbp]
 \small
@@ -71,497 +73,253 @@ while (true) { // main event loop
 }
 \end{lstlisting}
 
-\caption{典型套接字服务器应用程序的伪代码，显示最重要的套接字操作。 套接字连接是由整数\emph {FD}（文件描述符）标识的FIFO字节流通道。 Linux使用就绪驱动的I/O多路复用模型，其中操作系统告诉应用程序哪些文件描述符已准备好接收或发送，然后应用程序可以准备缓冲区并发出套接字操作。}
+\caption{Pseudocode of a typical socket server application, illustrating the most crucial socket operations. Socket connections are identified by the integer \emph {FD} (file descriptor), a FIFO byte stream channel. Linux employs a readiness-driven I/O multiplexing model, where the operating system informs the application which file descriptors are ready to receive or send, and then the application can prepare the buffer and execute socket operations.}
 \label{socksdirect:fig:socket-pseudo-code}
 \end{figure}
 
-现代操作系统中的TCP套接字通常具有三个功能:（1）寻址，找到并连接到另一个应用程序；（2）提供可靠且有序的通信通道，由整数 \emph {文件描述符}（File Descriptor）标识；（3）查询来自多个通道的事件，例如 poll 和 epoll。大多数Linux应用程序使用准备驱动（readiness-driven）的 I/O 多路复用模型，即操作系统告诉应用程序哪些文件描述符已准备好接收或发送，然后应用程序可以准备缓冲区并发出接收或发送操作。
+TCP sockets in contemporary operating systems typically serve three functions: (1) addressing, locating, and connecting to another application; (2) providing a reliable and ordered communication channel, identified by the integer \emph {file descriptor}; (3) polling events from multiple channels, such as poll and epoll. Most Linux applications utilize a readiness-driven I/O multiplexing model, that is, the operating system informs the application which file descriptors are ready to receive or send, and then the application can prepare the buffer and initiate receive or send operations.
 
-
-
-\subsection{Linux 套接字中的开销}
+\subsection{Overhead in Linux Sockets}
 \label{socksdirect:subsec:motivation}
 
+Modern data center networks have microsecond latency and tens of Gbps throughput. However, traditional Linux sockets are implemented in the operating system kernel space with shared data structures, making sockets a well-known bottleneck for communication-intensive applications running on multiple hosts \cite {barroso2017attack}. In addition to inter-host communication, microservices and containers on the same host often communicate with each other, making intra-host socket communication increasingly important in the cloud era. Under stress testing, applications such as Nginx~ \cite {reese2008nginx}, Memcached~ \cite {fitzpatrick2004distributed} and Redis~ \cite {carlson2013redis} consume 50\% to 90\% of CPU time in the kernel, mainly for handling TCP socket operations \cite{jeong2014mtcp}.
 
-现代数据中心网络具有微秒级延迟和数十Gbps吞吐量。 但是，传统的Linux套接字是在具有共享数据结构的操作系统内核空间中实现的，这使得套接字成为在多个主机上运行的通信密集型应用程序众所周知的瓶颈 \cite {barroso2017attack}。 除了主机间通信之外，同一主机上的微服务和容器经常相互通信，使得主机内套接字通信在云时代变得越来越重要。 在压力测试下，Nginx~ \cite {reese2008nginx}，Memcached~ \cite {fitzpatrick2004distributed} 和Redis~ \cite {carlson2013redis} 等应用程序在内核中消耗50\%到9\%％的CPU时间，主要用于处理TCP套接字操作 \cite{jeong2014mtcp}。
+Conceptually, the Linux network protocol stack consists of three layers. First, the VFS layer provides the socket API (such as \emph {connect}, \emph {send} and \emph {epoll}) to applications. Socket connections are bidirectional, reliable, and ordered pipelines, identified by the integer \emph {file descriptor}.
+Second, the traditional TCP/IP transport layer provides I/O multiplexing, congestion control, packet loss recovery, routing, and Quality of Service (QoS) functions.
+Third, the network card layer communicates with network card hardware (or virtual loopback interface for intra-host sockets) to send and receive packets.
+It is well known that the VFS layer contributes a large part of the cost in the network protocol stack \cite {clark1989analysis,boyd2010analysis}.
+This can be verified by a simple experiment: the latency and throughput of a Linux TCP socket between two processes in a host are only slightly worse than those of a pipe, FIFO, and Unix domain socket. (In Table \ref {socksdirect:tab:operation-performance}, the Linux TCP latency is 11 $\mu$s, throughput is 0.9 M op/s, and the latency of pipe, FIFO, and Unix domain socket is 8~9 $\mu$s, throughput is 0.9~1.2 M op/s.)
+Pipes, FIFOs, and Unix domain sockets bypass the transport and network card layers, but their performance is still unsatisfactory.
 
-从概念上讲，Linux网络协议栈由三层组成。首先，VFS层为应用程序提供套接字API（例如\emph {connect}，\emph {send} 和 \emph {epoll}）。套接字连接是双向、可靠且有序的管道，由整数 \emph {文件描述符}（文件描述符）标识。
-其次，传统的TCP/IP传输层提供I/O复用、拥塞控制、丢包恢复、路由和服务质量保证（QoS）功能。
-第三，网卡层与网卡硬件（或用于主机内套接字的虚拟环回接口）通信以发送和接收数据包。
-众所周知，VFS层贡献了网络协议栈中的很大一部分成本 \cite {clark1989analysis,boyd2010analysis}。
-这可以通过一个简单的实验来验证：主机中两个进程之间的Linux TCP套接字的延迟和吞吐量只比管道（pipe）、FIFO和Unix域套接字（Unix domain socket）差一点。（表 \ref {socksdirect:tab:operation-performance} 中，Linux TCP 延迟为 11 $\mu$s、吞吐量为 0.9 M op/s，管道、FIFO和Unix域套接字的延迟为 8～9 $\mu$s、吞吐量为 0.9～1.2 M op/s。）
-管道、FIFO和Unix域套接字绕过了传输层和网卡层，但它们的性能仍然不尽如人意。
-
-Clark 等的经典工作~\cite{clark1989analysis} 将套接字开销划分为每数据包和每字节开销。在现代协议栈中，由于连接创建也有显著开销~\cite{jeong2014mtcp,lin2016scalable}，我们引入一类新的开销：每连接开销；由于每次套接字操作在 VFS 层有一定的开销，与其处理的数据包数量无关（有些操作，如 \texttt{dup2}，根本不处理数据包），我们引入另一类新的开销：每次操作开销。
-下文将套接字开销分为四种类型：每次操作，每个数据包，每个字节和每个连接。
-
-% categorized socket overhead into per-packet and per-byte costs.
-%Because connection establishment incurs significant cost~\cite{jeong2014mtcp,lin2016scalable} and some operations do not touch payload (e.g. \texttt{dup2}, \texttt{fnctl} and \texttt{epoll}), we include two additional types of costs: per connection cost and per operation cost, as Table~\ref{socksdirect:tab:overhead} shows.
+The seminal work of Clark et al.~\cite{clark1989analysis} categorized socket overhead into per-packet and per-byte costs. In contemporary protocol stacks, due to the substantial cost of connection establishment~\cite{jeong2014mtcp,lin2016scalable}, we propose a new type of cost: per-connection cost. Given that each socket operation incurs a certain cost at the VFS layer, irrespective of the number of packets it manages (some operations, such as \texttt{dup2}, do not manage packets at all), we introduce another new type of cost: per-operation cost.
+Subsequently, we will classify socket overhead into four types: per operation, per packet, per byte, and per connection.
 
 \begin{table}[t]
 	\centering
-	\caption{Linux 套接字的开销。}
+	\caption{Overhead of Linux sockets.}
 	\label{socksdirect:tab:overhead}
 	\small
 		\begin{tabularx}{1\textwidth}{l|X|X}
 			\hline
-			类型 & 开销 & 本章的解决方案 \\
+			Type & Overhead & Solution in this chapter \\
 			\hline
 			\hline
-			每操作 & 内核穿越（系统调用） & 用户态库 (\S\ref{socksdirect:sec:architecture}) \\
+			Per operation & Kernel crossing (system call) & User-space library (\S\ref{socksdirect:sec:architecture}) \\
 			\hline
-			每操作 & 并发线程和进程的套接字文件描述符锁 & 基于令牌的套接字共享 (\S\ref{socksdirect:subsec:fork}) \\
-			\hline
-			\hline
-			每数据包 & 传输层协议（TCP/IP） & 使用 RDMA 或共享内存 (\S\ref{socksdirect:subsec:lockless-queue}) \\
-			\hline
-			每数据包 & 缓冲区管理 & 新的环形缓冲区设计 (\S\ref{socksdirect:subsec:lockless-queue}) \\
-			\hline
-			每数据包 & I/O 多路复用 & 使用 RDMA 或共享内存 (\S\ref{socksdirect:subsec:lockless-queue}) \\
-			\hline
-			每数据包 & 中断处理 & 事件通知 (\S\ref{socksdirect:subsec:process-mux}) \\
-			\hline
-			每数据包 & 进程唤醒 & 事件通知 (\S\ref{socksdirect:subsec:process-mux}) \\
+			Per operation & Socket file descriptor lock for concurrent threads and processes & Token-based socket sharing (\S\ref{socksdirect:subsec:fork}) \\
 			\hline
 			\hline
-			每字节 & 数据复制 & 页面重映射 (\S\ref{socksdirect:subsec:zerocopy}) \\
+			Per packet & Transport layer protocol (TCP/IP) & Using RDMA or shared memory (\S\ref{socksdirect:subsec:lockless-queue}) \\
+			\hline
+			Per packet & Buffer management & New ring buffer design (\S\ref{socksdirect:subsec:lockless-queue}) \\
+			\hline
+			Per packet & I/O multiplexing & Using RDMA or shared memory (\S\ref{socksdirect:subsec:lockless-queue}) \\
+			\hline
+			Per packet & Interrupt handling & Event notification (\S\ref{socksdirect:subsec:process-mux}) \\
+			\hline
+			Per packet & Process wakeup & Event notification (\S\ref{socksdirect:subsec:process-mux}) \\
 			\hline
 			\hline
-			每连接  & 内核文件描述符分配 & 文件描述符重映射表 (\S\ref{socksdirect:subsec:connection-management}) \\
+			Per byte & Data copying & Page remapping (\S\ref{socksdirect:subsec:zerocopy}) \\
 			\hline
-			每连接 & TCB 锁管理 & 分派到 \libipc{} (\S\ref{socksdirect:subsec:connection-management}) \\
 			\hline
-			每连接 & 分派新连接 & 守护进程 (\S\ref{socksdirect:subsec:connection-management}) \\
+			Per connection  & Kernel file descriptor allocation & File descriptor remapping table (\S\ref{socksdirect:subsec:connection-management}) \\
+			\hline
+			Per connection & TCB lock management & Dispatch to \libipc{} (\S\ref{socksdirect:subsec:connection-management}) \\
+			\hline
+			Per connection & Dispatch new connection & Daemon process (\S\ref{socksdirect:subsec:connection-management}) \\
 			\hline
 		\end{tabularx}
 \end{table}
 
-\subsubsection{每次操作的开销}
+\subsubsection{Overhead per operation}
 \label{socksdirect:subsec:per-operation-overhead}
 
-\parab {内核穿越（kernel crossing）。}
-传统上，套接字API在内核中实现，因此需要针对每个套接字操作进行内核穿越（即系统调用）。更糟糕的是，为防止 Meltdown \cite {Lipp2018meltdown} 攻击，内核页表隔离（KPTI）补丁 \cite {kpti} 使内核穿越变得4倍昂贵，如表 \ref {socksdirect:tab:operation-performance} 所示（使用 KPTI 补丁前，内核穿越需要 50~ns，而使用 KPTI 后需要 200~ns）。
-本章的目标是绕过内核而不影响安全性（\S\ref{socksdirect:sec:architecture}）。
+\parab {Kernel crossing.}
+Traditionally, the socket API is implemented in the kernel, so a kernel crossing (i.e., system call) is required for each socket operation. Worse, to prevent Meltdown \cite {Lipp2018meltdown} attacks, the Kernel Page Table Isolation (KPTI) patch \cite {kpti} makes kernel crossing 4 times more expensive, as shown in Table \ref {socksdirect:tab:operation-performance} (before the KPTI patch, kernel crossing required 50~ns, and after KPTI, it required 200~ns).
+The goal of this chapter is to bypass the kernel without compromising security (\S\ref{socksdirect:sec:architecture}).
 
-\parab {套接字文件描述符锁。}
-许多应用程序都是多线程的，原因有两个。
-首先，与FreeBSD不同，用于在Linux中读写磁盘文件的异步接口无法利用操作系统缓存和缓冲区，因此应用程序继续使用多线程和同步接口 \cite {nginx-multi-thread}。
-其次，许多Web应用程序框架更喜欢用同步编程模型处理每个用户请求，因为同步编程模型更容易编写和调试 \cite {barroso2017attack}。
-进程中的多个线程共享套接字连接。此外，在进程fork之后，父进程和子进程共享现有套接字。套接字也可以通过Unix域套接字传递给另一个进程。为了保护并发操作，Linux内核为每个套接字操作获取每个套接字锁 \cite {boyd2010analysis,han2012megapipe,lin2016scalable}。表 \ref {socksdirect:tab:operation-performance} 表明，即使没有多核争用，受原子操作保护的共享内存队列相比无锁队列的延迟可达 4 倍，吞吐量也只有无锁队列的 22\%。
-本章的目标是通过优化常见情况并删除常用套接字操作中的同步操作来尽可能降低同步开销（\S\ref{socksdirect:subsec:fork}）。
+\parab {Socket file descriptor lock.}
+Many applications are multithreaded for two reasons.
+First, unlike FreeBSD, the asynchronous interface for reading and writing disk files in Linux cannot take advantage of operating system cache and buffer, so applications continue to use multithreading and synchronous interfaces \cite {nginx-multi-thread}.
+Second, many web application frameworks prefer to handle each user request with a synchronous programming model because it is easier to write and debug \cite {barroso2017attack}.
+Multiple threads in a process share socket connections. In addition, after a process forks, the parent process and child process share existing sockets. Sockets can also be passed to another process through Unix domain sockets. To protect concurrent operations, the Linux kernel acquires a lock for each socket operation \cite {boyd2010analysis,han2012megapipe,lin2016scalable}. Table \ref {socksdirect:tab:operation-performance} shows that even without multicore contention, the latency of a shared memory queue protected by atomic operations is up to 4 times that of a lock-free queue, and the throughput is only 22% of that of a lock-free queue.
+The goal of this chapter is to minimize synchronization overhead as much as possible by optimizing common cases and removing synchronization operations from common socket operations (\S\ref{socksdirect:subsec:fork}).
 
-%\parab{Intra-host communication.}
-%Most existing approaches for intra-host socket either use kernel network stack or 网卡 loopback.
-%The kernel network stack has evolved to become quite complicated over the years~\cite{yasukata2016stackmap}, which is an overkill for intra-host communication. % may not need many TCP features, e.g., congestion control and loss recovery.
+\parab{Intra-host communication.}
+Most existing approaches for intra-host socket either use kernel network stack or network card loopback.
+The kernel network stack has evolved to become quite complicated over the years~\cite{yasukata2016stackmap}, which is an overkill for intra-host communication. % may not need many TCP features, e.g., congestion control and loss recovery.
 
-%Arrakis uses the 网卡 to forward packets from one application to another.
-%As shown in Table~\ref{socksdirect:tab:operation-performance}, the hairpin latency from CPU to 网卡 is still 25x higher than inter-core cache migration delay ($\sim$30 ns). The throughput is also limited by Memory-Mapped I/O (MMIO) doorbell latency and PCIe bandwidth~\cite{neugebauer2018understanding,li2017kv}.
+Arrakis uses the network card to forward packets from one application to another.
+As shown in Table~\ref{socksdirect:tab:operation-performance}, the hairpin latency from CPU to network card is still 25x higher than inter-core cache migration delay ($\sim$30 ns). The throughput is also limited by Memory-Mapped I/O (MMIO) doorbell latency and PCIe bandwidth~\cite{neugebauer2018understanding,li2017kv}.
 
-%We aim to leverage user-space shared memory for intra-host socket communication.
+We aim to leverage user-space shared memory for intra-host socket communication.
 
+The main challenge for leveraging RDMA for inter-host socket communication is to bridge the semantics of socket and RDMA~\cite{dragojevic2014farm}.
+For example, RDMA preserves messages boundaries while TCP does not.
+For I/O multiplexing, RDMA provides a completion notification model while event polling in Linux socket requires a readiness model~\cite{han2012megapipe}.
+Further, one-sided and two-sided RDMA verbs have different efficiency and overheads~\cite{kalia2014using,kaminsky2016design}.
 
-%%For inter-host communication inside data centers, there are two challenges for using RDMA.
-%%The first is to transparently determine whether or not the remote host supports \sys{}.
-%%We cannot use an out-of-band communication channel such as RDMA CM because it cannot pass through middleboxes in cloud network.
-%%The second is to bridge the semantics of socket and RDMA~\cite{dragojevic2014farm}.
-%The main challenge for leverage RDMA for inter-host socket communication is to bridge the semantics of socket and RDMA~\cite{dragojevic2014farm}.
-%For example, RDMA preserves messages boundaries while TCP does not.
-%For I/O multiplexing, RDMA provides a completion notification model while event polling in Linux socket requires a readiness model~\cite{han2012megapipe}.
-%Further, one-sided and two-sided RDMA verbs have different efficiency and overheads~\cite{kalia2014using,kaminsky2016design}.
+We aim to use RDMA efficiently for inter-host socket communication, while falling back to TCP transparently in case of non-RDMA peers.
 
-%We aim to use RDMA efficiently for inter-host socket communication, while falling back to TCP transparently in case of non-RDMA peers.
+\parab{Many concurrent connections.}
+Internet facing applications often need to serve millions of concurrent connections efficiently~\cite{jeong2014mtcp,lin2016scalable,belay2017ix}.
+Moreover, it is also common for two backend applications to create a large number of connections between them, where each connection handles a concurrent task~\cite{ihm2011towards,jang2011sslshader,nishtala2013scaling}. In Linux, a socket connection has dedicated send and receive buffers, each is at least one page (4~KB) in size~\cite{davidskbs}. With millions of concurrent connections, the socket buffers can consume gigabytes of memory, most of which is empty. Random accesses to a large number of buffers also cause CPU cache misses and TLB misses. Similar issue exists in RDMA network cards with limited on-chip memory for caching connection states~\cite{mprdma,kaminsky2016design}.
 
-%\parab{Many concurrent connections.}
-%Internet facing applications often need to serve millions of concurrent connections efficiently~\cite{jeong2014mtcp,lin2016scalable,belay2017ix}.
-%%In addition, because a socket connection provides a FIFO abstraction and the OS offers event multiplexing, 
-%Moreover, it is also common for two backend applications to create large number of connections between them, where each connection handles a concurrent task~\cite{ihm2011towards,jang2011sslshader,nishtala2013scaling}. In Linux, a socket connection has dedicated send and receive buffers, each is at least one page (4~KB) in size~\cite{davidskbs}. With millions of concurrent connections, the socket buffers can consume gigabytes of memory, most of which is empty. Random accesses to a large number of buffers also cause CPU cache misses and TLB misses. Similar issue exists in RDMA 网卡s with limited on-chip memory for caching connection states~\cite{mprdma,kaminsky2016design}.
-%%, which is slower than sequential access to a single buffer~\cite{li2017kv}. 
-%%This problem is exaggerated in RDMA. RDMA 网卡 caches connection states in limited on-board memory. Just over a few hundred active RDMA connections could cause cache misses and degrade performance~\cite{mprdma,kaminsky2016design}. 
-%%Moreover, event-driven applications use \texttt{epoll} to detect which connections are ready for send or receive. If the event queue is separated from data queues, each \texttt{recv} operation involves two cache migrations for event and data~\cite{yasukata2016stackmap}. 
-%
-%We aim to minimize memory cache misses per data transmission by multiplexing socket connections.
+The translation of your text is as follows:
 
+We aim to minimize memory cache misses per data transmission by multiplexing socket connections.
 
 \begin{table}[t]
 	\centering
-	\caption{往返延迟和单核吞吐量操作（测试平台设置在\S \ref {socksdirect:subsec:methodology} 中）。未特别说明的情况下，消息大小为8个字节。}
+	\caption{Round-trip latency and single-core throughput operations (test platform settings in \S \ref {socksdirect:subsec:methodology}). Unless otherwise specified, the message size is 8 bytes.}
 	\label{socksdirect:tab:operation-performance}
 	\small
 		\begin{tabular}{l|l|l|}
 			\hline
-			操作	& 延迟  & 吞吐量  \\
-			& ($\mu$s) & (M 次操作每秒) \\
+			Operation	& Latency  & Throughput  \\
+			& ($\mu$s) & (M operations per second) \\
 			\hline
 			\hline
-			核间缓存迁移	& 0.03 & 50 \\
+			Inter-core cache migration	& 0.03 & 50 \\
 			\hline
-			轮询 32 个空队列 & 0.04 & 24 \\
+			Polling 32 empty queues & 0.04 & 24 \\
 			\hline
-			系统调用（KPTI 前） & 0.05 & 21 \\
+			System call (before KPTI) & 0.05 & 21 \\
 			\hline
-			自旋锁（无竞争） & 0.10 & 10 \\
+			Spinlock (no contention) & 0.10 & 10 \\
 			\hline
-			分配和释放缓冲区 & 0.13 & 7.7 \\
+			Allocation and release of buffer & 0.13 & 7.7 \\
 			\hline
-			自旋锁（有竞争） & 0.20 & 5 \\
+			Spinlock (with contention) & 0.20 & 5 \\
 			\hline
-			无锁共享内存队列 & 0.25 & 27 \\
+			Lock-free shared memory queue & 0.25 & 27 \\
 			\hline
-			\textbf{主机内 \sys} & 0.30 & 22 \\
+			\textbf{Intra-host \sys} & 0.30 & 22 \\
 			\hline
-			系统调用（KPTI 后） & 0.20 & 5.0 \\
+			System call (after KPTI) & 0.20 & 5.0 \\
 			\hline
-			复制 1 个内存页（4~KiB） & 0.40 & 5.0 \\
+			Copying 1 memory page (4~KiB) & 0.40 & 5.0 \\
 			\hline
-			协作式上下文切换 & 0.52 & 2.0 \\
+			Cooperative context switch & 0.52 & 2.0 \\
 			\hline
-			映射一个内存页（4~KiB） & 0.78 & 1.3 \\
+			Mapping a memory page (4~KiB) & 0.78 & 1.3 \\
 			\hline
-			主机内通过网卡通信 & 0.95 & 1.0 \\
+			Intra-host communication via network card & 0.95 & 1.0 \\
 			\hline
-			原子共享内存队列 & 1.0 & 6.1 \\
+			Atomic shared memory queue & 1.0 & 6.1 \\
 			\hline
-			映射 32 个内存页（128~KiB） & 1.2 & 0.8 \\
+			Mapping 32 memory pages (128~KiB) & 1.2 & 0.8 \\
 			\hline
-			打开套接字文件描述符 & 1.6 & 0.6 \\
+			Opening a socket file descriptor & 1.6 & 0.6 \\
 			\hline
-			单边 RDMA 写操作 & 1.6 & 13 \\
+			Unilateral RDMA write operation & 1.6 & 13 \\
 			\hline
-			双边 RDMA 发送 / 接收操作 & 1.6 & 8 \\
+			Bilateral RDMA send / receive operation & 1.6 & 8 \\
 			\hline
-			\textbf{主机间 \sys} & 1.7 & 8 \\
+			\textbf{Inter-host \sys} & 1.7 & 8 \\
 			\hline
-			进程唤醒 & 2.8$\sim$5.5 & 0.2$\sim$0.4 \\
+			Process awakening & 2.8$\sim$5.5 & 0.2$\sim$0.4 \\
 			\hline
-			Linux 管道 / FIFO & 8 & 1.2 \\
+			Linux pipe / FIFO & 8 & 1.2 \\
 			\hline
-			Linux 中的 Unix 域套接字 & 9 & 0.9 \\
+			Unix domain sockets in Linux & 9 & 0.9 \\
 			\hline
-			主机间 Linux TCP 套接字 & 11 & 0.9 \\
+			Inter-host Linux TCP sockets & 11 & 0.9 \\
 			\hline
-			复制 32 个内存页（128~KiB） & 13 & 0.08 \\
+			Copying 32 memory pages (128~KiB) & 13 & 0.08 \\
 			\hline
-			主机间 Linux TCP 套接字 & 30 & 0.3 \\
+			Inter-host Linux TCP sockets & 30 & 0.3 \\
 			\hline
 		\end{tabular}	
 \end{table}
 
 
-\subsubsection{每个数据包的开销}
+\subsubsection{Overhead per packet}
 \label{socksdirect:subsec:per-packet-overhead}
 
-\parab {传输协议（TCP / IP）。}
-传统上，TCP/IP是数据中心传输协议的事实标准。
-TCP/IP协议处理、拥塞控制和丢包恢复在每个发送和接收的数据包上消耗CPU。
-此外，丢包检测，基于速率的拥塞控制和TCP状态机使用定时器，很难实现微秒级粒度和低开销 \cite{jeong2014mtcp}。
-幸运的是，近年来在许多数据中心见证了RDMA的大规模部署 \cite {guo2016rdma,zhu2015congestion,mittal2015timely}。
-RDMA将传输协议卸载到RDMA 网卡，提供了与TCP/IP相当的基于硬件的传输层。
-对于主机间套接字，本章的目标是利用 RDMA 硬件传输层的高吞吐量、低延迟和接近零的 CPU 开销（\S\ref{socksdirect:subsubsec:fork_rdwr}）。
-对于主机内套接字，本章的目标是完全绕过传输层。
+\parab {Transport Protocol (TCP / IP).}
+Traditionally, TCP/IP has been the de facto standard for data center transport protocols.
+The processing of TCP/IP protocol, congestion control, and packet loss recovery consume CPU on every sent and received packet.
+Furthermore, packet loss detection, rate-based congestion control, and the TCP state machine employ timers, making it challenging to achieve microsecond granularity and low overhead \cite{jeong2014mtcp}.
+Fortunately, in recent years, we have seen large-scale deployment of RDMA in many data centers \cite {guo2016rdma,zhu2015congestion,mittal2015timely}.
+RDMA offloads the transport protocol to the RDMA network card, providing a hardware-based transport layer equivalent to TCP/IP.
+For inter-host sockets, the aim of this chapter is to leverage the high throughput, low latency, and near-zero CPU overhead of the RDMA hardware transport layer (\S\ref{socksdirect:subsubsec:fork_rdwr}).
+For intra-host sockets, the aim of this chapter is to completely bypass the transport layer.
 
-\parab {缓冲管理。}
-传统上，CPU通过\emph {环形缓冲区}（ring buffer）从网卡发送和接收数据包。
-环形缓冲区由固定数量的固定长度的元数据条目组成。
-每个条目都指向一个存储数据包有效负载的缓冲区。
-要发送或接收数据包，需要分配和释放缓冲区。
-表 \ref {socksdirect:tab:operation-performance} 显示了环形缓冲区的成本。
-此外，为了确保可以接收MTU大小的分组，每个接收缓冲区应该具有至少一个MTU的大小。
-但是，许多数据包小于MTU~ \cite {thompson1997wide}，因此内部碎片会降低内存利用率。
-虽然现代网卡支持LSO和LRO~ \cite {lsolro} 以批量处理多个数据包，但本章的目标是完全消除缓冲区管理的开销（\S\ref{socksdirect:subsec:lockless-queue}）。
+\parab {Buffer Management.}
+Traditionally, the CPU sends and receives packets from the network card through a \emph {ring buffer}.
+The ring buffer comprises a fixed number of fixed-length metadata entries.
+Each entry points to a buffer that stores the packet payload.
+To send or receive a packet, it is necessary to allocate and release buffers.
+Table \ref {socksdirect:tab:operation-performance} shows the cost of the ring buffer.
+Additionally, to ensure that packets of MTU size can be received, each receive buffer should be at least the size of an MTU.
+However, many packets are smaller than the MTU~ \cite {thompson1997wide}, so internal fragmentation reduces memory utilization.
+Although modern network cards support LSO and LRO~ \cite {lsolro} to batch process multiple packets, the aim of this chapter is to completely eliminate the overhead of buffer management (\S\ref{socksdirect:subsec:lockless-queue}).
 
-\parab {I/O多路复用。}
-对于传统的网卡，接收到的不同连接的数据包通常在环形缓冲区中混合，因此网络协议栈需要将数据包分类到相应的套接字缓冲区中。
-现代网卡支持接收数据包转向 \cite {mellanox}，它可以将特定连接映射到专用环形缓冲区，该缓冲区由高性能套接字系统使用 \cite {jeong2014mtcp,lin2016scalable,libvma}。
-本章利用RDMA网卡中的类似功能，将接收到的数据包解复用（demultiplex）到每个连接专属的环形缓冲区。
+\parab {I/O Multiplexing.}
+For traditional network cards, packets from different connections are usually mixed in a ring buffer, so the network protocol stack needs to classify the packets into the corresponding socket buffers. Modern network cards support packet steering \cite {mellanox}, which can map specific connections to dedicated ring buffers used by high-performance socket systems \cite {jeong2014mtcp,lin2016scalable,libvma}. This chapter utilizes similar functionality in RDMA network cards to demultiplex received packets into ring buffers dedicated to each connection.
 
-\parab {中断处理。}
-Linux网络协议栈分为系统调用和中断上下文，因为它处理来自应用程序和硬件设备的事件。
-例如，当应用程序调用 send 时，网络协议栈进程上下文中将数据包发送出去（如果窗口允许）。当网卡接收到该数据包时，网卡向 CPU 发送一个中断，然后网络协议栈在中断上下文中处理接收到的数据包。
-TCP拥塞控制中的ACK时钟（ACK clocking）机制 \cite {mprdma} 要求及时处理中断和定时器。
-中断上下文不一定与应用程序在同一核心上，导致 CPU 核的局部性下降。
-但是，RDMA 网卡硬件实现了需要精确计时的数据包处理，因此主机 CPU 不再需要处理大部分数据平面的中断。
+\parab {Interrupt Handling.}
+The Linux network protocol stack is divided into system call and interrupt contexts because it handles events from both applications and hardware devices. For instance, when an application calls send, the network protocol stack sends the packet in the process context (if the window allows). When the network card receives the packet, it sends an interrupt to the CPU, and then the network protocol stack processes the received packet in the interrupt context. The ACK clocking mechanism in TCP congestion control \cite {mprdma} requires timely handling of interrupts and timers. The interrupt context is not necessarily on the same core as the application, leading to a decrease in CPU core locality. However, RDMA network card hardware implements packet processing that requires precise timing, so the host CPU no longer needs to handle most of the data plane interrupts.
 
+\parab {Process Awakening.}
+When a process calls a remote procedure call (RPC) and waits for a reply, should the CPU switch to other ready-to-run processes? The answer in Linux is yes, and this process switching wake-sleep process takes 3 to 5 $\mu$s, as shown in Table \ref {socksdirect:tab:operation-performance}. Within the round-trip time of RPC within the host, two process awakenings contribute more than half of the latency. For host-to-host RPC via RDMA, the round-trip latency of small messages smaller than the MTU size on the network is even lower than the process awakening latency. For this reason, many distributed systems and user-space protocol stacks use polling to avoid awakening overhead. However, simple polling methods consume a CPU core for each thread and cannot scale to a large number of threads. To hide microsecond-level RPC latency \cite {barroso2017attack}, cooperative context switching through \texttt {sched\_yield} is much faster than process awakening. The goal of this chapter is to efficiently share cores among multiple threads (\S\ref{socksdirect:subsec:process-mux}).
 
+\parab {Container Networking.}
+Many container deployments use isolated network namespaces, and these containers communicate through a virtual overlay network. In Linux, a virtual switch \cite {pfaff2015design} forwards packets between the host network card and the virtual network card in the container. This architecture incurs overhead from multiple context switches and memory copies on each packet, and the virtual switch becomes a bottleneck \cite {pfefferle2015hybrid}. Slim~ \cite {slim} reduces three kernel round trips to one. Several recent works \cite {martins2014clickos,roghanchi2017ffwd,huang2017high,nsdi19freeflow} delegate all operations to a virtual switch running as a daemon, thus increasing latency and CPU cost on the data path. The solution in this chapter is a centralized control plane and a distributed data plane (\S\ref{socksdirect:subsec:connection-management}).
 
-\parab {进程唤醒。}
-当进程调用远程过程调用（RPC）并等待回复时，是否应让CPU切换到准备运行的其他进程？
-Linux的答案是肯定的，这个进程切换的唤醒睡眠过程需要3到5 $\mu$s，如表 \ref {socksdirect:tab:operation-performance} 所示。
-在主机内 RPC 的往返时间内，两次进程唤醒贡献了超过一半的延迟。
-对于通过 RDMA 的主机间 RPC，小于 MTU 大小的小消息在网络上的往返延迟甚至低于进程唤醒的延迟。
-为此，许多分布式系统和用户态协议栈使用轮询来避免唤醒开销。
-然而，简单的轮询方法会为每个线程消耗一个 CPU 核，不能扩放到大量线程。
-为了隐藏微秒级RPC延迟 \cite {barroso2017attack}，通过 \texttt {sched\_yield} 的协作上下文切换比进程唤醒要快得多。
-本章的目标是高效地在多个线程之间共享核心（\S\ref{socksdirect:subsec:process-mux}）。
+The content you provided is already in English and in academic style. As per your instructions, I will keep it as-is. Here is the content:
 
-\parab {容器网络。}
-许多容器部署使用隔离的网络命名空间，这些容器通过虚拟覆盖网络（virtual overlay network）进行通信。
-在Linux中，虚拟交换机 \cite {pfaff2015design} 在主机网卡和容器中的虚拟网卡之间转发数据包。
-这种架构会在每个数据包上产生多个上下文切换和内存拷贝的开销，虚拟交换机成为瓶颈 \cite {pfefferle2015hybrid}。
-Slim~ \cite {slim} 将三次内核往返减少到一次。
-最近的几个工作 \cite {martins2014clickos,roghanchi2017ffwd,huang2017high,nsdi19freeflow} 将所有操作委托给作为守护进程运行的虚拟交换机，因此它增加了数据路径上的延迟和CPU成本。
-本章的解决方案是集中式的控制平面和分布式的数据平面（\S\ref{socksdirect:subsec:connection-management}）。
-
-
-\subsubsection{每字节的开销}
+\subsubsection{Per-byte Overhead}
 \label{socksdirect:subsec:per-byte-overhead}
 
-\parab {有效载荷（payload）复制。}
-在大多数套接字系统中，\texttt {send}和\texttt {recv}的语义会导致应用程序和网络协议栈之间的内存复制。 对于非阻塞\texttt {send}，系统需要将数据复制出缓冲区，因为应用程序可能会在\texttt {send}返回后立即覆盖缓冲区。 简单地删除拷贝可能会违反应用程序的正确性。
-零拷贝\texttt {recv}甚至比\texttt {send}更难。
-Linux提供了基于准备就绪的事件模型，即应用程序知道传入的数据（例如通过\texttt {epoll}）然后调用\texttt {recv}，因此网卡接收但未传递给应用程序的数据必须存储在系统缓冲区中。
-因为\texttt {recv}允许应用程序提供任何缓冲区作为数据目标，所以系统需要将数据从系统复制到应用程序缓冲区。
-本章的目标是在标准套接字应用程序中为较大有效载荷传输实现零拷贝（\S\ref{socksdirect:subsec:zerocopy}）。
+\parab {Payload Copying.}
+In most socket systems, the semantics of \texttt {send} and \texttt {recv} result in memory copying between the application and the network protocol stack. For non-blocking \texttt {send}, the system needs to copy data out of the buffer because the application may overwrite the buffer immediately after \texttt {send} returns. Simply eliminating the copy may violate the correctness of the application. Zero-copy \texttt {recv} is even more challenging than \texttt {send}. Linux provides a readiness-based event model, i.e., the application knows about incoming data (e.g., through \texttt {epoll}) and then calls \texttt {recv}, so data received by the network card but not delivered to the application must be stored in the system buffer. Because \texttt {recv} allows the application to provide any buffer as the data target, the system needs to copy data from the system to the application buffer. The goal of this chapter is to implement zero-copy for larger payload transfers in standard socket applications (\S\ref{socksdirect:subsec:zerocopy}).
 
-
-
-\subsubsection{每条连接的开销}
+\subsubsection{Per-connection Overhead}
 \label{socksdirect:subsec:per-connection-overhead}
 
-\parab {内核文件描述符分配。}
-在Linux中，每个套接字连接都是VFS中的文件，因此需要分配整数文件描述符和\emph {inode}。
-用户空间套接字的挑战是有许多API（例如open，close和epoll）同时支持套接字和非套接字文件描述符（例如文件和设备），因此必须将套接字文件描述符与其他文件描述符区分开来。
-用户空间中的Linux兼容套接字 \cite {libvma,rsockets} 通常在内核中打开一个文件以获取每个套接字的虚拟文件描述符，因此它们仍然需要内核文件描述符分配。
-LOS~ \cite {huang2017high} 将文件描述符空间划分为用户和内核部分，但违反了Linux分配最小可用文件描述符的属性。
-但是，许多应用程序，如Redis~ \cite {redis} 和Memcached~ \cite {memcached} 都依赖于此属性。
-本章的目标是在保持兼容性的同时绕过内核套接字文件描述符分配（\S\ref{socksdirect:subsec:connection-management}）。
+\parab {Kernel File Descriptor Allocation.}
+In Linux, each socket connection is a file in VFS, thus requiring the allocation of integer file descriptors and \emph {inode}.
+The challenge with user-space sockets is that many APIs (such as open, close, and epoll) support both socket and non-socket file descriptors (such as files and devices), so socket file descriptors must be distinguished from other file descriptors.
+Linux-compatible sockets in user space \cite {libvma,rsockets} typically open a file in the kernel to obtain a virtual file descriptor for each socket, so they still require kernel file descriptor allocation.
+LOS~ \cite {huang2017high} divides the file descriptor space into user and kernel parts, but violates the Linux property of allocating the smallest available file descriptor.
+However, many applications, such as Redis~ \cite {redis} and Memcached~ \cite {memcached}, rely on this property.
+The goal of this chapter is to bypass kernel socket file descriptor allocation while maintaining compatibility (\S\ref{socksdirect:subsec:connection-management}).
 
-\parab {TCP控制块管理中的锁。}
-在建立连接期间，Linux获取几个全局锁来分配TCB（TCP Control Block，TCP控制块）。
-最近的工作，如MegaPipe~ \cite {han2012megapipe} 和FastSocket~ \cite {lin2016scalable} 通过对全局表进行分区来减少锁争用，但正如表~ \ref {socksdirect:tab:operation-performance} 所示，非争用自旋锁是仍然很贵。
-本章将工作分发到每个进程中的用户空间库\libipc {} （\S\ref{socksdirect:subsec:connection-management}）。
+The content you provided is already in English and it follows an academic style. As per your instructions, I will not make any changes to it.
 
-\parab {新连接调度。}
-多个进程和线程可以侦听同一端口以接受传入连接。
-在Linux中，处理\texttt {accept}调用的核心在传入连接的队列上进行竞争。
-本章利用委托（delegation）比锁 \cite {roghanchi2017ffwd} 更快的事实，使用管程守护程序来分派新连接（\S\ref{socksdirect:subsec:connection-management}）。
+\parab {Optimization of Kernel Network Protocol Stack:}
+The first type of work is the optimization of the kernel TCP/IP protocol stack. FastSocket~\cite{lin2016scalable}, Affinity-Accept~\cite{pesterev2012improving}, FlexSC~\cite{soares2010flexsc}, and zero-copy sockets \cite{thadani1995efficient,chu1996zero,linux-zero-copy} achieve good compatibility and isolation.
 
+MegaPipe~\cite{han2012megapipe} and StackMap~\cite{yasukata2016stackmap} propose new APIs to implement zero-copy and improved I/O multiplexing, at the cost of requiring modifications to the application. However, a significant amount of kernel overhead still exists. The challenge of supporting zero-copy is socket semantics.
 
-%Most modern applications use socket in an event-driven style. similar to Figure~\ref{socksdirect:fig:socket-pseudo-code}.
+\parab {User-space TCP/IP Protocol Stack:}
+The second type of work completely bypasses the kernel TCP/IP protocol stack and implements TCP/IP in user-space. In this category, IX~\cite{belay2017ix} and Arrakis~\cite{peter2016arrakis} are new operating system architectures that use virtualization to ensure security and isolation. IX uses LwIP~\cite{dunkels2001design} to implement TCP/IP in user-space, while using the kernel to forward each packet to achieve performance isolation and QoS. In contrast, Arrakis offloads QoS to the network card, thus bypassing the kernel on the data plane. These works use the network card to forward packets between applications on the same host. As shown in Table \ref{socksdirect:tab:operation-performance}, the round-trip (hairpin) latency from the CPU to the network card is much higher than the cache migration latency between cores. The throughput is also limited by the doorbell latency of memory-mapped I/O (MMIO) and PCIe bandwidth \cite{neugebauer2018understanding,li2017kv}.
 
-%Socket is a well-known bottleneck for communication intensive applications. We stress test Nginx load balancer, memcached and Redis with one request per TCP connection or a stream of requests on pre-established TCP connections, and find that 50\%$\sim$90\% CPU time is consumed in the kernel, mostly dealing with socket system calls. The one request per connection scenario shows much lower throughput, because of overhead in connection creation.
+In addition to these new operating system architectures, many user-space sockets on Linux use high-performance packet I/O frameworks, such as Netmap~\cite{rizzo2012netmap}, Intel DPDK~\cite{dpdk}, and PF_RING \cite{pf-ring}, to directly access network card queues in user-space. SandStorm~\cite{marinos2014network}, mTCP~\cite{jeong2014mtcp}, Seastar~\cite{seastar}, and F-Stack~\cite{fstack} propose new APIs, thus requiring modifications to the application. Most API changes aim to support zero-copy, while the standard API still copies data. FaSST~\cite{kalia2016fasst} and eRPC~\cite{kalia2018datacenter} provide an RPC API instead of sockets. LibVMA~\cite{libvma}, OpenOnload~\cite{openonload}, DBL~\cite{dbl}, LOS~\cite{huang2017high}, and TAS~\cite{taseurosys19} comply with the standard socket API.
 
-%If we were able to mitigate the overhead associated with sockets, application performance would be 2x$\sim$10x.
-%As another example, we replaced socket with RDMA and enabled zero copy gRPC in distributed Tensorflow~\cite{abadi2016tensorflow}, and training a VGG network shows 5x speedup.
+The user-space TCP/IP protocol stack offers superior performance compared to Linux, but it still falls short when compared to RDMA and shared memory. A significant reason for this is that existing works do not support the sharing of sockets between threads and processes, which results in compatibility issues in fork and container hot migration, as well as overhead from multi-threaded locks.
 
-%Socket is a well-known bottleneck in fast data center networks \RED{(cite)}. In a data center, we categorize systems that process queries from Internet users to be \textit{front-end} (\textit{e.g.} DNS server, load balancer and Web service), and the other systems (\textit{e.g.} database, stream processing and machine learning) to be \textit{back-end}.
+Firstly, in LibVMA and RSocket, after a process forks, for sockets created by the parent process before the fork, the child process either takes ownership of all existing sockets or cannot access any sockets (i.e., these sockets still belong to the parent process). There is no way to independently control the ownership of each socket. However, many web services \cite{apache,nginx,php-fpm,python-gunicorn,vsftpd} and key-value stores \cite{memcached} have a master process to accept new connections from the listening socket, then it may fork a child process to handle requests, and the child process needs to access the socket of the new connection. At the same time, the parent process still needs to accept new connections through the listening socket. This makes such web services unable to work properly. A more tricky situation is that the parent process and the child process can simultaneously write to the log server through the existing socket.
 
-%For front-end systems, as shown in Figure~\ref{socksdirect:fig:socket-kernel-time}, 70\% -- 90\% CPU time is used in socket system calls. They maintain a large number of socket connections to Internet users. Establishing a socket connection takes $\approx$40$\mu$s CPU time, so a CPU core can only serve 25K new connections per second~\cite{lin2016scalable}.
+Secondly, multi-threading is common in applications. Applications bear the risk of race conditions in socket operations, or must adopt socket file descriptor locks for each operation. The latter method ensures correctness, but even without contention between locks, locks can impair performance.
 
-%For back-end systems, the performance using socket is significantly worse than using RDMA or shared memory. This is because back-end systems interact frequently with other nodes and services, consequently the latency is vital for their performance. As shown in Figure~\ref{socksdirect:fig:socket-comparison}, socket latency between different processes in a same server is $\approx$10~$\mu$s, even much higher than inter-server RDMA latency ($\approx$2~$\mu$s).
+\parab {Offloading the Transport Layer to the Network Card:}
+To reduce the overhead of operating system communication primitives, a series of works offload part of the socket system to the network card hardware. The TCP Offload Engine (TOE) \cite{tcp-chimney-offload} offloads part or all of the TCP/IP protocol stack to the network card, but due to the rapid growth of general processor performance according to Moore's Law, these dedicated hardware have limited performance advantages and only achieve success in dedicated fields, such as iSCSI HBA storage cards \cite{iscsi-hba} and stateless offloads (such as checksum, Receive Side Scaling (RSS), Large Send Offload (LSO), Large Receive Offload (LRO) \cite{lsolro}). In recent years, due to hardware trends and application demands in data centers, the story of \emph{stateful} offloads has begun to revive \cite{chuanxiong-rdma-keynote}. Therefore, RDMA \cite{infiniband2000infiniband} is widely used in production data centers \cite{guo2016rdma}. RDMA provides two types of abstractions: one-sided primitives for reading and writing remote shared memory, and two-sided primitives with socket-like send-receive semantics. Compared with the software-based TCP/IP network protocol stack, RDMA uses hardware offloading to provide ultra-low latency and near-zero CPU overhead. To enable socket applications to use RDMA, RSocket \cite{rsockets}, SDP~\cite{socketsdirect}, and UNH EXS~\cite{russell2008extended} convert socket operations into two-sided RDMA primitives. They have similar designs, with RSocket being the most actively developed and the de facto standard for socket-to-RDMA conversion. FreeFlow~\cite{nsdi19freeflow} uses RDMA network cards to provide container overlay networks, using shared memory for intra-host communication and RDMA for inter-host communication. To implement RDMA virtualization, FreeFlow is essentially a microkernel architecture, with control plane and data plane operations handled by a user-space virtual switch. FreeFlow uses RSocket to convert sockets to RDMA.
 
-%\textbf{Event-driven programming.}
+However, due to the mismatch between RDMA and socket abstractions, these works have limitations. 
+In terms of compatibility, first, they lack support for several important APIs, such as \textit{epoll}, thus they are incompatible with many applications, including Nginx, Memcached, Redis, etc. 
+This is because RDMA only provides transport functionality, while \textit{epoll} is a file abstraction integrated with OS event notification. 
+Second, RDMA QP does not support \textit{fork} and container hot migration \cite{nsdi19freeflow}, hence RSocket has the same problem. 
+Third, since RSocket uses RDMA as the network packet format, it cannot connect to regular TCP/IP peers. 
+This is a deployment challenge, as all hosts and applications in a distributed system must switch to RSocket simultaneously. 
+The goal of this chapter is to transparently detect whether the remote end supports Rsocket, and if not, fall back to TCP/IP. 
+In terms of performance, they cannot eliminate payload copy, socket file descriptor lock, buffer management, process wake-up, and per-connection overhead. 
+For example, RSocket allocates buffers and copies payloads at both the sender and receiver. 
+Similar to Arrakis, RSocket uses the network card for intra-host communication, leading to performance bottlenecks.
 
-%\textbf{Socket process: connection setup and data transmission.}
+The content you provided is already in English and it's in LaTeX format, not Markdown. As per your instructions, I will keep it as-is. 
 
-\subsection{高性能套接字系统}
-\label{socksdirect:subsec:related-work}
-
-学术界和工业界都提出了许多高性能套接字系统，如表 \ref {socksdirect:tab:related-work} 所示。
-
-
-\begin{sidewaystable}[htbp]
-	\centering
-	\caption{高性能套接字系统的比较。}
-	\label{socksdirect:tab:related-work}
-	\scalebox{0.7}{
-		\begin{tabularx}{1.4\textwidth}{l|X|X|X|X|X|X|X|X|X|X|}
-			\hline
-			& FastSocket & MegaPipe / StackMap & IX & Arrakis & SandStorm / mTCP & LibVMA & OpenOnload & Rsocket / SDP & FreeFlow & SocksDirect \\
-			\hline
-			\hline
-			类别 & \multicolumn{2}{c|}{内核优化} & \multicolumn{5}{c|}{用户态 TCP/IP 协议栈} & \multicolumn{3}{c|}{卸载到 RDMA 网卡} \\
-			%\hline
-			%Changes needed for deployment & New kernel & New kernel & New kernel & New kernel & Lib+driver & Lib+driver & Lib+driver & Lib+driver & Lib+driver +daemon & Lib+driver +daemon \\
-			\hline
-			\hline
-			\multicolumn{11}{c|}{兼容性} \\
-			\hline
-			\hline
-			对现有应用程序透明 & \yes &   & \yes & \yes &   & \yes & \yes & \yes & \yes & \yes \\
-			\hline
-			\texttt{epoll} (Nginx, Memcached 等) & \yes & \yes & \yes & \yes & \yes & \yes & \yes & & & \yes \\
-			\hline
-			与普通 TCP/IP 对端兼容 &	\yes & \yes & \yes & \yes & \yes & \yes & \yes & & & \yes \\
-			\hline
-			主机内通信 & \yes & \yes & & \yes & & & & & \yes & \yes \\
-			\hline
-			多个应用程序监听同一端口 & \yes & \yes & & & & & & \yes & \yes & \yes \\
-			\hline
-			完整的 fork 支持 & \yes & \yes & & & & & \yes & & & \yes \\
-			\hline
-			容器热迁移 & \yes & \yes & & & & & & & & \yes \\
-			\hline
-			\hline
-			\multicolumn{11}{c|}{隔离性} \\
-			\hline
-			\hline
-			访问控制策略 & 内核 & & 内核 & 内核 & & & & 内核 & 守护进程 & 守护进程 \\
-			\hline
-			容器 / 虚拟机间的隔离 & \yes & & \yes & \yes & & & & \yes & \yes & \yes \\
-			\hline
-			QoS（性能隔离） & 内核 & 内核 & 内核 & 网卡 & 网卡 & 网卡 & 网卡 & 网卡 & 守护进程 & 网卡 \\
-			\hline
-			\hline
-			\multicolumn{11}{c|}{消除性能开销} \\
-			\hline
-			\hline
-			数据面上的系统调用 & & & 批处理 & \yes & 批处理 & \yes & \yes & \yes & \yes & $<$16KB 消息 \\
-			\hline
-			套接字文件描述符锁 & & & & & & & & & & \yes \\
-			\hline
-			传输协议 & & & & & & & & \yes & \yes & \yes \\
-			\hline
-			缓冲区管理 & & & & & & & & & & \yes \\
-			\hline
-			I/O 多路复用与中断处理 & & 改进 & \yes & \yes & 改进 & \yes & \yes & \yes & \yes & \yes \\
-			\hline
-			进程唤醒 & & & & & & & & & & \yes \\
-			\hline
-			数据复制 & & \yes & & & \yes & & & & & $\ge$16KB 消息 \\
-			\hline
-			内核文件描述符分配 & & \yes &  &  & \yes & & & & & \yes \\
-			\hline
-			TCB 管理与连接分派 & \yes & \yes & \yes & \yes & \yes & & & & & \yes \\
-			\hline
-		\end{tabularx}
-	}
-\end{sidewaystable}
-
-
-
-\parab {内核网络协议栈优化：}
-第一类工作是优化内核TCP / IP协议栈。 FastSocket~ \cite {lin2016scalable}，Affinity-Accept~ \cite {pesterev2012improving}，FlexSC~ \cite {soares2010flexsc}和零拷贝套接字 \cite {thadani1995efficient,chu1996zero,linux-zero-copy}实现良好的兼容性和隔离性。
-
-MegaPipe~ \cite {han2012megapipe}和StackMap~ \cite {yasukata2016stackmap}提出了新的API来实现零拷贝和改进I / O多路复用，代价是需要修改应用程序。
-但是，大量的内核开销仍然存在。
-支持零拷贝的挑战是套接字语义。
-
-\parab {用户态TCP / IP协议栈：}
-第二类工作完全绕过内核TCP / IP协议栈并在用户空间（user-space）中实现TCP / IP。
-在这个类别中，IX~ \cite {belay2017ix}和Arrakis~\cite {peter2016arrakis}是新的操作系统架构，它使用虚拟化来确保安全性和隔离性。 IX利用LwIP~ \cite {dunkels2001design}在用户空间中实现TCP / IP，同时使用内核转发每个数据包以实现性能隔离和QoS。相比之下，Arrakis将QoS卸载到网卡，因此绕过数据平面的内核。
-这些工作使用网卡在同一主机中的应用程序之间转发数据包。
-如表 \ref {socksdirect:tab:operation-performance} 所示，从CPU到网卡的往返（hairpin）延迟远远高于核心间缓存迁移延迟。
-吞吐量也受到内存映射I / O（MMIO）的门铃（doorbell）延迟和PCIe带宽的限制 \cite {neugebauer2018understanding,li2017kv}。
-
-除了这些新的操作系统体系结构，许多用户空间套接字在Linux上使用高性能数据包I / O框架，例如Netmap~ \cite {rizzo2012netmap}，Intel DPDK~ \cite {dpdk}和PF\_RING \cite {pf-ring}，以便直接访问用户空间中的网卡队列。
-SandStorm~ \cite {marinos2014network}，mTCP~ \cite {jeong2014mtcp}，Seastar~ \cite {seastar}和F-Stack~ \cite {fstack}提出了新的API，因此需要修改应用程序。
-大多数API更改旨在支持零拷贝，标准API仍然会复制数据。
-FaSST~ \cite {kalia2016fasst}和eRPC~ \cite {kalia2018datacenter}提供RPC API而不是套接字。
-LibVMA~ \cite {libvma}，OpenOnload~ \cite {openonload}，DBL~ \cite {dbl}，LOS~ \cite {huang2017high} 和 TAS~\cite{taseurosys19} 符合标准套接字API。
-
-用户空间TCP / IP协议栈提供了比Linux更好的性能，但它仍然不接近RDMA和共享内存。
-一个重要原因是现有的工作都不支持在线程和进程之间共享套接字，导致fork和容器热迁移中的兼容性问题，以及多线程锁开销。
-
-首先，在 LibVMA 和 RSocket 中，当进程fork后，对于父进程在 fork 前创建的套接字，子进程或者获取所有已有套接字的所有权，或者不能访问任何套接字（即这些套接字仍归父进程所有）。没有办法独立地控制每个套接字的所有权。
-但是，许多Web服务 \cite {apache,nginx,php-fpm,python-gunicorn,vsftpd}和键值存储 \cite {memcached} 都有一个主进程来从监听套接字中接受新连接，然后它可能 fork 一个子进程来处理请求，子进程需要访问新连接的套接字。
-与此同时，父进程仍需要通过监听套接字接受新连接。
-这使得此类Web服务无法正常工作。
-更棘手的情况是父进程和子进程可以通过现有套接字同时写入日志服务器。
-
-第二，多线程在应用程序中很常见。
-应用程序在套接字操作中承担竞争条件的风险，或者每次操作必须采用套接字文件描述符锁。
-后一种方法保证了正确性，但即使没有锁之间的争用（contention），锁也会损害性能。
-
-\parab {将传输层卸载到网卡：}
-为了降低操作系统通信原语的开销，一系列工作将套接字系统的一部分卸载到网卡硬件上。
-TCP 卸载引擎（TCP Offload Engine，TOE） \cite {tcp-chimney-offload} 将部分或全部的 TCP / IP 协议栈卸载到网卡，但由于通用处理器的性能按摩尔定律迅速增长，这些专用硬件的性能优势有限，仅在专用领域中获得成功，例如 iSCSI HBA 存储卡 \cite {iscsi-hba} 和无状态卸载（例如校验和、接收侧扩放（RSS）、大发送数据卸载（LSO）、大接收数据卸载（LRO） \cite {lsolro}）。
-近年来，由于数据中心的硬件趋势和应用需求，\emph {有状态}卸载的故事开始复兴 \cite {chuanxiong-rdma-keynote}。
-因此，RDMA \cite {infiniband2000infiniband} 在生产数据中心中广泛使用 \cite {guo2016rdma}。
-RDMA 提供了两类抽象：读写远程共享内存的单边原语，以及类似套接字发送接收语义的双边原语。
-与基于软件的 TCP / IP 网络协议栈相比，RDMA 使用硬件卸载来提供超低延迟和接近零的 CPU 开销。
-为了使套接字应用程序能够使用 RDMA，RSocket \cite {rsockets}，SDP~ \cite {socketsdirect} 和 UNH EXS~ \cite {russell2008extended} 将套接字操作转换为双边 RDMA 原语。
-它们具有相似的设计，其中 RSocket 的开发最活跃，是套接字转换 RDMA 的事实标准。
-FreeFlow~ \cite {nsdi19freeflow} 利用 RDMA 网卡提供容器（container）覆盖网络（overlay network），它利用共享内存进行主机内部通信，利用 RDMA 进行主机间通信。
-为了实现 RDMA 虚拟化，FreeFlow 本质上是一种微内核架构，控制面和数据面操作都由用户态的虚拟交换机处理。
-FreeFlow 使用 RSocket 将套接字转换为 RDMA。
-
-但是，由于RDMA和套接字的抽象不匹配，这些工作有局限性。
-在兼容性方面，首先，它们缺乏对几个重要API的支持，例如\textit {epoll}，因此它与许多应用程序不兼容，包括Nginx，Memcached，Redis等。
-这是因为RDMA仅提供传输功能，而\textit {epoll}是与OS事件通知集成的文件抽象。
-其次，RDMA QP不支持\textit {fork}和容器热迁移 \cite{nsdi19freeflow}，因此RSocket也有同样的问题。
-第三，由于RSocket使用RDMA作为网络数据包格式，因此无法连接到常规TCP / IP对等体。
-这是一个部署挑战，因为分布式系统中的所有主机和应用程序必须同时切换到RSocket。
-本章的目标是透明地检测远程端是否支持Rsocket，如果没有则回退到TCP / IP。
-在性能方面，它们无法删除有效负载拷贝，套接字文件描述符锁，缓冲区管理，进程唤醒和每个连接开销。
-例如，RSocket在发送方和接收方分配缓冲区并复制有效负载。
-与Arrakis类似，RSocket使用网卡进行主机内通信，从而导致性能瓶颈。
-
-%In addition, they use two-sided RDMA \texttt{send} and \texttt{recv}, but one-sided RDMA \texttt{write} has higher throughput due to lower CPU cost on receive side (Table~\ref{socksdirect:tab:operation-performance}).
-%However, such simple translations suffer from throughput degradation with a large number of concurrent connections. This is because RDMA 网卡 keeps per-connection states using a $\approx$2~MB~\cite{kalia2018datacenter} on-网卡 memory as cache. With hundreds of concurrent connections, we will suffer from frequent cache misses, resulting in serious throughput degradation~\cite{mprdma,kaminsky2016design}. 
-
-
-%Spinlock in kernel is implemented with Compare-And-Swap (CAS) instruction, which costs $100\sim200$~ns per acquire and release. In comparison, shared memory message passing only needs one cache migration~\cite{roghanchi2017ffwd} (30~ns).
-%In comparison, shared memory message passing
-%Scalability analysis of Linux system calls~\cite{boyd2010analysis,clements2015scalable} suggests that many socket operations are not commutable and thus impossible to scale for all cases. 
-%For example, socket provides \texttt{SO\_REUSEPORT} option. When this option is enabled, multiple processes on one host can \texttt{bind} to the same port and incoming connections are dispatched to the listeners. During connection setup, coordination is required to allocate file descriptors and port numbers, load balance connections and allocate buffers. In addition, a socket may be shared by multiple processes and threads in a same process share socket connections. When a process forks, the parent and child processes also share the sockets created before fork.
-
-
-%For inter-server data transmission, Linux kernel copies data four times: on the send side, from application to kernel socket buffer, then to 网卡 ring buffer; the receive side is similar. For intra-server, data is copied three times: from application to kernel send buffer, then to kernel receive buffer via loopback interface, and finally to another application. Each CPU core can copy $\approx$5~GiB data per second~\cite{panda2016netbricks}, that's why a kernel TCP connection is hard to saturate an 100~Gbps 网卡.
-%Historically, \texttt{send} was designed as a blocking operation, and the send buffer may be overwritten by the application after \texttt{send} function call.
-%In a non-blocking \texttt{send}, the process could overwrite the send buffer after \texttt{send} function call returns. To avoid race condition on the data buffer, network stack needs to copy data to an internal buffer. %before \texttt{send} returns, and then send the copied data in background.
-%For the \texttt{recv} operation, application provides a buffer and read the data after \texttt{recv}.
-%If we implement \texttt{send} as a lazy operation, \textit{i.e.}, the data is buffered on the sender, the receiver needs to wait for a round-trip time on \texttt{recv}.
-%For this reason, most socket implementations send data to the receiver eagerly.
-%Because the receiver's network stack cannot predict the user-provided \texttt{recv} address, it needs to buffer received data internally, then copy to the desired destination when \texttt{recv} is called.
-%Our goal in \sys is to achieve zero copy for large data transfers without making changes to applications. We accomplish this by taking advantage of the page mapping mechanism in virtual memory. 
-
-
-
-
-
-
-
-%\textbf{Virtual file system.}
-%Each socket connection is a \textit{file descriptor} (文件描述符) in Linux. First, each new connection involves expensive \texttt{inode} and \texttt{dentry} creation in the \texttt{proc} file system, which is not scalable and rarely used except for diagnostic and monitoring utilities. Second, socket operations need to pass through the virtual file system (VFS), which introduces CPU overhead and additional latency.
-
-
-
-
-
-%\subsection{High Performance Socket Systems}
-%\label{socksdirect:sec:related}
-
-
-\iffalse
-\begin{table*}[t]
-	\centering
-	\scalebox{0.88}{
-		\begin{tabular}{l|c|ccc|cc|ccc|}
-			\hline
-			Category	& \multicolumn{1}{c|}{Linux Opt.} & \multicolumn{3}{c|}{New Kernel Stack} & \multicolumn{2}{c|}{User-space Packet} & \multicolumn{3}{c|}{User-space Socket} \\
-			\hline
-			System	& FastSocket & IX & MegaPipe & StackMap & Arrakis & FreeFlow & mTCP & libvma & SocksDirect \\
-			\hline
-			\hline
-			Socket-like API & \yes & & \yes & \yes & \yes & & \yes & \yes & \yes \\
-			\hline
-			Linux Compatible & \yes & & & & & & & \yes & \yes \\
-			\hline
-			Process Isolation & \yes & \yes & \yes & \yes & \yes & \yes & \yes & \yes & \yes \\
-			\hline
-			\hline
-			Kernel Bypass & & & & & \yes & \yes & \yes & \yes & \yes \\
-			\hline
-			Cooperative Multitasking & & & & & & & & & \yes \\
-			\hline
-			Zero Copy & & \yes & & \yes & \yes & \yes & & & \yes \\
-			\hline
-			\hline
-			网卡-bypass IPC & \yes & & \yes & \yes & & \yes & \yes & & \yes \\
-			\hline
-			RDMA as Transport & & & & & & \yes & & & \yes \\
-			\hline
-			\hline
-			Scalable Socket Creation & \yes & \yes & \yes & \yes & \yes & \yes & \yes & & \yes \\
-			\hline
-			Lock-free Multi-thread & & & & & & & & & \yes \\
-			\hline
-			Scale to Many Sockets & \yes & \yes & \yes & \yes & & & \yes & & \yes \\
-			\hline
-		\end{tabular}
-	}
-	\caption{Comparison of high performance socket systems.}
-	\label{socksdirect:tab:old-related-work}
-	
-\end{table*}
-\fi
+Please provide the content that needs to be translated.

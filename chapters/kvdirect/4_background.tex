@@ -1,18 +1,18 @@
 %!TEX root=main.tex
-\section{背景}
+\section{Background}
 \label{kvdirect:sec:background}
 
 
 \egg{
-\subsection{The Road to High Performance 键值存储}
+\subsection{The Road to High Performance Key-Value Storage}
 
-Building a high performance 键值存储 is a non-trivial exercise of optimizing various software and hardware components in a computer system. The rich literature on 键值存储 performance optimizations can give us a glimpse of software and hardware evolution in recent years.
-Early works on distributed in-memory 键值存储 such as Memcached~\cite{fitzpatrick2004distributed} uses OS locks for multi-core synchronization and TCP/IP networking stack for communication. Since then, optimizations have been made on multiple fronts to remove bottlenecks in various parts of the system.
+Building a high performance key-value storage is a non-trivial exercise of optimizing various software and hardware components in a computer system. The rich literature on key-value storage performance optimizations can give us a glimpse of software and hardware evolution in recent years.
+Early works on distributed in-memory key-value storage such as Memcached~\cite{fitzpatrick2004distributed} uses OS locks for multi-core synchronization and TCP/IP networking stack for communication. Since then, optimizations have been made on multiple fronts to remove bottlenecks in various parts of the system.
 
 
 \subsubsection{Synchronization cost}
 \label{kvdirect:sec:CoreSynchronizationCost}
-Synchronization is needed in multi-threaded 键值存储 implementation since multiple clients might access the same keys concurrently. For example, when two clients make atomic increments to a single key, the value needs to reflect both increments.
+Synchronization is needed in multi-threaded key-value storage implementation since multiple clients might access the same keys concurrently. For example, when two clients make atomic increments to a single key, the value needs to reflect both increments.
 
 To reduce synchronization cost, Masstree~\cite{mao2012cache}, MemC3~\cite{fan2013memc3} and libcuckoo~\cite{li2014algorithmic} optimize caching, hashing and memory allocation algorithms, and replace permissive kernel locks with optimistic version-based locks.
 MICA~\cite{lim2014mica, li2016full} takes a further step to completely avoid synchronization by partitioning the hash table to each core so that each core serves an exclusive portion of the hash table.
@@ -21,46 +21,39 @@ This approach, however, may introduce core imbalance for long-tail access patter
 \subsubsection{Networking overhead}
 \label{kvdirect:sec:ReduceNetworkingOverhead}
 
-In a 键值存储 where computation to communication ratio is low, a significant portion of CPU cycles is spent in the kernel networking stack, including protocol handling, memory copy, system call and multi-core synchronization~\cite{peter2016arrakis}.
+In a key-value storage where computation to communication ratio is low, a significant portion of CPU cycles is spent in the kernel networking stack, including protocol handling, memory copy, system call and multi-core synchronization~\cite{peter2016arrakis}.
 Furthermore, the kernel network stack adds hundreds of microseconds latency~\cite{ousterhout2015ramcloud}, which greatly impacts response time.
-and complicates latency-hiding programming of applications that require multiple round-trips to the 键值存储.
+and complicates latency-hiding programming of applications that require multiple round-trips to the key-value storage.
 
-Extensive research have been done to reduce network communication cost and improve end-to-end latency.
-One line of work proposes the 键值存储 server software communicate directly with 网卡s by polling while bypassing the kernel~\cite{rizzo2012netmap, intel2014data}; packets are processed by a lightweight network stack in user space~\cite{jeong2014mtcp, marinos2014network}.
-Chronos~\cite{kapoor2012chronos}, RAMCloud~\cite{ousterhout2010case, ousterhout2015ramcloud} and MICA~\cite{lim2014mica,li2016full} leverage this approach to achieve high throughput (\approx5 million 键值 operations per second (op/s) per core) and low latency (microsecond-scale) by reducing networking overhead.
+Extensive research has been conducted to reduce network communication costs and improve end-to-end latency. One line of work proposes that key-value storage server software communicates directly with network cards by polling while bypassing the kernel~\cite{rizzo2012netmap, intel2014data}; packets are processed by a lightweight network stack in user space~\cite{jeong2014mtcp, marinos2014network}. Chronos~\cite{kapoor2012chronos}, RAMCloud~\cite{ousterhout2010case, ousterhout2015ramcloud} and MICA~\cite{lim2014mica,li2016full} leverage this approach to achieve high throughput (approximately 5 million key-value operations per second (op/s) per core) and low latency (microsecond-scale) by reducing networking overhead.
 
-The other line of work leverage two-sided RDMA~\cite{infiniband2000infiniband} as an RPC mechanism between 键值存储 client and server.
-RDMA is a hardware-based transport that almost completely removes the CPU overhead of networking.
-键值存储 systems such as HERD~\cite{kalia2014using, kalia2016design} achieve per-core throughput and end-to-end latency comparable or superior to the first line of work, but the overall throughput per server largely depends on the processing capacity of RDMA 网卡~\cite{kalia2016design}.
+The other line of work leverages two-sided RDMA~\cite{infiniband2000infiniband} as an RPC mechanism between key-value storage client and server. RDMA is a hardware-based transport that almost completely removes the CPU overhead of networking. Key-value storage systems such as HERD~\cite{kalia2014using, kalia2016design} achieve per-core throughput and end-to-end latency comparable or superior to the first line of work, but the overall throughput per server largely depends on the processing capacity of RDMA network cards~\cite{kalia2016design}.
 
 \subsubsection{Throughput bottleneck of CPU}
 \label{kvdirect:sec:CPU-键值-Bottleneck}
-When pushed to the limit, in high performance 键值存储 systems the throughput bottleneck can be attributed to the computation in 键值 operation and the latency in random memory access. 键值存储 needs to spend CPU cycles for key comparison and hash slot computation. Moreover, 键值存储 hash table is orders of magnitude larger than the CPU cache, therefore the memory access latency is dominated by cache miss latency for practical access patterns.
+When pushed to the limit, in high performance key-value storage systems the throughput bottleneck can be attributed to the computation in key-value operation and the latency in random memory access. Key-value storage needs to spend CPU cycles for key comparison and hash slot computation. Moreover, key-value storage hash table is orders of magnitude larger than the CPU cache, therefore the memory access latency is dominated by cache miss latency for practical access patterns.
 
-By our measurement, a 64-byte random read latency for a contemporary computer (Sec.~\ref{kvdirect:sec:evaluation-setup}) is \approx110~ns. A CPU core can issue several memory access instructions concurrently when they fall in the instruction window, limited by the number of load-store units in a core (measured to be 3\approx4 in our CPU)~\cite{gharachorloo1992hiding, han2010packetshader, zhang2015mega}. In our CPU, we measure a max throughput of 29.3M random 64B access per second per core. On the other hand, an operation to access 64-byte 键值 pair typically requires \approx100ns computation or \approx500 instructions, which is too large to fit in the instruction window (measured to be 100\approx200). When interleaved with computation, the performance a CPU core degrades to only 5.5 MOps. An optimization is to batch memory accesses in a 键值 store by clustering the computation for several operations together before issuing the memory access all at once~\cite{li2016full, narula2014phase}. This improves the per-core throughput to 7.9 MOps in our CPU, which is still far less than the throughput of the host DRAM. 
-}
+By our measurement, a 64-byte random read latency for a contemporary computer (Sec.~\ref{kvdirect:sec:evaluation-setup}) is approximately 110~ns. A CPU core can issue several memory access instructions concurrently when they fall in the instruction window, limited by the number of load-store units in a core (measured to be 3 to 4 in our CPU)~\cite{gharachorloo1992hiding, han2010packetshader, zhang2015mega}. In our CPU, we measure a max throughput of 29.3M random 64B access per second per core. On the other hand, an operation to access 64-byte key-value pair typically requires approximately 100ns computation or approximately 500 instructions, which is too large to fit in the instruction window (measured to be 100 to 200). When interleaved with computation, the performance a CPU core degrades to only 5.5 MOps. An optimization is to batch memory accesses in a key-value store by clustering the computation for several operations together before issuing the memory access all at once~\cite{li2016full, narula2014phase}. This improves the per-core throughput to 7.9 MOps in our CPU, which is still far less than the throughput of the host DRAM. 
+
 
 \begin{comment}
-When pushed to the limit, in high performance 键值存储 systems the throughput bottleneck can be attributed to the computation in 键值 operation and the latency in random memory access. This is actually the bottleneck we want to remove in our design and we discuss the issue here in more detail. 
+When pushed to the limit, in high performance key-value storage systems the throughput bottleneck can be attributed to the computation in key-value operation and the latency in random memory access. This is actually the bottleneck we want to remove in our design and we discuss the issue here in more detail. 
 
-键值存储 needs to spend CPU cycles for key comparison and hash slot computation. Moreover, 键值存储 hash table is orders of magnitude larger than the CPU cache, therefore the memory access latency is dominated by cache miss latency for practical access patterns.
-
-
+Key-value storage needs to spend CPU cycles for key comparison and hash slot computation. Moreover, key-value storage hash table is orders of magnitude larger than the CPU cache, therefore the memory access latency is dominated by cache miss latency for practical access patterns.
 
 The latency for CPU to access DRAM on the same NUMA node, \ie cache miss latency, is 80\approx90 nanoseconds on our platform (measured with~\cite{intelmemaccess}, hardware details in sec. \ref{kvdirect:sec:implementation}).
 For 64-byte access granularity, the random read latency including data copy is \approx110~ns.
 This latency can be partially hidden by the out-of-order execution engine in modern CPUs, which can issue a few memory accesses in parallel.
 However, the parallelism is limited by two factors: the number of load-store units (LSUs) per core~\emph{k} (measured to be 3\approx4 on our CPU) and the instruction window size~\emph{W} (measured to be 100\approx200 instructions on our CPU)~\cite{gharachorloo1992hiding, han2010packetshader, zhang2015mega}. When there are enough memory operations in the instruction window, \emph{k} of them can be issued simultaneously. 
 
-
-
 Figure~\ref{kvdirect:fig:cpu-mem} shows random memory access performances of a multicore CPU. It shows that a modern CPU core can provide fairly high random memory access throughput (27M~op/s or 1.7~GB/s for 64B granularity). Moreover, memory throughput scales linearly with number of CPU cores, indicating that the DDR main memory is not a bottleneck.
 
-However, in a 键值 store memory access is interleaved with computation for hash slot calculation and key comparison. An operation to access a 64-byte 键值 pair typically requires \approx100 ns computation or \approx500 instructions, which is far larger than the instruction window size.
+However, in a key-value store memory access is interleaved with computation for hash slot calculation and key comparison. An operation to access a 64-byte key-value pair typically requires \approx100 ns computation or \approx500 instructions, which is far larger than the instruction window size.
 Consequently, when the random memory access instructions for different keys are separated by computation, the second DRAM access is too far to fit in the same instruction window with the first DRAM access and cannot be issued in parallel.
+\end{comment}
 
-One can batch memory accesses in a 键值 store, i.e. clustering the computation for several operations together before issuing the memory access all at once~\cite{li2016full, narula2014phase}.
-Table~\ref{kvdirect:tab:kv-cpu-throughput} depicts the measured per-core hash table throughput under different 键值 sizes and batch sizes, assuming the 键值 is inlined in hash table and each 键值 operation requires one non-cached memory access.
+One can batch memory accesses in a key-value store, i.e., clustering the computation for several operations together before issuing the memory access all at once~\cite{li2016full, narula2014phase}.
+Table~\ref{kvdirect:tab:kv-cpu-throughput} depicts the measured per-core hash table throughput under different key-value sizes and batch sizes, assuming the key-value is inlined in hash table and each key-value operation requires one non-cached memory access.
 The results fit the following formulas within 10\% error:
 \begin{equation}
 %\small
@@ -69,38 +62,38 @@ The results fit the following formulas within 10\% error:
 \begin{equation}
 %\small \frac{1}{键值Throughput} = ComputeTime + \frac{MemLatency}{min(BatchSz, Parallelism)}
 \begin{aligned}
-\frac{1}{键值opThroughput} = & ComputationTime + \\
+\frac{1}{KeyValueOpThroughput} = & ComputationTime + \\
       & \frac{MemLatency}{min(BatchSize, Parallelism)}
 \end{aligned}
 \end{equation}
-This indicates that when interleaved with computation, the performance of CPU degrades significantly. In the extreme case, even if the instruction window size or memory fetch parallelism goes to infinity, the per-core 键值 operation throughput would still be bounded by computation (\approx10M~op/s), 10\approx20x slower than a single DDR channel.
+This indicates that when interleaved with computation, the performance of CPU degrades significantly. In the extreme case, even if the instruction window size or memory fetch parallelism goes to infinity, the per-core key-value operation throughput would still be bounded by computation (\approx10M~op/s), 10\approx20x slower than a single DDR channel.
 \end{comment}
 
 \egg{
-\subsection{Domain-Specific Architectures for 键值存储}
+\subsection{Domain-Specific Architectures for Key-Value Storage}
 
 Ten years ago, processor frequency scaling was over and people turned to multi-core and concurrency~\cite{sutter2005free}.
-Nowadays, CMOS feature-size reduction is getting more and more difficult, which implies that multi-core scaling is also over. People are turning to domain-specific architectures (DSAs)~\cite{esmaeilzadeh2013power} for better performance. Several such DSAs have been used to improve 键值存储 performances. 
+Nowadays, CMOS feature-size reduction is getting more and more difficult, which implies that multi-core scaling is also over. People are turning to domain-specific architectures (DSAs)~\cite{esmaeilzadeh2013power} for better performance. Several such DSAs have been used to improve key-value storage performances. 
 
 \egg{
 For computation, DSAs such as GPU, 
 FPGA~\cite{putnam2014programmable, caulfield2016cloud} and ASIC~\cite{liu2016cambricon, tpu} have been quickly accepted by the market.
-For networking, DSAs are also deployed at scale in datacenters, such as RDMA/RoCE 网卡s~\cite{mellanoxrdma}, programmable 网卡s~\cite{greenberg2015sdn, li2016clicknp} and programmable switches~\cite{bosshart2013forwarding}.
+For networking, DSAs are also deployed at scale in datacenters, such as RDMA/RoCE network cards~\cite{mellanoxrdma}, programmable network cards~\cite{greenberg2015sdn, li2016clicknp} and programmable switches~\cite{bosshart2013forwarding}.
 }
 
 \subsubsection{One-sided RDMA}
 
-Due to high overhead in CPU network processing, DSAs to accelerate networking, such as RDMA/RoCE 网卡s~\cite{mellanoxrdma}, are deployed at scale in datacenters. High performance 键值存储 systems can leverage RDMA capable hardware. One approach is to accelerate RPC with \textit{two-sided} verbs in RDMA/RoCE 网卡s (section \ref{kvdirect:sec:ReduceNetworkingOverhead}, Figure~\ref{kvdirect:fig:memaccess-a}).
-By doing so, the 键值 performance is bounded by CPU (section \ref{kvdirect:sec:CPU-键值-Bottleneck}).
+Due to high overhead in CPU network processing, DSAs to accelerate networking, such as RDMA/RoCE network cards~\cite{mellanoxrdma}, are deployed at scale in datacenters. High performance key-value storage systems can leverage RDMA capable hardware. One approach is to accelerate RPC with \textit{two-sided} verbs in RDMA/RoCE network cards (section \ref{kvdirect:sec:ReduceNetworkingOverhead}, Figure~\ref{kvdirect:fig:memaccess-a}).
+By doing so, the key-value performance is bounded by CPU (section \ref{kvdirect:sec:CPU-key-value-Bottleneck}).
 
-A significantly different approach is to leverage \textit{one-sided} RDMA to access remote memory via the 网卡 on the client and bypass the CPU on the server, as shown in Figure~\ref{kvdirect:fig:memaccess-b}.
-In this approach, 键值 computation and synchronization are handled by the client CPU, therefore making the 键值 server very light-weight and high performance.
-Despite the high message rate (8M\approx150M~op/s~\cite{kalia2016design}) provided by RDMA 网卡s, it is challenging to find an efficient match between RDMA primitives and key-value operations.
+A significantly different approach is to leverage \textit{one-sided} RDMA to access remote memory via the network card on the client and bypass the CPU on the server, as shown in Figure~\ref{kvdirect:fig:memaccess-b}.
+In this approach, key-value computation and synchronization are handled by the client CPU, therefore making the key-value server very light-weight and high performance.
+Despite the high message rate (8M\approx150M~op/s~\cite{kalia2016design}) provided by RDMA network cards, it is challenging to find an efficient match between RDMA primitives and key-value operations.
 For a write (PUT or atomic) operation, multiple network round-trips and memory accesses may be required to handle hash conflicts, memory allocation and fetch/save non-inline data.
 RDMA does not support transactions. Clients must synchronize with each other to ensure consistency by either using RDMA atomics or distributed atomic broadcast~\cite{szepesi2014designing}, both incurring communication overhead and synchronization latency~\cite{mitchell2013using, dragojevic2014farm}.
-As a consequence, most RDMA-based 键值存储, \eg, Pilaf~\cite{mitchell2013using}, FaRM~\cite{dragojevic2014farm} and HERD~\cite{kalia2014using} recommend using one-sided RDMA for GET operations only. For PUT operations, they fall back to two-sided RDMA as RPC and let the remote CPU do the actual work. Throughput of write-intensive workload is still bottlenecked by CPU cores.
+As a consequence, most RDMA-based key-value storage, \eg, Pilaf~\cite{mitchell2013using}, FaRM~\cite{dragojevic2014farm} and HERD~\cite{kalia2014using} recommend using one-sided RDMA for GET operations only. For PUT operations, they fall back to two-sided RDMA as RPC and let the remote CPU do the actual work. Throughput of write-intensive workload is still bottlenecked by CPU cores.
 
-In addition to the mismatch between RDMA primitives and 键值 operations, implementation of commodity RDMA 网卡s also constrain 键值 throughput. For example, RDMA 网卡s hold a lock for atomic operations when a PCIe DMA to the same memory address is in flight, which bounds RDMA atomics throughput to \approx2M~op/s~\cite{kalia2016design}.
+In addition to the mismatch between RDMA primitives and key-value operations, implementation of commodity RDMA network cards also constrain key-value throughput. For example, RDMA network cards hold a lock for atomic operations when a PCIe DMA to the same memory address is in flight, which bounds RDMA atomics throughput to \approx2M~op/s~\cite{kalia2016design}.
 
 \subsubsection{Highly parallel architectures}
 
@@ -115,90 +108,65 @@ Compared to GPGPU, FPGA is more power-efficient and has lower latency.
 
 In recent years, FPGA is becoming cost-effective and is getting deployed at scale in datacenters~\cite{putnam2014programmable, caulfield2016cloud}. Its programmability has been greatly improved~\cite{li2016clicknp}.
 Most existing work store the entire hash table inside the on-board DRAM, which is often quite limiting (typically on the order of 4\approx16~GiB), while the host DRAM is often large (on the order of 100\approx500~GiB).
-KV-Direct follows this line of work, while leveraging host DRAM for 键值 storage, as depicted in Figure~\ref{kvdirect:fig:memaccess-c}.
+KV-Direct follows this line of work, while leveraging host DRAM for key-value storage, as depicted in Figure~\ref{kvdirect:fig:memaccess-c}.
 
-KV-Direct leverages a programmable 网卡 with large-scale deployments in datacenters.
-The programmable 网卡 is composed of two parts: a traditional RDMA 网卡 plus a field-programmable gate array (FPGA).
-There has been research on leveraging the reconfigurability of the 网卡 for network processing, \eg, network virtualization~\cite{greenberg2015sdn, vfp} and network functions~\cite{li2016clicknp}.
-KV-Direct extends the application of programmable 网卡s to a novel area: key-value stores.
-}
+KV-Direct leverages a programmable network card with large-scale deployments in datacenters.
+The programmable network card is composed of two parts: a traditional RDMA network card plus a field-programmable gate array (FPGA).
+There has been research on leveraging the reconfigurability of the network card for network processing, \eg, network virtualization~\cite{greenberg2015sdn, vfp} and network functions~\cite{li2016clicknp}.
+KV-Direct extends the application of programmable network cards to a novel area: key-value stores.
 
-\subsection{键值存储的概念}
+\subsection{Concept of Key-Value Storage}
 \label{kvdirect:sec:kvs}
 
-顾名思义，键值存储（key-value storage）保存了若干键值对（key-value pair）组成的无序集合。其中的键（key）和值（value）都是可变长度的任意字符串。在一个键值存储中，相同的键只能出现一次。键值存储的基本操作是 GET 和 PUT。GET 操作输入一个键，输出该键对应的值。PUT 操作输入一个键值对，将其保存到键值存储中。如果有相同的键，则将原有键值对删除，再保存新的键值对。
-为了高效地支持读写操作，键值存储通常基于哈希表实现。不论是 GET 还是 PUT 操作，都首先计算键的哈希值，并在哈希表中查找之。对于 PUT 操作，可能需要为新的键值对分配内存，并释放同一个键的原有键值对占用的内存。
-在分布式系统中，键值存储通常作为服务，接收来自网络客户端的 GET 和 PUT 操作，并将处理结果通过网络发送回客户端。
+As the name suggests, key-value storage stores an unordered collection of key-value pairs. Both the key and value are variable-length arbitrary strings. In a key-value store, the same key can only appear once. The basic operations of key-value storage are GET and PUT. The GET operation inputs a key and outputs the corresponding value. The PUT operation inputs a key-value pair and saves it to the key-value store. If there is the same key, the original key-value pair is deleted and the new key-value pair is saved.
+To efficiently support read and write operations, key-value storage is usually based on a hash table. Whether it is a GET or PUT operation, it first calculates the hash value of the key and looks it up in the hash table. For the PUT operation, it may need to allocate memory for the new key-value pair and release the memory occupied by the original key-value pair of the same key.
+In distributed systems, key-value storage is often used as a service, receiving GET and PUT operations from network clients, and sending the processing results back to the clients through the network.
 
-\subsection{键值存储的工作负载变化}
+\subsection{Workload Shift in Key-Value Storage}
 \label{kvdirect:sec:workload-shift}
 
+Historically, key-value stores like Memcached \cite{fitzpatrick2004distributed} gained popularity as object caching systems for web services. In the era of in-memory computing, key-value stores have transcended caching to become infrastructure services for storing shared data structures in distributed systems. Many data structures can be represented in key-value hash tables, such as data indices in NoSQL databases \cite{chang2008bigtable}, model parameters in machine learning \cite{li2014scaling}, nodes and edges in graph computing \cite{shao2013trinity,xiao17tux2}, and sequence number generators in distributed synchronization \cite{kalia2016design,eris}. In the future, in-memory key-value stores can also provide high-performance temporary storage for serverless computing \cite{jonas2019cloud}.
 
-从历史上看，诸如 Memcached \cite {fitzpatrick2004distributed} 的键值存储作为Web服务的对象缓存系统获得了普及。
-在内存计算的时代，键值存储超越了缓存，成为在分布式系统中存储共享数据结构的基础架构服务。
-许多数据结构可以在键值哈希表中表示，例如，NoSQL 数据库中的数据索引 \cite {chang2008bigtable}，机器学习中的模型参数 \cite {li2014scaling}，图计算中的节点和边 \cite {shao2013trinity,xiao17tux2} 和分布式同步中的序列号发生器 \cite {kalia2016design,eris}。
-未来，内存键值存储还可为无服务器计算（serverless computing）提供高性能的临时存储 \cite{jonas2019cloud}。
+The shift in workload from object caching to general data structure storage implies several new design goals for key-value stores.
 
-工作负载从对象缓存转移到通用数据结构存储意味着键值存储的几个新的设计目标。
+\textbf{High throughput for small key-values.} In-memory computing often involves large batch access to small key-value pairs, such as sparse parameters in linear regression \cite{li2014algorithmic,xiao17tux2} or all neighbor nodes in graph traversal \cite{shao2013trinity}, so key-value stores can benefit from batch processing and pipelining operations.
 
-\textbf {小键值的高批量吞吐量。}
-内存计算通常以大批量访问小键值对，例如线性回归中的稀疏参数 \cite {li2014algorithmic,xiao17tux2} 或图遍历中的所有邻居节点 \cite {shao2013trinity}，因此键值存储能够受益于批处理和流水线操作。
+\textbf{Predictable low latency.} For many data-parallel computing tasks, the latency of iterations is determined by the slowest operation \cite{ousterhout2015ramcloud}. Therefore, controlling the tail latency of key-value stores is very important. CPU-based designs often need to balance latency and throughput by adjusting batch size \cite{li2016full}. Moreover, due to irregular scheduling by the operating system, unpredictable hardware interrupts, and cache misses, CPU processing time may fluctuate significantly under high load \cite{li2016clicknp}.
 
-\textbf {可预测的低延迟。}
-对于许多数据并行计算任务，迭代的延迟由最慢的操作决定 \cite {ousterhout2015ramcloud}。 因此，控制键值存储的尾延迟非常重要。
-基于 CPU 的设计往往需要通过调整批量大小来解决延迟和吞吐量间的平衡 \cite {li2016full}。%而硬件加速设计可以利用流水线技术提高吞吐量而不会牺牲延迟 \cite {kalia2016design}。
-此外，由于操作系统不规则的调度、难以预测的硬件中断和缓存不命中，CPU 处理时间在高负载下可能会有很大的波动 \cite {li2016clicknp}。
+\textbf{High efficiency under write-intensive workloads.} For caching workloads, the number of reads in key-value stores is usually more than writes \cite{atikoglu2012workload}, but this is no longer the case for distributed computing workloads such as graph computing \cite{page1999pagerank} and parameter servers \cite{li2014scaling}. For PageRank computation in graphs \cite{page1999pagerank} or gradient descent in parameter servers \cite{li2014scaling}, each iteration cycle reads and writes each node or parameter once. Key-value stores need to provide an equal number of GET (read) and PUT (write) operations. Sequencers \cite{kalia2016design} require atomic increment operations rather than read-only operations. These workloads require a hash table structure that can efficiently handle read and write operations simultaneously.
 
-\textbf {写入密集型工作负载下的高效率。}
-对于缓存工作负载，键值存储的读取数量通常比写入更多 \cite {atikoglu2012workload}，但图计算 \cite {page1999pagerank}、参数服务器\cite {li2014scaling} 等分布式计算工作负载不再是这种情况。
-对于图中的 PageRank 计算 \cite {page1999pagerank} 或参数服务器中的梯度下降 \cite {li2014scaling}，每个迭代周期，都要读取和写入每个节点或参数一次。键值存储需要提供相同数量的 GET（读）和 PUT（写）操作。
-序列号发生器（sequencer）\cite {kalia2016design} 需要原子的增量操作而不是只读操作。
-这些工作负载需要可以同时高效处理读写操作的哈希表结构。
+\textbf{Fast atomic operations.} Several very popular applications require atomic operations, such as centralized schedulers \cite{perry2014fastpass}, sequencers \cite{kalia2016design,eris}, counters \cite{zhu2015packet}, and temporary values in web applications \cite{atikoglu2012workload}. This requires high-throughput atomic operations on single keys.
 
-\textbf {快速原子操作。}
-几个非常流行的应用程序需要原子操作，例如集中式调度程序 \cite {perry2014fastpass}，序列号发生器 \cite {kalia2016design,eris}，计数器 \cite {zhu2015packet} 和 Web 应用程序中的临时值 \cite {atikoglu2012workload}。
-这需要单个键上的高吞吐量原子操作。
+\textbf{Vector operations.} Machine learning and graph computing workloads \cite{li2014scaling,shao2013trinity,xiao17tux2} often require operations on each element in a vector, such as adding a scalar to each element in a vector, or reducing a vector to the sum of its elements. Key-value stores without vector support require the client to issue a key-value store operation for each element in the vector, or to retrieve the entire vector as a large key-value pair, bring it back to the client, and perform the operation. If key-value stores support vector data types and operations, it can greatly reduce network communication and CPU computation overhead.
 
-\textbf {向量操作。}
-机器学习和图计算工作负载 \cite {li2014scaling,shao2013trinity,xiao17tux2} 通常需要对向量中的每个元素进行操作，例如，将一个标量加到向量中的每个元素，或将向量归约为其元素的总和。
-没有向量支持的键值存储要求客户端为向量中的每个元素发出一个键值存储操作，或者将整个向量作为一个大键值对，取回客户端并执行操作。
-键值存储如果支持向量数据类型和操作，就可以大大减少网络通信和 CPU 计算开销。
-
-\subsection{现有键值存储系统的性能瓶颈}
+\subsection{Performance Bottlenecks of Existing Key-Value Storage Systems}
 \label{kvdirect:sec:state-of-the-art-kvs}
 
-构建高性能键值存储需要全局优化计算机系统中各种软件和硬件组件。
-按照数据结构在哪里处理，目前最先进的高性能键值存储系统基本上分为三类：
-在键值存储服务器的 CPU 上（图~\ref{kvdirect:fig:memaccess-a}）、在键值存储客户端上（图~\ref{kvdirect:fig:memaccess-b}）或者在硬件加速器上（图~\ref{kvdirect:fig:memaccess-c}）。
-
+Building high-performance key-value stores requires global optimization of various software and hardware components in the computer system. Depending on where the data structure is processed, the state-of-the-art high-performance key-value storage systems can be basically divided into three categories: on the CPU of the key-value storage server (Figure~\ref{kvdirect:fig:memaccess-a}), on the key-value storage client (Figure~\ref{kvdirect:fig:memaccess-b}), or on the hardware accelerator (Figure~\ref{kvdirect:fig:memaccess-c}).
 
 \begin{figure*}[htbp]
 	\centering
-	\subfloat[软件 / 双侧 RDMA。\label{kvdirect:fig:memaccess-a}]
+	\subfloat[Software / Two-sided RDMA.\label{kvdirect:fig:memaccess-a}]
 	{\includegraphics[width=.33\textwidth,page=1]{cropped_access.pdf}}
-	\subfloat[单侧 RDMA。\label{kvdirect:fig:memaccess-b}]
+	\subfloat[One-sided RDMA.\label{kvdirect:fig:memaccess-b}]
 	{\includegraphics[width=.33\textwidth,page=2]{cropped_access.pdf}}
-	\subfloat[\oursys{}。\label{kvdirect:fig:memaccess-c}]
+	\subfloat[\oursys{}.\label{kvdirect:fig:memaccess-c}]
 	{\includegraphics[width=.33\textwidth,page=3]{cropped_access.pdf}}
-	\caption{键值存储数据通路和处理装置的设计空间。 行表示数据路径。 一个键值操作（细线）可能需要多个基于地址的存储器访问（粗线）。 黑框表示键值处理发生的位置。}
+	\caption{Design space of key-value storage data paths and processing devices. Rows represent data paths. A key-value operation (thin line) may require multiple address-based memory accesses (thick line). The black box indicates where key-value processing occurs.}
 	\label{kvdirect:fig:memaccess}
 \end{figure*}
 
-当网络开销被缩减到极限时，高性能键值存储系统的吞吐量瓶颈可归因于键值操作中的计算和随机存储器访问中的延迟。
-基于CPU的键值存储需要花费CPU周期来进行键比较和哈希槽计算。
-此外，键值存储哈希表比CPU高速缓存的容量大几个数量级，因此内存访问延迟主要由实际访问模式下的缓存不命中延迟决定。
+When network overhead is reduced to the limit, the throughput bottleneck of high-performance key-value storage systems can be attributed to the latency in key-value operations and random memory access. CPU-based key-value storage requires CPU cycles for key comparison and hash slot calculation. In addition, the key-value storage hash table is several orders of magnitude larger than the CPU cache, so the memory access latency is mainly determined by the cache miss latency under the actual access pattern.
 
-
-测量表明，当代计算机的 64 字节随机读取延迟大约为 100~ns \footnote{此随机读取延迟假定使用 4~KiB 正常页面大小，把 TLB 不命中和数据缓存行（cache line）不命中的延迟都考虑在内。}。CPU 核心可以同时发出多个内存访问指令，受核心中加载存储单元（load-store unit）数量的限制（如3至4个） \cite {gharachorloo1992hiding,han2010packetshader,zhang2015mega} \footnote{尽管 CPU 微体系结构中每个核心可能有数十个加载存储单元，但 64 字节随机访存会产生多次 TLB 不命中和数据缓存行不命中，因此本文的实际测量中，一个访存延迟内只能完成 3 至 4 个随机访存操作。}。如图 \ref{kvdirect:fig:cpu-mem} 和表 \ref{kvdirect:tab:kv-cpu-throughput} 所示，在本文实验使用的CPU中，每个核心每秒最大吞吐量为29.3~M随机64B访问。另一方面，访问64字节键值对的操作通常需要大约100~ns计算或大约500条指令，这是无法放进指令窗口的 \footnote{指令窗口是 CPU 乱序执行引擎可以重排的最大指令数量。如果一个访存指令之后有超过指令窗口数量的计算指令，而访存延迟大于执行指令窗口数量的计算指令的时间，那么由于指令窗口的限制，流水线在执行指令窗口数量的计算指令后就需要暂停（stall），等待访存结果返回，才能继续执行后续的计算指令。在我们使用的 CPU 上，指令窗口的大小的测量值约为 100 至 200。}。当随机访存与计算交错时，由于指令窗口不足以覆盖访存延迟，CPU内核的性能降低到每秒5.5~M 键值操作（Mops）。一种优化方法是在一次发出内存访问之前，将多个键值存储操作的计算汇聚在一起，批量进行内存访问 \cite {li2016full,narula2014phase}。此优化可以将本文使用的CPU的每核心键值操作吞吐量提高到7.9~MOps，这仍远低于主机DRAM的随机64B吞吐量。
-
+Measurements show that the 64-byte random read latency of modern computers is about 100~ns \footnote{This random read latency assumes a normal page size of 4~KiB, taking into account the latency of TLB misses and data cache line misses.}. The CPU core can issue multiple memory access instructions at the same time, limited by the number of load-store units in the core (such as 3 to 4) \cite {gharachorloo1992hiding,han2010packetshader,zhang2015mega} \footnote{Although there may be dozens of load-store units in each core of the CPU microarchitecture, 64-byte random memory access will cause multiple TLB misses and data cache line misses, so in the actual measurements of this paper, only 3 to 4 random memory access operations can be completed within one memory access latency.}. As shown in Figure \ref{kvdirect:fig:cpu-mem} and Table \ref{kvdirect:tab:kv-cpu-throughput}, in the CPU used in this paper's experiment, each core has a maximum throughput of 29.3~M random 64B accesses per second. On the other hand, the operation of accessing a 64-byte key-value pair usually requires about 100~ns of computation or about 500 instructions, which cannot fit into the instruction window \footnote{The instruction window is the maximum number of instructions that the CPU out-of-order execution engine can rearrange. If there are more than the number of instructions in the instruction window after a memory access instruction, and the memory access latency is greater than the time to execute the number of instructions in the instruction window, then due to the limitation of the instruction window, the pipeline needs to pause (stall) after executing the number of instructions in the instruction window, waiting for the memory access result to return, before it can continue to execute subsequent computation instructions. On the CPU we used, the measured size of the instruction window is about 100 to 200.}. When random memory access and computation are interleaved, due to the instruction window not being able to cover the memory access latency, the performance of the CPU core is reduced to 5.5~M key-value operations (Mops) per second. One optimization method is to aggregate the computation of multiple key-value storage operations before issuing a memory access, and perform memory access in batches \cite {li2016full,narula2014phase}. This optimization can increase the per-core key-value operation throughput of the CPU used in this paper to 7.9~MOps, which is still far lower than the random 64B throughput of the host DRAM.
 
 \begin{figure}[htbp]
 	\centering
-	\subfloat[单核。\label{kvdirect:fig:cpu-mem-single}]
+	\subfloat[Single core.\label{kvdirect:fig:cpu-mem-single}]
 	{\includegraphics[width=.5\textwidth,page=1]{cpu_random_mem_single_core.pdf}}
-	\subfloat[多核。\label{kvdirect:fig:cpu-mem-multi}]
+	\subfloat[Multi-core.\label{kvdirect:fig:cpu-mem-multi}]
 	{\includegraphics[width=.5\textwidth,page=1]{cpu_random_mem_multi_core.pdf}}
-	\caption{CPU 随机内存访问性能。}
+	\caption{CPU random memory access performance.}
 	\label{kvdirect:fig:cpu-mem}
 \end{figure}
 
@@ -206,10 +174,10 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 \begin{table}[htbp]
 	\small
 	\centering
-	\caption{不同工作负载和内存访问粒度下的吞吐量（百万次操作每秒）。}
+	\caption{Throughput (millions of operations per second) under different workloads and memory access granularities.}
 	\begin{tabular}{|c|c|c|c|c|c|c|}
 		\hline
-		\multirow{2}{*}{大小（字节）} & \multirow{2}{*}{仅计算} & \multirow{2}{*}{仅访存} & \multicolumn{4}{c|}{同时计算和访存（批处理大小）} \\\cline{4-7} 
+		\multirow{2}{*}{Size (bytes)} & \multirow{2}{*}{Computation only} & \multirow{2}{*}{Memory access only} & \multicolumn{4}{c|}{Computation and memory access (batch size)} \\\cline{4-7} 
 		&  & & 1 & 2 & 3 & 4 \\\hline
 		32 & 24.1 & 44.0 & 7.5 & 11.1 & 13.1 & 14.1 \\\hline
 		64 & 11.1 & 29.3 & 5.5 & 6.7 & 7.6 & 7.9 \\\hline
@@ -221,21 +189,15 @@ KV-Direct extends the application of programmable 网卡s to a novel area: key-v
 \end{table}
 
 
-观察到键值处理中CPU的有限容量，最近的工作利用单边（one-sided） RDMA 将键值处理卸载到客户端。
-单边 RDMA 提供了远程访问共享内存的抽象。服务器端应用程序向本地 RDMA 网卡注册一块内存用于共享内存。客户端应用程序需要读写这块共享内存时，就向本地 RDMA 网卡发送 RDMA 读或写工作请求（work request）。客户端 RDMA 网卡会将工作请求转换成网络数据包发送给服务器端 RDMA 网卡。服务器端 RDMA 网卡将收到的数据包转换成 PCIe DMA 请求，访问共享内存，并将结果返回到客户端 RDMA 网卡。客户端 RDMA 网卡将读到的数据通过 PCIe DMA 发送到应用程序的内存缓冲区，再通过工作完成（work completion）通知应用程序。在这个过程中，服务器端的 RDMA 网卡处理读写请求，完全绕过服务器端的 CPU \footnote{在现代数据中心服务器体系结构中，这个说法是不严谨的，因为 PCIe 根（root complex）和内存控制器都在主机 CPU 内部，网卡通过 PCIe DMA 访问主机内存必须经过 CPU。本文的 ``绕过 CPU'' 遵从系统学术界的惯用说法，是逻辑上的含义，即绕过 CPU 核上软件的处理。本文的系统结构图中，CPU 也指代软件处理。下文还将多次出现 ``绕过 CPU'' 的说法，均取此义。}。
+Observing the limited capacity of the CPU in key-value processing, recent work has used one-sided RDMA to offload key-value processing to the client. One-sided RDMA provides an abstraction of remote access to shared memory. The server-side application registers a block of memory with the local RDMA network card for shared memory. When the client application needs to read and write this shared memory, it sends an RDMA read or write work request to the local RDMA network card. The client RDMA network card converts the work request into a network packet and sends it to the server RDMA network card. The server RDMA network card converts the received packet into a PCIe DMA request, accesses the shared memory, and returns the result to the client RDMA network card. The client RDMA network card sends the read data to the application's memory buffer through PCIe DMA, and then notifies the application through work completion. In this process, the server-side RDMA network card handles read and write requests, completely bypassing the server-side CPU \footnote{In the modern data center server architecture, this statement is not rigorous, because the PCIe root complex and memory controller are both inside the host CPU, and the network card accesses the host memory through PCIe DMA must go through the CPU. This paper's "bypassing the CPU" follows the customary usage in the system academic community, which is a logical meaning, that is, bypassing the software processing on the CPU core. In the system architecture diagram of this paper, the CPU also refers to software processing. The term "bypassing the CPU" will appear many times in the following text, all with this meaning.}.
 
-尽管 RDMA 网卡提供了高消息吞吐量（8 至 150~Mops \cite {kalia2016design}），但要找到 RDMA 原语和键值操作之间的高效匹配是一项挑战。
-对于写入（PUT或原子）操作，可能需要多个网络往返和多次内存访问来查询哈希索引，处理哈希冲突并分配可变大小的存储器。
-RDMA不支持事务。为了保持数据结构的一致性，客户端必须相互同步，使用RDMA原子操作或分布式原子广播（distributed atomic broadcast） \cite{szepesi2014designing}。这两种方案都会产生通信开销和同步延迟 \cite {mitchell2013using,dragojevic2014farm}。
-因此，大多数基于RDMA的键值存储 \cite {mitchell2013using,dragojevic2014farm,kalia2014using} 建议仅使用单边 RDMA 进行 GET（只读）操作。对于写入（PUT 或原子）操作，它们会回退到使用服务器 CPU 处理。因此，写入密集型工作负载的吞吐量仍然受限于服务器 CPU 的瓶颈。
+Although RDMA network cards provide high message throughput (8 to 150~Mops \cite {kalia2016design}), finding an efficient match between RDMA primitives and key-value operations is a challenge. For write (PUT or atomic) operations, multiple network round trips and multiple memory accesses may be required to query the hash index, handle hash conflicts, and allocate variable-sized memory. RDMA does not support transactions. To maintain the consistency of data structures, clients must synchronize with each other, using RDMA atomic operations or distributed atomic broadcasts \cite{szepesi2014designing}. Both of these schemes generate communication overhead and synchronization latency \cite {mitchell2013using,dragojevic2014farm}. Therefore, most RDMA-based key-value stores \cite {mitchell2013using,dragojevic2014farm,kalia2014using} suggest using one-sided RDMA only for GET (read-only) operations. For write (PUT or atomic) operations, they fall back to using the server CPU for processing. Therefore, the throughput of write-intensive workloads is still limited by the bottleneck of the server CPU.
 
 \iffalse
-\subsection{FPGA 可编程网卡}
+\subsection{FPGA Programmable Network Card}
 \label{kvdirect:sec:programmable-nic}
 
-十年前，处理器频率扩展速度放慢，人们转向多核和并发\cite {sutter2005free}。
-如今，功率上限意味着多核扩展也遇到了困难\cite {esmaeilzadeh2013power}。
-人们现在转向领域定制架构（DSA）以获得更好的性能。
+A decade ago, as the speed of processor frequency expansion slowed, people turned to multi-core and concurrency \cite {sutter2005free}. Today, power limits mean that multi-core expansion has also encountered difficulties \cite {esmaeilzadeh2013power}. People are now turning to domain-specific architectures (DSA) for better performance.
 
 %On the spectrum of hardware programmability and performance, general-purpose processors lie on the programmability end, while application-specific integrated circuits (ASICs) lie on the performance end.
 %Field-programmable gate array (FPGA) is an architecture between the two extremes, providing both programmability and performance~\cite{bacon2013fpga}.
@@ -243,68 +205,43 @@ RDMA不支持事务。为了保持数据结构的一致性，客户端必须相�
 %Millions of reconfigurable gates and thousands of small block RAMs (BRAMs) provide massive parallelism to build thousands of ``cores'' running simultaneously, and more importantly, customized interconnections among the ``cores'' and BRAMs specializing communication and synchronization for a certain application.
 %Consequently, for applications with sufficient bit-level and task-level parallelism, FPGAs provide not only high throughput and power efficiency, but also low and predictable latency.
 
-由于网络速度和CPU网络处理能力的不匹配日益增加，带有FPGA的可编程网卡 \cite {vfp,greenberg2015sdn,li2016clicknp,caulfield2016cloud} 现在可以在数据中心进行大规模部署。
-本文使用的可编程网卡的核心是FPGA，带有嵌入式网卡芯片以连接到网络。
-可编程网卡通常带有板载DRAM作为数据包缓冲区和用于网卡固件的运行时内存\cite {li2016clicknp}，但DRAM通常不足以容纳整个键值存储。
+Due to the increasing mismatch between network speed and CPU network processing capabilities, programmable network cards with FPGA \cite {vfp,greenberg2015sdn,li2016clicknp,caulfield2016cloud} can now be deployed on a large scale in data centers. The core of the programmable network card used in this paper is FPGA, with an embedded network card chip to connect to the network. Programmable network cards usually come with onboard DRAM as a packet buffer and runtime memory for network card firmware \cite {li2016clicknp}, but DRAM is usually not enough to accommodate the entire key-value store.
 \fi
 
-\subsection{远程直接键值访问面临的挑战}
+\subsection{Challenges Faced by Remote Direct Key-Value Access}
 \label{kvdirect:sec:challenge}
 
-KV-Direct将键值处理从CPU移动到服务器中的可编程网卡（图  \ref {kvdirect:fig:memaccess-c}）。
-与RDMA相同，KV-Direct 网卡通过PCIe访问主机内存。 PCIe是一种分组交换网络，具有大约500 ns的往返延迟和每Gen3 x8端点7.87~GB/s的理论带宽。
-在延迟方面，由于本文使用的 FPGA 硬核中有大约 300~ns 的额外处理延迟，可编程网卡通过 PCIe DMA 读取已被 CPU 缓存的主机内存，延迟为800~ns。
-随机DMA读取未被缓存的主机内存时，由于DRAM访问、DRAM刷新和PCIe DMA引擎中的PCIe响应重新排序，存在额外的250~ns平均延迟（图 \ref {kvdirect:fig:dma-lat}）。
-在吞吐量方面，每个DMA读或写操作都需要一个带有26字节头的PCIe传输层数据包（TLP）和用于64位寻址的填充（padding）。
-对于以64字节粒度访问主机内存的PCIe Gen3 x8 网卡，理论吞吐量因此为5.6~GB/s或87~Mops。
+KV-Direct moves key-value processing from the CPU to the programmable network card in the server (Figure \ref {kvdirect:fig:memaccess-c}). Like RDMA, the KV-Direct network card accesses host memory via PCIe. PCIe is a packet-switched network with a round-trip latency of about 500 ns and a theoretical bandwidth of 7.87~GB/s per Gen3 x8 endpoint. In terms of latency, because the FPGA hard core used in this paper has an additional processing delay of about 300~ns, the programmable network card reads host memory that has been cached by the CPU via PCIe DMA, with a latency of 800~ns. When randomly DMA reading uncached host memory, there is an additional average delay of 250~ns due to DRAM access, DRAM refresh, and PCIe response reordering in the PCIe DMA engine (Figure \ref {kvdirect:fig:dma-lat}). In terms of throughput, each DMA read or write operation requires a PCIe transport layer packet (TLP) with a 26-byte header and padding for 64-bit addressing. For a PCIe Gen3 x8 network card that accesses host memory at a granularity of 64 bytes, the theoretical throughput is therefore 5.6~GB/s or 87~Mops.
 
 \begin{figure}[t]
 	\centering
-	\subfloat[DMA 吞吐量。\label{kvdirect:fig:dma-tput}]
+	\subfloat[DMA throughput.\label{kvdirect:fig:dma-tput}]
 	{\includegraphics[width=.5\textwidth,page=1]{pcie_bw.pdf}}
-	\subfloat[DMA 读延迟。\label{kvdirect:fig:dma-lat}]
+	\subfloat[DMA read latency.\label{kvdirect:fig:dma-lat}]
 	{\includegraphics[width=.5\textwidth,page=1]{pcie_latency.pdf}}
-	\caption{PCIe 随机 DMA 性能。}
+	\caption{Random PCIe DMA performance.}
 	\label{kvdirect:fig:dma-perf}
 \end{figure}
 
-为了使用 64 字节 DMA 请求使 PCIe Gen3 x8 接口的吞吐量饱和，考虑到 1050~ns 的延迟，需要 92 个并发 DMA 请求。
-然而，有两个实际因素进一步限制了DMA请求的并发性。
-首先，基于PCIe信用（credit）的流控（flow control） \footnote{在基于信用的流控中，接收端根据其接收缓冲区的容量，通告一定数量的信用。发送端每发送一定量的数据，就扣除相应的信用。信用不足时不能发送。这保证了接收端的缓冲区不会溢出。} 限制了每种DMA类型正在处理请求的数量。
-服务器中的PCIe root complex（根节点）为 DMA 无响应（posted） \footnote{PCIe DMA 操作分为有响应（non-posted）和无响应（posted）两种。有响应操作意味着双向通信，需要接收端返回数据，例如读操作。无响应操作意味着单向通信，例如写操作，接收端写入完成后不再通知发送端。PCIe 流控机制中的有响应和无响应操作是由独立的信用分别控制的。} 操作通告了 88 个 PCIe 传输层数据包（TLP）的信用 \footnote{PCIe 基于信用的流控分为基于数据包和基于有效载荷的两种，数据包的个数和有效载荷的字节数都满足流控要求时才能发送。本文的键值操作访问内存的粒度较小，因此有效载荷字节数不是瓶颈，只需考虑数据包的个数。}，为 DMA 有响应（non-posted）操作通告了 84 个 TLP 的信用。这意味着并发写操作不能超过 88 个，并发读操作不能超过 84 个。
-其次，DMA 读操作需要分配唯一的 PCIe 标签来识别和重排 DMA 响应 \footnote{由于 PCIe 网络的传播延迟和 PCIe 终端的处理延迟是可变的，不能保证先发送的操作一定先返回响应。为了配对 DMA 请求和响应，PCIe 终端发送读操作时携带标签，接收端返回的数据也携带相应的标签。显然，并发的读操作必须具有唯一的标签。}。
-尽管 PCIe 协议和很多内存控制器支持 256 个 PCIe 标签，本文使用的 FPGA 中的 DMA 引擎仅支持 64 个 PCIe 标签，进一步将 DMA 读操作的并发请求数限制为 64 个。这使得 PCIe DMA 读操作的吞吐量仅能达到 60~Mops（百万次操作每秒），如图 \ref {kvdirect:fig:dma-tput} 所示。
-另一方面，对于 40~Gbps 网络和 64 字节键值对，如果客户端批量发送这些键值对，网络吞吐量的上限为 78~Mops。
-本文希望用 GET（读）操作使网络吞吐量饱和。
-因此，网卡上的键值存储必须充分利用 PCIe 带宽，即每个 GET 操作的平均内存访问次数需要接近 1。
-这归结为三个挑战：
+To saturate the throughput of the PCIe Gen3 x8 interface using 64-byte DMA requests, considering a latency of 1050~ns, 92 concurrent DMA requests are needed. However, two practical factors further limit the concurrency of DMA requests. First, the number of requests being processed for each type of DMA is limited by PCIe credit-based flow control. The PCIe root complex in the server announces 88 PCIe transport layer packet (TLP) credits for DMA posted operations and 84 TLP credits for DMA non-posted operations. This means that the number of concurrent write operations cannot exceed 88, and the number of concurrent read operations cannot exceed 84. Second, DMA read operations require the allocation of unique PCIe tags to identify and reorder DMA responses. Although the PCIe protocol and many memory controllers support 256 PCIe tags, the DMA engine in the FPGA used in this paper only supports 64 PCIe tags, further limiting the number of concurrent DMA read requests to 64. This results in a PCIe DMA read throughput of only 60~Mops (million operations per second), as shown in Figure \ref{kvdirect:fig:dma-tput}. On the other hand, for a 40~Gbps network and 64-byte key-value pairs, if the client sends these key-value pairs in batches, the upper limit of network throughput is 78~Mops. This paper aims to saturate network throughput with GET (read) operations. Therefore, the key-value store on the network card must fully utilize the PCIe bandwidth, i.e., the average number of memory accesses per GET operation needs to be close to 1. This boils down to three challenges:
 
-\textbf {最小化每键值操作的DMA请求。}
-哈希表和内存分配器是键值存储中需要随机内存访问的两个主要组件。
-以前的工作建议使用布谷鸟（Cuckoo）哈希 \cite {dragojevic2014farm,breslow2016horton}，即使在高负载因子 \footnote{负载因子（load factor）指哈希表中已经存储数据的哈希槽在所有哈希槽中的比例。} 下，每个 GET 操作的内存访问次数也接近 1。
-但是，布谷鸟哈希是为读操作优化的。
-在高于50％的负载因子下，布谷鸟哈希的每个 PUT 操作平均需要多次存储器访问，且方差很大。
-这不仅会消耗PCIe吞吐量，还会导致写入密集型工作负载的延迟不稳定。
+\textbf{Minimize the number of DMA requests per key-value operation.} The hash table and memory allocator are the two main components in the key-value store that require random memory access. Previous work suggests using Cuckoo hash, which keeps the number of memory accesses per GET operation close to 1 even under high load factors. However, Cuckoo hash is optimized for read operations. At load factors above 50%, each PUT operation in Cuckoo hash requires multiple memory accesses on average, with high variance. This not only consumes PCIe throughput but also leads to unstable latency for write-intensive workloads.
 
-除了哈希表查找之外，还需要动态内存分配来存储无法在哈希表中内联 \footnote{内联（inline）是指键值对很小，可以直接放在哈希表内固定大小的槽位中，而无需分配动态内存专门存储。} 的可变长度键值。
-为了在写入密集型小键值工作负载下匹配 PCIe 和网络吞吐量（即将两者的吞吐量同时几乎全部利用），需要使哈希表查找和内存分配的内存访问次数尽可能少。
+In addition to hash table lookups, dynamic memory allocation is needed to store variable-length key-values that cannot be inlined in the hash table. To match PCIe and network throughput under write-intensive small key-value workloads (i.e., to nearly fully utilize both), the number of memory accesses for hash table lookups and memory allocation should be minimized.
 
-\textbf {隐藏 PCIe 延迟，同时保持一致性。}
-一致性（consistency）是分布式事务中的术语，表示并发执行的事务之间逻辑上相互隔离的性质。
-可编程网卡内的不同硬件模块并行处理，组成一个分布式系统。由于一个键值操作需要多次内存读写访问，多个键值操作并发处理时，每个键值操作可被视为一个分布式事务。
-本文实现了严格可线性化（strict serializability），即多个键值操作并发执行的结果与它们按照网络输入顺序一个接一个执行的结果相同。严格可线性化是分布式事务最强的一致性标准。
+\textbf{Hide PCIe latency while maintaining consistency.} Consistency is a term in distributed transactions that refers to the property of logical isolation between concurrently executing transactions. Different hardware modules inside a programmable network card process in parallel, forming a distributed system. Since a key-value operation requires multiple memory read-write accesses, when multiple key-value operations are processed concurrently, each key-value operation can be considered a distributed transaction. This paper implements strict serializability, i.e., the result of concurrently executing multiple key-value operations is the same as if they were executed one after another in the order of network input. Strict serializability is the strongest consistency standard for distributed transactions.
 
-在本文的 FPGA 平台上，一个 PCIe DMA 操作的延迟大约是 1 $\mu$s。可编程网卡处理键值请求时，如果在等待 DMA 读操作返回的过程中不做任何其他事情，那么键值请求的吞吐量将只有约 1 Mops，这显然不能接受。
-因此，可编程网卡上的高性能键值存储必须并发执行键值操作和 DMA 请求，以隐藏 PCIe 延迟。
-但是，键值操作可能具有依赖性，不是所有的键值操作都能并发执行。
-例如，在同一个键上的 PUT 操作之后的 GET 操作需要返回更新后的值。
-再如，两个相邻的原子增加操作需要在执行第二个之前等待第一个完成。
-这需要跟踪正在处理的键值操作，并在发生数据冒险（data hazard）时暂停流水线，或者更好地设计乱序执行器以解决数据依赖性而无需显式暂停流水线。
+In the FPGA platform of this article, the latency of a PCIe DMA operation is about 1 $\mu$s. When the programmable network card processes key-value requests, if it does nothing else while waiting for the DMA read operation to return, then the throughput of the key-value request will only be about 1 Mops, which is obviously unacceptable.
+Therefore, high-performance key-value storage on programmable network cards must concurrently execute key-value operations and DMA requests to hide PCIe latency.
+However, key-value operations may have dependencies, and not all key-value operations can be executed concurrently.
+For example, a GET operation after a PUT operation on the same key needs to return the updated value.
+Again, two adjacent atomic increment operations need to wait for the first one to complete before executing the second one.
+This requires tracking the key-value operations being processed, and pausing the pipeline in the event of a data hazard, or better designing an out-of-order executor to solve data dependencies without explicitly pausing the pipeline.
 
 
-\textbf {在网卡 DRAM 和主机内存之间分配负载。}
-一个显而易见的想法是使用网卡上的DRAM作为主机内存的缓存，但在网卡中，DRAM 吞吐量（12.8~GB/s）与两个 PCIe Gen3 x8 接口的可实现吞吐量（13.2~GB/s）相当。 
-本文期望在DRAM和主机存储器之间分配存储器访问以便利用它们的两个带宽。
-然而，与主机存储器（64~GiB）相比，板载DRAM很小（4~GiB），因此需要混合缓存和负载调度方法。
+\textbf {Allocate load between network card DRAM and host memory.}
+An obvious idea is to use the DRAM on the network card as a cache for host memory, but on the network card, the DRAM throughput (12.8~GB/s) is comparable to the achievable throughput of two PCIe Gen3 x8 interfaces (13.2~GB/s).
+This article expects to allocate memory access between DRAM and host memory to take advantage of their two bandwidths.
+However, compared with host memory (64~GiB), the on-board DRAM is small (4~GiB), so a mixed cache and load scheduling method is needed.
 
-下文将介绍 KV-Direct，一种基于FPGA的新型键值存储系统，满足了上述所有设计目标。
+The following will introduce KV-Direct, a new FPGA-based key-value storage system that meets all the above design goals.
